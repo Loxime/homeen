@@ -1,0 +1,30 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Backend / Symfony
+/backend/vendor/
+/backend/var/
+/backend/.phpunit.result.cache
+/backend/.php-cs-fixer.cache
+
+# Frontend / Vite
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.vite/
+/frontend/coverage/
+
+# Runtime / local data
+*.log
+/tmp/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local Docker overrides
+compose.override.yaml
+docker-compose.override.yml
