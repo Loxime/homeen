@@ -1,0 +1,71 @@
+{
+  "name": "loxime/homeen-backend",
+  "description": "Homeen private productivity API",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": ">=8.4",
+    "ext-ctype": "*",
+    "ext-iconv": "*",
+    "ext-json": "*",
+    "ext-mbstring": "*",
+    "ext-pdo": "*",
+    "doctrine/dbal": "^4.4",
+    "doctrine/doctrine-bundle": "^3.3",
+    "doctrine/doctrine-migrations-bundle": "^4.0",
+    "symfony/console": "8.1.*",
+    "symfony/dotenv": "8.1.*",
+    "symfony/flex": "^2.6",
+    "symfony/framework-bundle": "8.1.*",
+    "symfony/rate-limiter": "8.1.*",
+    "symfony/runtime": "8.1.*",
+    "symfony/yaml": "8.1.*"
+  },
+  "require-dev": {
+    "phpstan/phpstan": "^2.2",
+    "phpunit/phpunit": "^13.3",
+    "symfony/browser-kit": "8.1.*",
+    "symfony/css-selector": "8.1.*"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "App\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "analyse": "phpstan analyse -c phpstan.neon --memory-limit=512M",
+    "quality": [
+      "@test",
+      "@analyse"
+    ],
+    "auto-scripts": {
+      "cache:clear": "symfony-cmd",
+      "assets:install %PUBLIC_DIR%": "symfony-cmd"
+    },
+    "post-install-cmd": [
+      "@auto-scripts"
+    ],
+    "post-update-cmd": [
+      "@auto-scripts"
+    ]
+  },
+  "config": {
+    "allow-plugins": {
+      "symfony/flex": true,
+      "symfony/runtime": true
+    },
+    "sort-packages": true
+  },
+  "extra": {
+    "symfony": {
+      "allow-contrib": false,
+      "require": "8.1.*"
+    }
+  }
+}

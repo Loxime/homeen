@@ -1,0 +1,18 @@
+framework:
+    secret: '%env(APP_SECRET)%'
+    handle_all_throwables: true
+    http_method_override: false
+    session:
+        enabled: true
+        name: HOMEEN_SESSION
+        cookie_httponly: true
+        cookie_samesite: strict
+        cookie_secure: auto
+        storage_factory_id: session.storage.factory.native
+    rate_limiter:
+        access_login:
+            policy: fixed_window
+            limit: 5
+            interval: '1 minute'
+    router:
+        utf8: true

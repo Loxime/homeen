@@ -1,0 +1,14 @@
+parameters:
+    app.timezone: '%env(APP_TIMEZONE)%'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/Kernel.php'
+
+    Symfony\Component\RateLimiter\RateLimiterFactory $accessLoginLimiter: '@limiter.access_login'
