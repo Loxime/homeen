@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import BaseModal from '../components/BaseModal.vue'
+import AppIcon from '../components/AppIcon.vue'
 import NoteEditor from '../components/NoteEditor.vue'
 import { api } from '../services/api'
 import { formatDate } from '../services/format'
@@ -81,7 +82,7 @@ onMounted(() => void load())
 </script>
 
 <template>
-  <section class="page">
+  <section class="page notes-page">
     <header class="page-header">
       <div>
         <p class="eyebrow">WORKSPACE</p>
@@ -89,15 +90,51 @@ onMounted(() => void load())
         <p v-if="query" class="muted">Search results for “{{ query }}”</p>
       </div>
       <div class="page-actions">
-        <div v-if="scope !== 'trash'" class="segmented" aria-label="Note display">
-          <button :class="{ active: display === 'grid' }" @click="display = 'grid'">Grid</button>
-          <button :class="{ active: display === 'list' }" @click="display = 'list'">List</button>
-          <button :class="{ active: display === 'whiteboard' }" @click="display = 'whiteboard'">Whiteboard</button>
+        <div
+          v-if="scope !== 'trash'"
+          class="segmented keep-view-switcher"
+          aria-label="Note display"
+        >
+          <button
+            :class="{ active: display === 'grid' }"
+            title="Grid"
+            @click="display = 'grid'"
+          >
+            <AppIcon name="grid" :size="19" />
+          </button>
+
+          <button
+            :class="{ active: display === 'list' }"
+            title="List"
+            @click="display = 'list'"
+          >
+            <AppIcon name="list" :size="19" />
+          </button>
+
+          <button
+            :class="{ active: display === 'whiteboard' }"
+            title="Whiteboard"
+            @click="display = 'whiteboard'"
+          >
+            <AppIcon name="whiteboard" :size="19" />
+          </button>
         </div>
-        <button v-if="scope === 'active'" class="primary" @click="newNote">+ New note</button>
       </div>
     </header>
+    <button
+      v-if="scope === 'active'"
+      class="keep-note-composer"
+      @click="newNote"
+    >
+      <AppIcon name="note" :size="21" />
 
+      <span>Take a note…</span>
+
+      <span class="keep-composer-actions">
+        <AppIcon name="check" :size="19" />
+        <AppIcon name="plus" :size="19" />
+      </span>
+    </button>
     <p v-if="error" class="form-error">{{ error }}</p>
     <div v-if="loading" class="empty-state">Loading notes…</div>
     <div v-else-if="notes.length === 0" class="empty-state">
@@ -140,6 +177,7 @@ onMounted(() => void load())
 
     <BaseModal :open="modalOpen" :title="selected ? (selected.title || 'Untitled note') : 'New note'" @close="modalOpen = false">
       <NoteEditor
+        :key="selected?.id ?? 'new-note'"
         :note="selected"
         :labels="labels"
         @saved="(note) => { selected = note; void load() }"

@@ -22,19 +22,88 @@ function enableAudio(): void {
   if (audioContext.state === 'suspended') void audioContext.resume()
 }
 
-function beep(phase: 'work' | 'break'): void {
-  if (!audioContext || audioContext.state !== 'running') return
-  const oscillator = audioContext.createOscillator()
-  const gain = audioContext.createGain()
+type PomodoroSound =
+  | 'start'
+  | 'work'
+  | 'break'
+
+function playTone(
+  context: AudioContext,
+  frequency: number,
+  startAt: number,
+  duration: number,
+): void {
+  const oscillator =
+    context.createOscillator()
+
+  const gain =
+    context.createGain()
+
   oscillator.type = 'sine'
-  oscillator.frequency.value = phase === 'work' ? 740 : 520
-  gain.gain.setValueAtTime(0.0001, audioContext.currentTime)
-  gain.gain.exponentialRampToValueAtTime(0.15, audioContext.currentTime + 0.01)
-  gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.22)
+
+  oscillator.frequency.setValueAtTime(
+    frequency,
+    startAt,
+  )
+
+  gain.gain.setValueAtTime(
+    0.0001,
+    startAt,
+  )
+
+  gain.gain.exponentialRampToValueAtTime(
+    0.12,
+    startAt + 0.015,
+  )
+
+  gain.gain.exponentialRampToValueAtTime(
+    0.0001,
+    startAt + duration,
+  )
+
   oscillator.connect(gain)
-  gain.connect(audioContext.destination)
-  oscillator.start()
-  oscillator.stop(audioContext.currentTime + 0.24)
+  gain.connect(context.destination)
+
+  oscillator.start(startAt)
+
+  oscillator.stop(
+    startAt + duration + 0.02,
+  )
+}
+
+function playPomodoroSound(
+  sound: PomodoroSound,
+): void {
+  enableAudio()
+
+  const context = audioContext
+
+  if (!context) {
+    return
+  }
+
+  void context.resume().then(() => {
+    const start =
+      context.currentTime + 0.02
+
+    const frequencies =
+      sound === 'start'
+        ? [523.25, 659.25]
+        : sound === 'break'
+          ? [783.99, 659.25]
+          : [659.25, 783.99]
+
+    frequencies.forEach(
+      (frequency, index) => {
+        playTone(
+          context,
+          frequency,
+          start + index * 0.17,
+          0.15,
+        )
+      },
+    )
+  })
 }
 
 function tick(): void {
@@ -46,7 +115,12 @@ function tick(): void {
   }
 
   const next = calculatePomodoroState(store.active.startedAt, store.active.workMinutes)
-  if (previousPhase && next.phase !== previousPhase) beep(next.phase)
+  if (
+    previousPhase
+    && next.phase !== previousPhase
+  ) {
+    playPomodoroSound(next.phase)
+  }
   previousPhase = next.phase
   store.live = next
   const minutes = Math.floor(next.remainingSeconds / 60).toString().padStart(2, '0')
@@ -72,6 +146,7 @@ async function start(workMinutes: number): Promise<void> {
     body: JSON.stringify({ workMinutes }),
   })
   previousPhase = 'work'
+  playPomodoroSound('start')
   channel?.postMessage({ type: 'started' })
   await loadPresets()
   tick()
@@ -81,6 +156,7 @@ async function quickStart(): Promise<void> {
   enableAudio()
   store.active = await api<PomodoroSession>('/api/pomodoro/quick-start', { method: 'POST' })
   previousPhase = store.active.phase === 'break' ? 'break' : 'work'
+  playPomodoroSound('start')
   channel?.postMessage({ type: 'started' })
   await loadPresets()
   tick()
