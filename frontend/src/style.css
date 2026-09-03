@@ -1717,3 +1717,51 @@ h3 { margin-bottom: .35rem; }
     align-items: flex-start;
   }
 }
+
+.channel-invite-form {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    auto;
+  gap: .75rem;
+  max-width: 620px;
+}
+
+.channel-member-list,
+.channel-invitation-list {
+  display: grid;
+  gap: .55rem;
+}
+
+.channel-member-row,
+.channel-invitation-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 54px;
+  padding: .7rem .8rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.channel-invitation-actions {
+  display: flex;
+  gap: .5rem;
+}
+
+@media (max-width: 640px) {
+  .channel-invite-form {
+    grid-template-columns: 1fr;
+  }
+
+  .channel-member-row,
+  .channel-invitation-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .channel-invitation-actions {
+    width: 100%;
+  }
+}

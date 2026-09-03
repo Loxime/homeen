@@ -31,6 +31,17 @@ interface Channel {
   createdAt: string
 }
 
+interface ChannelMember {
+  userId: number
+  email: string
+  isCreator: boolean
+  joinedAt: string
+}
+
+interface MembersResponse {
+  members: ChannelMember[]
+}
+
 type ChannelTab =
   | 'notes'
   | 'tasks'
@@ -42,16 +53,32 @@ const route = useRoute()
 const router = useRouter()
 
 const channel = ref<Channel | null>(null)
+
 const loading = ref(true)
 const error = ref('')
 
 const activeTab =
   ref<ChannelTab>('notes')
 
+const members =
+  ref<ChannelMember[]>([])
+
+const membersLoading = ref(false)
+const membersLoaded = ref(false)
+
+const inviteEmail = ref('')
+const inviting = ref(false)
+const memberError = ref('')
+const memberSuccess = ref('')
+
+const removingMemberId =
+  ref<number | null>(null)
+
 const code = computed(
-  () => String(
-    route.params.code ?? '',
-  ),
+  () =>
+    String(
+      route.params.code ?? '',
+    ),
 )
 
 function formatCode(
@@ -88,9 +115,12 @@ async function load(): Promise<void> {
     ) {
       await router.replace({
         path: '/notes',
+
         query: {
           channelDenied:
-            formatCode(code.value),
+            formatCode(
+              code.value,
+            ),
         },
       })
 
@@ -111,9 +141,148 @@ async function load(): Promise<void> {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Unable to load channel.'
+        : 'Impossible de charger le canal.'
   } finally {
     loading.value = false
+  }
+}
+
+async function loadMembers(
+  force = false,
+): Promise<void> {
+  if (!channel.value) {
+    return
+  }
+
+  if (
+    membersLoaded.value
+    && !force
+  ) {
+    return
+  }
+
+  membersLoading.value = true
+  memberError.value = ''
+
+  try {
+    const response =
+      await api<MembersResponse>(
+        `/api/channels/${channel.value.code}/members`,
+      )
+
+    members.value =
+      response.members
+
+    membersLoaded.value = true
+  } catch (exception) {
+    memberError.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de charger les membres.'
+  } finally {
+    membersLoading.value = false
+  }
+}
+
+async function inviteMember(): Promise<void> {
+  if (
+    !channel.value
+    || !inviteEmail.value.trim()
+  ) {
+    return
+  }
+
+  memberError.value = ''
+  memberSuccess.value = ''
+  inviting.value = true
+
+  try {
+    await api(
+      `/api/channels/${channel.value.code}/invitations`,
+      {
+        method: 'POST',
+
+        body: JSON.stringify({
+          email:
+            inviteEmail.value.trim(),
+        }),
+      },
+    )
+
+    memberSuccess.value =
+      `Invitation envoyée à ${inviteEmail.value.trim()}.`
+
+    inviteEmail.value = ''
+  } catch (exception) {
+    memberError.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible d’envoyer l’invitation.'
+  } finally {
+    inviting.value = false
+  }
+}
+
+async function removeMember(
+  member: ChannelMember,
+): Promise<void> {
+  if (
+    !channel.value
+    || member.isCreator
+    || !channel.value.isCreator
+  ) {
+    return
+  }
+
+  const confirmed =
+    window.confirm(
+      `Retirer ${member.email} du canal ?`,
+    )
+
+  if (!confirmed) {
+    return
+  }
+
+  memberError.value = ''
+  memberSuccess.value = ''
+
+  removingMemberId.value =
+    member.userId
+
+  try {
+    await api(
+      `/api/channels/${channel.value.code}/members/${member.userId}`,
+      {
+        method: 'DELETE',
+      },
+    )
+
+    members.value =
+      members.value.filter(
+        candidate =>
+          candidate.userId
+          !== member.userId,
+      )
+
+    channel.value = {
+      ...channel.value,
+
+      memberCount:
+        Math.max(
+          1,
+          channel.value.memberCount - 1,
+        ),
+    }
+
+    memberSuccess.value =
+      `${member.email} a été retiré du canal.`
+  } catch (exception) {
+    memberError.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de retirer ce membre.'
+  } finally {
+    removingMemberId.value = null
   }
 }
 
@@ -121,14 +290,29 @@ function selectTab(
   tab: ChannelTab,
 ): void {
   activeTab.value = tab
+
+  memberError.value = ''
+  memberSuccess.value = ''
+
+  if (tab === 'members') {
+    void loadMembers()
+  }
 }
 
 watch(
   () => route.params.code,
-  () => void load(),
+  () => {
+    members.value = []
+    membersLoaded.value = false
+    activeTab.value = 'notes'
+
+    void load()
+  },
 )
 
-onMounted(() => void load())
+onMounted(() => {
+  void load()
+})
 </script>
 
 <template>
@@ -144,7 +328,9 @@ onMounted(() => void load())
       v-else-if="error"
       class="settings-card"
     >
-      <h1>Canal indisponible</h1>
+      <h1>
+        Canal indisponible
+      </h1>
 
       <p class="form-error">
         {{ error }}
@@ -162,8 +348,12 @@ onMounted(() => void load())
       <header class="channel-header">
         <div class="channel-avatar">
           <img
-            v-if="channel.profileImageUrl"
-            :src="channel.profileImageUrl"
+            v-if="
+              channel.profileImageUrl
+            "
+            :src="
+              channel.profileImageUrl
+            "
             alt=""
           />
 
@@ -184,14 +374,24 @@ onMounted(() => void load())
           </h1>
 
           <p class="muted">
-            {{ channel.formattedCode }}
+            {{
+              channel.formattedCode
+            }}
             ·
-            {{ channel.memberCount }}
+            {{
+              channel.memberCount
+            }}
             membre{{
               channel.memberCount > 1
                 ? 's'
                 : ''
             }}
+
+            <template
+              v-if="channel.isCreator"
+            >
+              · Vous êtes le créateur
+            </template>
           </p>
         </div>
       </header>
@@ -213,7 +413,9 @@ onMounted(() => void load())
             active:
               activeTab === 'notes',
           }"
-          @click="selectTab('notes')"
+          @click="
+            selectTab('notes')
+          "
         >
           Notes
         </button>
@@ -224,7 +426,9 @@ onMounted(() => void load())
             active:
               activeTab === 'tasks',
           }"
-          @click="selectTab('tasks')"
+          @click="
+            selectTab('tasks')
+          "
         >
           Tâches
         </button>
@@ -235,9 +439,17 @@ onMounted(() => void load())
             active:
               activeTab === 'members',
           }"
-          @click="selectTab('members')"
+          @click="
+            selectTab('members')
+          "
         >
           Membres
+
+          <span
+            class="channel-tab-count"
+          >
+            {{ channel.memberCount }}
+          </span>
         </button>
 
         <button
@@ -246,7 +458,9 @@ onMounted(() => void load())
             active:
               activeTab === 'chat',
           }"
-          @click="selectTab('chat')"
+          @click="
+            selectTab('chat')
+          "
         >
           Chat
         </button>
@@ -257,57 +471,232 @@ onMounted(() => void load())
             active:
               activeTab === 'settings',
           }"
-          @click="selectTab('settings')"
+          @click="
+            selectTab('settings')
+          "
         >
           Paramètres
         </button>
       </nav>
 
-      <section class="settings-card channel-placeholder">
-        <template v-if="activeTab === 'notes'">
-          <h2>Notes</h2>
+      <section
+        class="settings-card channel-content"
+      >
+        <template
+          v-if="
+            activeTab === 'notes'
+          "
+        >
+          <h2>
+            Notes
+          </h2>
 
           <p class="muted">
             Les notes collaboratives seront
-            branchées après la gestion des
-            membres et invitations.
+            branchées après validation du
+            système de membres.
           </p>
         </template>
 
-        <template v-else-if="activeTab === 'tasks'">
-          <h2>Tâches</h2>
+        <template
+          v-else-if="
+            activeTab === 'tasks'
+          "
+        >
+          <h2>
+            Tâches
+          </h2>
 
           <p class="muted">
             Les tâches du canal seront
-            dérivées des notes partagées.
+            rattachées aux notes
+            collaboratives.
           </p>
         </template>
 
-        <template v-else-if="activeTab === 'members'">
-          <h2>Membres</h2>
+        <template
+          v-else-if="
+            activeTab === 'members'
+          "
+        >
+          <div class="channel-members-heading">
+            <div>
+              <h2>
+                Membres
+              </h2>
 
-          <p class="muted">
-            La gestion des membres arrive
-            à l’étape suivante.
+              <p class="muted">
+                {{
+                  channel.memberCount
+                }}
+                membre{{
+                  channel.memberCount > 1
+                    ? 's'
+                    : ''
+                }}
+              </p>
+            </div>
+          </div>
+
+          <p
+            v-if="memberError"
+            class="form-error"
+          >
+            {{ memberError }}
           </p>
+
+          <p
+            v-if="memberSuccess"
+            class="form-success"
+          >
+            {{ memberSuccess }}
+          </p>
+
+          <form
+            v-if="channel.isCreator"
+            class="channel-invite-form"
+            @submit.prevent="
+              inviteMember
+            "
+          >
+            <label class="channel-invite-field">
+              <span>
+                Inviter un utilisateur
+              </span>
+
+              <input
+                v-model="
+                  inviteEmail
+                "
+                type="email"
+                autocomplete="email"
+                placeholder="utilisateur@exemple.fr"
+                required
+              />
+            </label>
+
+            <button
+              class="primary"
+              type="submit"
+              :disabled="
+                inviting
+                || !inviteEmail.trim()
+              "
+            >
+              {{
+                inviting
+                  ? 'Invitation…'
+                  : 'Inviter'
+              }}
+            </button>
+          </form>
+
+          <p
+            v-if="membersLoading"
+            class="muted"
+          >
+            Chargement des membres…
+          </p>
+
+          <div
+            v-else
+            class="channel-member-list"
+          >
+            <article
+              v-for="member in members"
+              :key="member.userId"
+              class="channel-member-row"
+            >
+              <div class="channel-member-identity">
+                <div class="channel-member-avatar">
+                  <AppIcon
+                    name="user"
+                    :size="18"
+                  />
+                </div>
+
+                <div>
+                  <div class="channel-member-name">
+                    <strong>
+                      {{ member.email }}
+                    </strong>
+
+                    <span
+                      v-if="
+                        member.isCreator
+                      "
+                      class="profile-badge"
+                    >
+                      Créateur
+                    </span>
+                  </div>
+
+                  <span
+                    class="channel-member-date"
+                  >
+                    Membre depuis
+                    {{
+                      new Date(
+                        member.joinedAt,
+                      ).toLocaleDateString(
+                        'fr-FR',
+                      )
+                    }}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                v-if="
+                  channel.isCreator
+                  && !member.isCreator
+                "
+                class="ghost danger-text"
+                type="button"
+                :disabled="
+                  removingMemberId
+                  === member.userId
+                "
+                @click="
+                  removeMember(member)
+                "
+              >
+                {{
+                  removingMemberId
+                    === member.userId
+                    ? 'Retrait…'
+                    : 'Retirer'
+                }}
+              </button>
+            </article>
+          </div>
         </template>
 
-        <template v-else-if="activeTab === 'chat'">
-          <h2>Chat</h2>
+        <template
+          v-else-if="
+            activeTab === 'chat'
+          "
+        >
+          <h2>
+            Chat
+          </h2>
 
           <p class="muted">
-            Le chat temps réel sera ajouté
-            après les invitations.
+            Le chat sera ajouté après les
+            notes partagées et avant le
+            temps réel.
           </p>
         </template>
 
         <template v-else>
-          <h2>Paramètres</h2>
+          <h2>
+            Paramètres
+          </h2>
 
           <p class="muted">
             Nom, description, image,
-            export et fermeture seront
-            disponibles ici.
+            export et fermeture du canal
+            seront disponibles ici.
           </p>
         </template>
       </section>

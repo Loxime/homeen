@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import {
+  onMounted,
+  ref,
+} from 'vue'
+
 import { useRouter } from 'vue-router'
+
 import AppIcon from '../components/AppIcon.vue'
 import { api } from '../services/api'
 
@@ -21,12 +26,33 @@ interface ChannelListResponse {
   channels: Channel[]
 }
 
+interface ChannelInvitation {
+  id: number
+  channelId: number
+  code: string
+  formattedCode: string
+  name: string
+  description: string
+  invitedByEmail: string
+  createdAt: string
+  seenAt: string | null
+}
+
+interface InvitationResponse {
+  invitations: ChannelInvitation[]
+}
+
 const router = useRouter()
 
 const channels = ref<Channel[]>([])
+const invitations = ref<ChannelInvitation[]>([])
+
 const loading = ref(true)
+const invitationsLoading = ref(true)
 const creating = ref(false)
+
 const error = ref('')
+const invitationError = ref('')
 
 const name = ref('')
 const description = ref('')
@@ -47,14 +73,66 @@ async function load(): Promise<void> {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Unable to load channels.'
+        : 'Impossible de charger les canaux.'
   } finally {
     loading.value = false
   }
 }
 
+async function loadInvitations(): Promise<void> {
+  invitationsLoading.value = true
+  invitationError.value = ''
+
+  try {
+    const response =
+      await api<InvitationResponse>(
+        '/api/channel-invitations',
+      )
+
+    invitations.value =
+      response.invitations
+
+    const hasUnread =
+      invitations.value.some(
+        invitation =>
+          invitation.seenAt === null,
+      )
+
+    if (hasUnread) {
+      await api(
+        '/api/channel-invitations/seen',
+        {
+          method: 'POST',
+        },
+      )
+
+      invitations.value =
+        invitations.value.map(
+          invitation => ({
+            ...invitation,
+            seenAt:
+              invitation.seenAt
+              ?? new Date().toISOString(),
+          }),
+        )
+    }
+  } catch (exception) {
+    invitationError.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de charger les invitations.'
+  } finally {
+    invitationsLoading.value = false
+  }
+}
+
 async function createChannel(): Promise<void> {
   error.value = ''
+
+  if (!name.value.trim()) {
+    return
+  }
+
   creating.value = true
 
   try {
@@ -63,10 +141,13 @@ async function createChannel(): Promise<void> {
         '/api/channels',
         {
           method: 'POST',
+
           body: JSON.stringify({
-            name: name.value,
+            name:
+              name.value.trim(),
+
             description:
-              description.value,
+              description.value.trim(),
           }),
         },
       )
@@ -81,7 +162,7 @@ async function createChannel(): Promise<void> {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Unable to create channel.'
+        : 'Impossible de créer le canal.'
   } finally {
     creating.value = false
   }
@@ -95,7 +176,67 @@ async function openChannel(
   )
 }
 
-onMounted(() => void load())
+async function acceptInvitation(
+  invitation: ChannelInvitation,
+): Promise<void> {
+  invitationError.value = ''
+
+  try {
+    const response =
+      await api<{
+        code: string
+        formattedCode: string
+      }>(
+        `/api/channel-invitations/${invitation.id}/accept`,
+        {
+          method: 'POST',
+        },
+      )
+
+    await router.push(
+      `/canal/${response.code}`,
+    )
+  } catch (exception) {
+    invitationError.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible d’accepter l’invitation.'
+  }
+}
+
+async function rejectInvitation(
+  invitation: ChannelInvitation,
+): Promise<void> {
+  invitationError.value = ''
+
+  try {
+    await api(
+      `/api/channel-invitations/${invitation.id}/reject`,
+      {
+        method: 'POST',
+      },
+    )
+
+    invitations.value =
+      invitations.value.filter(
+        candidate =>
+          candidate.id
+          !== invitation.id,
+      )
+  } catch (exception) {
+    invitationError.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de refuser l’invitation.'
+  }
+}
+
+onMounted(() => {
+  void Promise.all([
+    load(),
+    loadInvitations(),
+  ])
+})
 </script>
 
 <template>
@@ -106,7 +247,9 @@ onMounted(() => void load())
           COLLABORATION
         </p>
 
-        <h1>Canaux</h1>
+        <h1>
+          Canaux
+        </h1>
 
         <p class="muted">
           Vos espaces de travail partagés.
@@ -121,18 +264,113 @@ onMounted(() => void load())
       {{ error }}
     </p>
 
+    <p
+      v-if="invitationError"
+      class="form-error"
+    >
+      {{ invitationError }}
+    </p>
+
+    <section
+      v-if="
+        invitationsLoading
+        || invitations.length
+      "
+      class="settings-card channel-invitations"
+    >
+      <div>
+        <p class="eyebrow">
+          INVITATIONS
+        </p>
+
+        <h2>
+          Invitations reçues
+        </h2>
+      </div>
+
+      <p
+        v-if="invitationsLoading"
+        class="muted"
+      >
+        Chargement…
+      </p>
+
+      <div
+        v-else
+        class="channel-invitation-list"
+      >
+        <article
+          v-for="invitation in invitations"
+          :key="invitation.id"
+          class="channel-invitation-row"
+        >
+          <div>
+            <div class="channel-card-title">
+              <strong>
+                {{ invitation.name }}
+              </strong>
+            </div>
+
+            <p
+              v-if="invitation.description"
+              class="muted channel-description"
+            >
+              {{ invitation.description }}
+            </p>
+
+            <div class="channel-meta">
+              <span>
+                {{ invitation.formattedCode }}
+              </span>
+
+              <span>
+                Invité par
+                {{ invitation.invitedByEmail }}
+              </span>
+            </div>
+          </div>
+
+          <div class="channel-invitation-actions">
+            <button
+              class="ghost"
+              type="button"
+              @click="
+                rejectInvitation(invitation)
+              "
+            >
+              Refuser
+            </button>
+
+            <button
+              class="primary"
+              type="button"
+              @click="
+                acceptInvitation(invitation)
+              "
+            >
+              Accepter
+            </button>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <section class="settings-card">
-      <h2>Créer un canal</h2>
+      <h2>
+        Créer un canal
+      </h2>
 
       <form
         class="channel-create-form"
         @submit.prevent="createChannel"
       >
         <label>
-          <span>Nom</span>
+          <span>
+            Nom
+          </span>
 
           <input
-            v-model.trim="name"
+            v-model="name"
             type="text"
             maxlength="120"
             placeholder="Nom du canal"
@@ -141,10 +379,12 @@ onMounted(() => void load())
         </label>
 
         <label>
-          <span>Description</span>
+          <span>
+            Description
+          </span>
 
           <textarea
-            v-model.trim="description"
+            v-model="description"
             maxlength="2000"
             rows="3"
             placeholder="Description facultative"
@@ -153,9 +393,10 @@ onMounted(() => void load())
 
         <button
           class="primary"
+          type="submit"
           :disabled="
             creating
-            || !name
+            || !name.trim()
           "
         >
           <AppIcon
@@ -174,7 +415,9 @@ onMounted(() => void load())
 
     <section class="channels-section">
       <div class="channels-heading">
-        <h2>Mes canaux</h2>
+        <h2>
+          Mes canaux
+        </h2>
 
         <span class="muted">
           {{ channels.length }}
@@ -200,7 +443,14 @@ onMounted(() => void load())
           @click="openChannel(channel)"
         >
           <div class="channel-card-icon">
+            <img
+              v-if="channel.profileImageUrl"
+              :src="channel.profileImageUrl"
+              alt=""
+            />
+
             <AppIcon
+              v-else
               name="users"
               :size="22"
             />
@@ -233,9 +483,7 @@ onMounted(() => void load())
               </span>
 
               <span>
-                {{
-                  channel.memberCount
-                }}
+                {{ channel.memberCount }}
                 membre{{
                   channel.memberCount > 1
                     ? 's'

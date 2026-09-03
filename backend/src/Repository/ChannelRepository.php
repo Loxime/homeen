@@ -272,6 +272,151 @@ SQL,
         );
     }
 
+    /**
+     * @return list<array{
+     *     userId:int,
+     *     email:string,
+     *     isCreator:bool,
+     *     joinedAt:string
+     * }>
+     */
+    public function members(
+        string $code,
+    ): array {
+        /*
+         * getAccessible() garantit déjà
+         * que l'utilisateur courant est membre.
+         */
+        $channel =
+            $this->getAccessible($code);
+
+        $rows = $this->connection
+            ->fetchAllAssociative(
+                <<<'SQL'
+    SELECT
+        member.user_id AS "userId",
+        primary_email.email,
+        member.joined_at AS "joinedAt",
+        (
+            member.user_id =
+            channel.creator_user_id
+        ) AS "isCreator"
+    FROM channel_member member
+    INNER JOIN channel
+        ON channel.id =
+            member.channel_id
+    INNER JOIN user_email primary_email
+        ON primary_email.user_id =
+            member.user_id
+       AND primary_email.is_primary = TRUE
+    WHERE channel.id = :channelId
+    ORDER BY
+        "isCreator" DESC,
+        lower(primary_email.email)
+    SQL,
+                [
+                    'channelId' =>
+                        (int) $channel['id'],
+                ],
+            );
+
+        return array_map(
+            static function (
+                array $row,
+            ): array {
+                return [
+                    'userId' =>
+                        (int) $row['userId'],
+
+                    'email' =>
+                        (string) $row['email'],
+
+                    'isCreator' =>
+                        filter_var(
+                            $row['isCreator'],
+                            FILTER_VALIDATE_BOOLEAN,
+                        ),
+
+                    'joinedAt' =>
+                        (string) $row['joinedAt'],
+                ];
+            },
+            $rows,
+        );
+    }
+
+    public function removeMember(
+        string $code,
+        int $memberUserId,
+    ): void {
+        $userId =
+            $this->currentUser->id();
+
+        $channel = $this->connection
+            ->fetchAssociative(
+                <<<'SQL'
+    SELECT
+        id,
+        creator_user_id
+            AS "creatorUserId"
+    FROM channel
+    WHERE code = :code
+      AND closed_at IS NULL
+    SQL,
+                [
+                    'code' => $code,
+                ],
+            );
+
+        if ($channel === false) {
+            throw new \OutOfBoundsException(
+                'Channel not found.'
+            );
+        }
+
+        if (
+            (int) $channel['creatorUserId']
+            !== $userId
+        ) {
+            throw new \DomainException(
+                'CHANNEL_CREATOR_REQUIRED'
+            );
+        }
+
+        if (
+            $memberUserId
+            === (int) $channel[
+                'creatorUserId'
+            ]
+        ) {
+            throw new \DomainException(
+                'CREATOR_CANNOT_BE_REMOVED'
+            );
+        }
+
+        $affected = $this->connection
+            ->executeStatement(
+                <<<'SQL'
+    DELETE FROM channel_member
+    WHERE channel_id = :channelId
+      AND user_id = :userId
+    SQL,
+                [
+                    'channelId' =>
+                        (int) $channel['id'],
+
+                    'userId' =>
+                        $memberUserId,
+                ],
+            );
+
+        if ($affected !== 1) {
+            throw new \OutOfBoundsException(
+                'Channel member not found.'
+            );
+        }
+    }
+
     public static function formatCode(
         string $code,
     ): string {
