@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Ombre portée douce pour l'icône -->
+    <filter id="drop-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.16"/>
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.08"/>
+    </filter>
+
+    <!-- Ombre du pli inférieur droit -->
+    <filter id="fold-shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="-4" dy="-4" stdDeviation="6" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+
+    <!-- Dégradé subtil pour le rabat corné -->
+    <linearGradient id="fold-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#e2e2e2"/>
+      <stop offset="40%" stop-color="#ededed"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+
+    <!-- Dégradé noir profond très subtil pour la note -->
+    <linearGradient id="note-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1c1c1e"/>
+      <stop offset="100%" stop-color="#0a0a0c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fond blanc pur -->
+  <rect width="512" height="512" fill="#ffffff" />
+
+  <!-- Groupe icône avec ombre -->
+  <g filter="url(#drop-shadow)">
+    <!-- Corps du bloc-notes avec coin plié en bas à droite -->
+    <!-- Dimensions de base: 310 x 310, de x=101 à 411, y=101 à 411, rayon=52 -->
+    <!-- Le pli commence à x=336 en bas (411-75) et monte à y=336 à droite (411-75) -->
+    <path d="
+      M 153 101
+      L 359 101
+      A 52 52 0 0 1 411 153
+      L 411 336
+      L 336 411
+      L 153 411
+      A 52 52 0 0 1 101 359
+      L 101 153
+      A 52 52 0 0 1 153 101
+      Z
+    " fill="url(#note-grad)" />
+
+    <!-- Rabat plié (corné) avec bord arrondi moderne -->
+    <path d="
+      M 336 411
+      L 336 366
+      A 30 30 0 0 1 366 336
+      L 411 336
+      C 390 375 375 390 336 411
+      Z
+    " fill="url(#fold-grad)" filter="url(#fold-shadow)" />
+
+    <!-- Éléments intérieurs blancs -->
+    <!-- 3 Puces / Trous de reliure à gauche -->
+    <circle cx="152" cy="195" r="8" fill="#ffffff" />
+    <circle cx="152" cy="256" r="8" fill="#ffffff" />
+    <circle cx="152" cy="317" r="8" fill="#ffffff" />
+
+    <!-- Ligne verticale de séparation -->
+    <line x1="184" y1="160" x2="184" y2="352" stroke="#ffffff" stroke-width="12" stroke-linecap="round" />
+
+    <!-- Coche de validation (Checkmark) moderne et stylisée -->
+    <path d="M 224 256 L 268 300 L 358 206"
+          fill="none"
+          stroke="#ffffff"
+          stroke-width="28"
+          stroke-linecap="round"
+          stroke-linejoin="round" />
+  </g>
+</svg>
