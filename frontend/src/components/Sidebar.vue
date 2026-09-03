@@ -111,6 +111,19 @@ async function quickFocus(): Promise<void> {
       
       <RouterLink
         class="sidebar-entry"
+        to="/channels"
+      >
+        <span class="sidebar-icon-slot">
+          <AppIcon name="users" />
+        </span>
+
+        <span class="sidebar-label">
+          Canaux
+        </span>
+      </RouterLink>
+      
+      <RouterLink
+        class="sidebar-entry"
         to="/profile"
       >
         <span class="sidebar-icon-slot">

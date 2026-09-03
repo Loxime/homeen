@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import {
+  computed,
   onMounted,
   onUnmounted,
   ref,
   watch,
 } from 'vue'
-import { useRoute } from 'vue-router'
 
+import {
+  useRoute,
+  useRouter,
+} from 'vue-router'
+
+import BaseModal from './BaseModal.vue'
 import Sidebar from './Sidebar.vue'
 import TopBar from './TopBar.vue'
 
@@ -18,6 +24,7 @@ import {
 import { usePomodoro } from '../composables/usePomodoro'
 
 const route = useRoute()
+const router = useRouter()
 
 const {
   startGlobalTimer,
@@ -25,14 +32,21 @@ const {
   loadPresets,
 } = usePomodoro()
 
-const MOBILE_QUERY = '(max-width: 720px)'
+const MOBILE_QUERY =
+  '(max-width: 720px)'
 
-const mediaQuery = window.matchMedia(MOBILE_QUERY)
+const mediaQuery =
+  window.matchMedia(
+    MOBILE_QUERY,
+  )
 
-const isMobile = ref(mediaQuery.matches)
+const isMobile =
+  ref(mediaQuery.matches)
 
 const savedDesktopState =
-  localStorage.getItem('homeen-sidebar-collapsed') === '1'
+  localStorage.getItem(
+    'homeen-sidebar-collapsed',
+  ) === '1'
 
 const sidebarCollapsed = ref(
   isMobile.value
@@ -40,14 +54,27 @@ const sidebarCollapsed = ref(
     : savedDesktopState,
 )
 
+const deniedChannelCode = computed(
+  () => {
+    const value =
+      route.query.channelDenied
+
+    return typeof value === 'string'
+      ? value
+      : null
+  },
+)
+
 function toggleSidebar(): void {
-  sidebarCollapsed.value = !sidebarCollapsed.value
+  sidebarCollapsed.value =
+    !sidebarCollapsed.value
 }
 
 function handleViewportChange(
   event: MediaQueryListEvent,
 ): void {
-  isMobile.value = event.matches
+  isMobile.value =
+    event.matches
 
   if (event.matches) {
     sidebarCollapsed.value = true
@@ -59,14 +86,30 @@ function handleViewportChange(
   }
 }
 
-watch(sidebarCollapsed, (value) => {
-  if (!isMobile.value) {
-    localStorage.setItem(
-      'homeen-sidebar-collapsed',
-      value ? '1' : '0',
-    )
+async function closeDeniedModal(): Promise<void> {
+  const query = {
+    ...route.query,
   }
-})
+
+  delete query.channelDenied
+
+  await router.replace({
+    path: route.path,
+    query,
+  })
+}
+
+watch(
+  sidebarCollapsed,
+  (value) => {
+    if (!isMobile.value) {
+      localStorage.setItem(
+        'homeen-sidebar-collapsed',
+        value ? '1' : '0',
+      )
+    }
+  },
+)
 
 watch(
   () => route.fullPath,
@@ -104,38 +147,82 @@ onUnmounted(() => {
   <div
     class="app-layout"
     :class="{
-      'sidebar-collapsed': sidebarCollapsed,
-      'is-mobile': isMobile,
+      'sidebar-collapsed':
+        sidebarCollapsed,
+      'is-mobile':
+        isMobile,
     }"
   >
-    <Sidebar :collapsed="sidebarCollapsed" />
+    <Sidebar
+      :collapsed="sidebarCollapsed"
+    />
 
     <button
-      v-if="isMobile && !sidebarCollapsed"
+      v-if="
+        isMobile
+        && !sidebarCollapsed
+      "
       class="mobile-sidebar-backdrop"
       aria-label="Close navigation"
-      @click="sidebarCollapsed = true"
+      @click="
+        sidebarCollapsed = true
+      "
     />
 
     <section class="workspace">
       <TopBar
-        :sidebar-collapsed="sidebarCollapsed"
-        @toggle-sidebar="toggleSidebar"
+        :sidebar-collapsed="
+          sidebarCollapsed
+        "
+        @toggle-sidebar="
+          toggleSidebar
+        "
       />
 
       <div class="page-scroll">
-        <RouterView v-slot="{ Component, route }">
+        <RouterView
+          v-slot="{
+            Component,
+            route: activeRoute,
+          }"
+        >
           <Transition
             name="page-fade"
             mode="out-in"
           >
             <component
               :is="Component"
-              :key="route.path"
+              :key="activeRoute.path"
             />
           </Transition>
         </RouterView>
       </div>
     </section>
+
+    <BaseModal
+      :open="
+        deniedChannelCode !== null
+      "
+      title="Accès au canal refusé"
+      @close="closeDeniedModal"
+    >
+      <div class="channel-denied-modal">
+        <p>
+          Vous n'êtes pas autorisé
+          à entrer dans le canal
+          <strong>
+            {{ deniedChannelCode }}
+          </strong>.
+        </p>
+
+        <button
+          class="primary"
+          type="button"
+          @click="closeDeniedModal"
+        >
+          Fermer
+        </button>
+      </div>
+    </BaseModal>
   </div>
 </template>
