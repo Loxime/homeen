@@ -297,6 +297,73 @@ final readonly class ProfileController
         ]);
     }
 
+    #[Route(
+        '',
+        name: 'api_profile_delete',
+        methods: ['DELETE'],
+    )]
+    public function deleteAccount(
+        Request $request,
+    ): JsonResponse {
+        $userId = $this->userId($request);
+
+        $data = $this->input->read($request);
+
+        $password = (string) (
+            $data['password'] ?? ''
+        );
+
+        if ($password === '') {
+            return new JsonResponse(
+                [
+                    'error' =>
+                        'Current password is required.',
+                    'code' =>
+                        'PASSWORD_REQUIRED',
+                ],
+                422,
+            );
+        }
+
+        $currentHash = $this->users
+            ->findPasswordHash($userId);
+
+        if (
+            $currentHash === null
+            || !$this->passwords->verify(
+                $password,
+                $currentHash,
+            )
+        ) {
+            return new JsonResponse(
+                [
+                    'error' =>
+                        'Current password is incorrect.',
+                    'code' =>
+                        'INVALID_CURRENT_PASSWORD',
+                ],
+                403,
+            );
+        }
+
+        $this->users->deleteAccount(
+            $userId
+        );
+
+        /*
+         * The account no longer exists.
+         * Destroy the authenticated session as well.
+         */
+        $request
+            ->getSession()
+            ->invalidate();
+
+        return new JsonResponse(
+            null,
+            204,
+        );
+    }
+
     private function userId(
         Request $request,
     ): int {

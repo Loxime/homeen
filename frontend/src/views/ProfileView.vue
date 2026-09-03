@@ -23,6 +23,9 @@ const loading = ref(true)
 const error = ref('')
 const success = ref('')
 
+const deletePassword = ref('')
+const deletingAccount = ref(false)
+
 const newEmail = ref('')
 const addingEmail = ref(false)
 
@@ -78,6 +81,55 @@ async function addEmail(): Promise<void> {
         : 'Unable to add email.'
   } finally {
     addingEmail.value = false
+  }
+}
+
+async function deleteAccount(): Promise<void> {
+  error.value = ''
+  success.value = ''
+
+  if (!deletePassword.value) {
+    error.value =
+      'Enter your current password.'
+
+    return
+  }
+
+  const confirmed = window.confirm(
+    'Delete your Homeen account and all personal data? This action cannot be undone.',
+  )
+
+  if (!confirmed) {
+    return
+  }
+
+  deletingAccount.value = true
+
+  try {
+    await api(
+      '/api/profile',
+      {
+        method: 'DELETE',
+        body: JSON.stringify({
+          password:
+            deletePassword.value,
+        }),
+      },
+    )
+
+    /*
+     * The backend invalidated the session.
+     * A complete reload guarantees that all
+     * in-memory personal state is discarded.
+     */
+    window.location.assign('/')
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Unable to delete account.'
+
+    deletingAccount.value = false
   }
 }
 
@@ -422,13 +474,45 @@ onMounted(() => void load())
           to individual users.
         </p>
 
+      <section class="settings-card danger-zone">
+        <h2>
+          Delete account
+        </h2>
+
+        <p class="muted">
+          Permanently delete your Homeen
+          account and all personal data.
+          This action cannot be undone.
+        </p>
+
+        <label class="delete-account-password">
+          Current password
+
+          <input
+            v-model="deletePassword"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Confirm your password"
+          />
+        </label>
+
         <button
           class="danger"
           type="button"
-          disabled
+          :disabled="
+            deletingAccount
+            || !deletePassword
+          "
+          @click="deleteAccount"
         >
-          Delete my account
+          {{
+            deletingAccount
+              ? 'Deleting…'
+              : 'Delete my account'
+          }}
         </button>
+      </section>
+
       </section>
     </template>
   </section>

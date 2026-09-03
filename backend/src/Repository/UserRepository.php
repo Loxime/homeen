@@ -471,6 +471,22 @@ SQL,
     }
 }
 
+    public function deleteAccount(int $userId): void
+    {
+        $affected = $this->connection->delete(
+            'app_user',
+            [
+                'id' => $userId,
+            ],
+        );
+
+        if ($affected !== 1) {
+            throw new \RuntimeException(
+                'Unable to delete user account.'
+            );
+        }
+    }
+
     public static function normalizeEmail(
         string $email,
     ): string {
