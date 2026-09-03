@@ -3,6 +3,7 @@ import NotesView from '../views/NotesView.vue'
 import LabelsView from '../views/LabelsView.vue'
 import PomodoroView from '../views/PomodoroView.vue'
 import StatisticsView from '../views/StatisticsView.vue'
+import ProfileView from '../views/ProfileView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -14,5 +15,6 @@ export const router = createRouter({
     { path: '/labels', component: LabelsView },
     { path: '/pomodoro', component: PomodoroView },
     { path: '/statistics', component: StatisticsView },
+    { path: '/profile', component: ProfileView },
   ],
 })

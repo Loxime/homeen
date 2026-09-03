@@ -2,9 +2,10 @@
 import { ref } from 'vue'
 import { useAccess } from '../composables/useAccess'
 
-const { loginAccess } = useAccess()
+const { loginUser } = useAccess()
 
-const accessKey = ref('')
+const email = ref('')
+const password = ref('')
 const error = ref('')
 const submitting = ref(false)
 
@@ -13,16 +14,17 @@ async function submit(): Promise<void> {
   submitting.value = true
 
   try {
-    await loginAccess(
-      accessKey.value,
+    await loginUser(
+      email.value,
+      password.value,
     )
 
-    accessKey.value = ''
+    password.value = ''
   } catch (exception) {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Access denied.'
+        : 'Unable to sign in.'
   } finally {
     submitting.value = false
   }
@@ -37,29 +39,41 @@ async function submit(): Promise<void> {
       </div>
 
       <p class="eyebrow">
-        PRIVATE WORKSPACE
+        USER ACCOUNT
       </p>
 
       <h1>
-        Homeen
+        Sign in
       </h1>
 
       <p class="muted">
-        Enter the access key configured
-        for this Homeen instance.
+        Use any email address linked
+        to your Homeen account.
       </p>
 
       <form @submit.prevent="submit">
-        <label for="access-key">
-          Access key
+        <label for="login-email">
+          Email
         </label>
 
         <input
-          id="access-key"
-          v-model="accessKey"
+          id="login-email"
+          v-model.trim="email"
+          type="email"
+          autocomplete="username"
+          autofocus
+          required
+        />
+
+        <label for="login-password">
+          Password
+        </label>
+
+        <input
+          id="login-password"
+          v-model="password"
           type="password"
           autocomplete="current-password"
-          autofocus
           required
         />
 
@@ -74,13 +88,14 @@ async function submit(): Promise<void> {
           class="primary wide"
           :disabled="
             submitting
-            || !accessKey
+            || !email
+            || !password
           "
         >
           {{
             submitting
-              ? 'Checking…'
-              : 'Continue'
+              ? 'Signing in…'
+              : 'Sign in'
           }}
         </button>
       </form>
