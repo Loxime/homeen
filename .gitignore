@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 
+!/backend/.env
 # Backend / Symfony
 /backend/vendor/
 /backend/var/

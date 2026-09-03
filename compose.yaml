@@ -25,6 +25,7 @@ services:
       APP_ENV: ${APP_ENV:-dev}
       APP_SECRET: ${APP_SECRET}
       APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Paris}
+      DEFAULT_URI: ${DEFAULT_URI:-http://localhost:8080}
       ACCESS_KEY: ${ACCESS_KEY}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8
     volumes:
@@ -74,6 +75,7 @@ services:
       APP_ENV: ${APP_ENV:-dev}
       APP_SECRET: ${APP_SECRET}
       APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Paris}
+      DEFAULT_URI: ${DEFAULT_URI:-http://localhost:8080}
       ACCESS_KEY: ${ACCESS_KEY}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8
     volumes:
