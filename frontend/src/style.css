@@ -1400,3 +1400,100 @@ h3 { margin-bottom: .35rem; }
 @media (min-width: 1380px) {
   .board-note { width: calc(25% - 28px); }
 }
+
+.profile-page {
+  max-width: 900px;
+}
+
+.settings-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.settings-card h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.email-list {
+  display: grid;
+  gap: .5rem;
+}
+
+.email-row,
+.preference-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.email-row {
+  min-height: 48px;
+  padding: .65rem .8rem;
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.profile-badge {
+  display: inline-flex;
+  margin-left: .6rem;
+  padding: .18rem .5rem;
+  border-radius: 999px;
+  font-size: .75rem;
+  background: rgba(66, 133, 244, .12);
+}
+
+.profile-inline-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .75rem;
+}
+
+.profile-password-form {
+  display: grid;
+  gap: .8rem;
+  max-width: 520px;
+}
+
+.profile-password-form label {
+  display: grid;
+  gap: .35rem;
+}
+
+.toggle-button {
+  min-width: 64px;
+  border-radius: 999px;
+}
+
+.toggle-button.active {
+  font-weight: 700;
+}
+
+.form-success {
+  margin: .7rem 0;
+  color: #18794e;
+}
+
+.danger-zone {
+  border-color: rgba(180, 35, 35, .25);
+}
+
+.danger-text {
+  color: #b42318;
+}
+
+@media (max-width: 640px) {
+  .profile-inline-form {
+    grid-template-columns: 1fr;
+  }
+
+  .email-row,
+  .preference-row {
+    align-items: flex-start;
+  }
+}

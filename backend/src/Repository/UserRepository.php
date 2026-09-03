@@ -278,6 +278,199 @@ SQL,
     );
 }
 
+
+/**
+ * @return array{
+ *     id:int,
+ *     primaryEmail:string,
+ *     notificationSoundEnabled:bool,
+ *     emails:list<array{
+ *         id:int,
+ *         email:string,
+ *         isPrimary:bool
+ *     }>
+ * }|null
+ */
+public function getProfile(int $userId): ?array
+{
+    $user = $this->connection->fetchAssociative(
+        <<<'SQL'
+SELECT
+    id,
+    notification_sound_enabled AS "notificationSoundEnabled"
+FROM app_user
+WHERE id = :id
+SQL,
+        ['id' => $userId],
+    );
+
+    if ($user === false) {
+        return null;
+    }
+
+    $rows = $this->connection->fetchAllAssociative(
+        <<<'SQL'
+SELECT
+    id,
+    email,
+    is_primary AS "isPrimary"
+FROM user_email
+WHERE user_id = :userId
+ORDER BY is_primary DESC, created_at ASC
+SQL,
+        ['userId' => $userId],
+    );
+
+    $emails = [];
+    $primaryEmail = '';
+
+    foreach ($rows as $row) {
+        $isPrimary = self::toBool(
+            $row['isPrimary']
+        );
+
+        $email = (string) $row['email'];
+
+        if ($isPrimary) {
+            $primaryEmail = $email;
+        }
+
+        $emails[] = [
+            'id' => (int) $row['id'],
+            'email' => $email,
+            'isPrimary' => $isPrimary,
+        ];
+    }
+
+    return [
+        'id' => (int) $user['id'],
+        'primaryEmail' => $primaryEmail,
+        'notificationSoundEnabled' =>
+            self::toBool(
+                $user['notificationSoundEnabled']
+            ),
+        'emails' => $emails,
+    ];
+}
+
+/**
+ * @return array{
+ *     id:int,
+ *     email:string,
+ *     isPrimary:bool
+ * }
+ */
+public function addEmail(
+    int $userId,
+    string $email,
+): array {
+    $normalized = self::normalizeEmail($email);
+
+    $id = $this->connection->fetchOne(
+        <<<'SQL'
+INSERT INTO user_email (
+    user_id,
+    email,
+    normalized_email,
+    is_primary
+)
+VALUES (
+    :userId,
+    :email,
+    :normalizedEmail,
+    FALSE
+)
+RETURNING id
+SQL,
+        [
+            'userId' => $userId,
+            'email' => trim($email),
+            'normalizedEmail' => $normalized,
+        ],
+    );
+
+    if ($id === false) {
+        throw new \RuntimeException(
+            'Unable to add email address.'
+        );
+    }
+
+    return [
+        'id' => (int) $id,
+        'email' => trim($email),
+        'isPrimary' => false,
+    ];
+}
+
+public function deleteSecondaryEmail(
+    int $userId,
+    int $emailId,
+): bool {
+    $affected = $this->connection->executeStatement(
+        <<<'SQL'
+DELETE FROM user_email
+WHERE id = :emailId
+  AND user_id = :userId
+  AND is_primary = FALSE
+SQL,
+        [
+            'emailId' => $emailId,
+            'userId' => $userId,
+        ],
+    );
+
+    return $affected === 1;
+}
+
+public function changePassword(
+    int $userId,
+    string $passwordHash,
+): void {
+    $affected = $this->connection->executeStatement(
+        <<<'SQL'
+UPDATE app_user
+SET password_hash = :passwordHash,
+    password_changed_at = NOW(),
+    updated_at = NOW()
+WHERE id = :id
+SQL,
+        [
+            'id' => $userId,
+            'passwordHash' => $passwordHash,
+        ],
+    );
+
+    if ($affected !== 1) {
+        throw new \RuntimeException(
+            'Unable to change password.'
+        );
+    }
+}
+
+public function setNotificationSoundEnabled(
+    int $userId,
+    bool $enabled,
+): void {
+    $affected = $this->connection->executeStatement(
+        <<<'SQL'
+UPDATE app_user
+SET notification_sound_enabled = :enabled,
+    updated_at = NOW()
+WHERE id = :id
+SQL,
+        [
+            'id' => $userId,
+            'enabled' => $enabled,
+        ],
+    );
+
+    if ($affected !== 1) {
+        throw new \RuntimeException(
+            'Unable to update notification preference.'
+        );
+    }
+}
+
     public static function normalizeEmail(
         string $email,
     ): string {
