@@ -217,6 +217,67 @@ SQL,
             : (string) $hash;
     }
 
+/**
+ * @return array{
+ *     id:int,
+ *     email:string
+ * }|null
+ */
+public function resetPasswordToTemporary(
+    string $email,
+    string $passwordHash,
+): ?array {
+    return $this->connection->transactional(
+        function (Connection $connection) use (
+            $email,
+            $passwordHash,
+        ): ?array {
+            $row = $connection->fetchAssociative(
+                <<<'SQL'
+SELECT
+    u.id,
+    ue.email
+FROM app_user u
+INNER JOIN user_email ue
+    ON ue.user_id = u.id
+WHERE ue.normalized_email = :email
+LIMIT 1
+SQL,
+                [
+                    'email' =>
+                        self::normalizeEmail($email),
+                ],
+            );
+
+            if ($row === false) {
+                return null;
+            }
+
+            $userId = (int) $row['id'];
+
+            $connection->executeStatement(
+                <<<'SQL'
+UPDATE app_user
+SET password_hash = :passwordHash,
+    must_change_password = TRUE,
+    temporary_password_consumed_at = NULL,
+    updated_at = NOW()
+WHERE id = :id
+SQL,
+                [
+                    'id' => $userId,
+                    'passwordHash' => $passwordHash,
+                ],
+            );
+
+            return [
+                'id' => $userId,
+                'email' => (string) $row['email'],
+            ];
+        },
+    );
+}
+
     public static function normalizeEmail(
         string $email,
     ): string {
