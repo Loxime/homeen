@@ -15,6 +15,7 @@ import AppIcon from '../components/AppIcon.vue'
 import ChannelNotesPanel from '../components/ChannelNotesPanel.vue'
 import ChannelTasksPanel from '../components/ChannelTasksPanel.vue'
 import ChannelChatPanel from '../components/ChannelChatPanel.vue'
+import ChannelSettingsPanel from '../components/ChannelSettingsPanel.vue'
 
 import {
   ApiError,
@@ -287,6 +288,19 @@ async function removeMember(
   } finally {
     removingMemberId.value = null
   }
+}
+
+function applyChannelUpdate(
+  updatedChannel: Channel,
+): void {
+  channel.value =
+    updatedChannel
+}
+
+function handleChannelClosed(): void {
+  void router.replace(
+    '/channels',
+  )
 }
 
 function selectTab(
@@ -673,17 +687,12 @@ onMounted(() => {
           />
         </template>
 
-        <template v-else>
-          <h2>
-            Paramètres
-          </h2>
-
-          <p class="muted">
-            Nom, description, image,
-            export et fermeture du canal
-            seront disponibles ici.
-          </p>
-        </template>
+        <ChannelSettingsPanel
+        v-else
+        :channel="channel"
+        @updated="applyChannelUpdate"
+        @closed="handleChannelClosed"
+      />
       </section>
     </template>
   </section>

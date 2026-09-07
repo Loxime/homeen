@@ -2078,3 +2078,75 @@ h3 { margin-bottom: .35rem; }
   line-height: 1;
   vertical-align: middle;
 }
+
+
+.channel-settings-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.channel-settings-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.channel-settings-field {
+  display: grid;
+  gap: .45rem;
+}
+
+.channel-settings-field > span {
+  font-weight: 700;
+}
+
+.channel-settings-field input,
+.channel-settings-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.channel-settings-field textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.channel-settings-preview {
+  width: 88px;
+  height: 88px;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.channel-settings-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.channel-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.channel-danger-zone {
+  display: grid;
+  gap: 1rem;
+}
+
+.channel-danger-button {
+  width: fit-content;
+  border: 0;
+  border-radius: 10px;
+  padding: .7rem 1rem;
+  background: #b3261e;
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.channel-danger-button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
