@@ -2,6 +2,7 @@
 import {
   onMounted,
   ref,
+  onUnmounted,
 } from 'vue'
 
 import { useRouter } from 'vue-router'
@@ -46,7 +47,23 @@ interface InvitationResponse {
   invitations: ChannelInvitation[]
 }
 
+import {
+  useChannelUnreadMessages,
+} from '../composables/useChannelUnreadMessages'
+
 const router = useRouter()
+
+const {
+  unreadFor,
+  start: startUnreadMessages,
+  stop: stopUnreadMessages,
+} = useChannelUnreadMessages()
+
+startUnreadMessages()
+
+onUnmounted(() => {
+  stopUnreadMessages()
+})
 
 const {
   markLocallySeen,
@@ -470,6 +487,22 @@ onMounted(() => {
             <div class="channel-card-title">
               <strong>
                 {{ channel.name }}
+
+              <span
+                v-if="
+                  unreadFor(channel.code) > 0
+                "
+                class="channel-list-unread-badge"
+                :title="
+                  `${unreadFor(channel.code)} message${unreadFor(channel.code) > 1 ? 's' : ''} non lu${unreadFor(channel.code) > 1 ? 's' : ''}`
+                "
+              >
+                {{
+                  unreadFor(channel.code) > 99
+                    ? '99+'
+                    : unreadFor(channel.code)
+                }}
+              </span>
               </strong>
 
               <span

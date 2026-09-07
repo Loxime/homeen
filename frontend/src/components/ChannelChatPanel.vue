@@ -12,6 +12,10 @@ import {
 } from '../services/api'
 
 import {
+  useChannelUnreadMessages,
+} from '../composables/useChannelUnreadMessages'
+
+import {
   formatDate,
 } from '../services/format'
 
@@ -35,6 +39,10 @@ interface MercureAuthorization {
 const props = defineProps<{
   channelCode: string
 }>()
+
+const {
+  refresh: refreshUnreadMessages,
+} = useChannelUnreadMessages()
 
 const messages =
   ref<ChannelMessage[]>([])
@@ -115,6 +123,8 @@ async function markRead(): Promise<void> {
         method: 'POST',
       },
     )
+
+    await refreshUnreadMessages()
   } catch {
     /*
      * Reading state is secondary and must

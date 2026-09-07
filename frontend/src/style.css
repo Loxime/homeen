@@ -2061,3 +2061,20 @@ h3 { margin-bottom: .35rem; }
     max-width: 90%;
   }
 }
+
+.channel-list-unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: .45rem;
+  padding: 0 .4rem;
+  border-radius: 999px;
+  background: #188038;
+  color: #fff;
+  font-size: .68rem;
+  font-weight: 800;
+  line-height: 1;
+  vertical-align: middle;
+}

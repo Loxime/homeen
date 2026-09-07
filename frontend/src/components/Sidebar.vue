@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   computed,
+  onUnmounted,
   ref,
 } from 'vue'
 
@@ -22,6 +23,10 @@ import {
   useChannelInvitations,
 } from '../composables/useChannelInvitations'
 
+import {
+  useChannelUnreadMessages,
+} from '../composables/useChannelUnreadMessages'
+
 defineProps<{
   collapsed: boolean
 }>()
@@ -36,6 +41,25 @@ const {
 const {
   unreadCount,
 } = useChannelInvitations()
+
+const {
+  total: unreadMessageCount,
+  start: startUnreadMessages,
+  stop: stopUnreadMessages,
+} = useChannelUnreadMessages()
+
+const channelNotificationCount =
+  computed(
+    () =>
+      unreadCount.value
+      + unreadMessageCount.value,
+  )
+
+startUnreadMessages()
+
+onUnmounted(() => {
+  stopUnreadMessages()
+})
 
 const quickLoading = ref(false)
 
@@ -190,7 +214,7 @@ async function quickFocus(): Promise<void> {
           <span
             v-if="
               collapsed
-              && unreadCount > 0
+              && channelNotificationCount > 0
             "
             class="sidebar-notification-dot"
           />
@@ -203,17 +227,17 @@ async function quickFocus(): Promise<void> {
         <span
           v-if="
             !collapsed
-            && unreadCount > 0
+            && channelNotificationCount > 0
           "
           class="sidebar-notification-badge"
           :title="
-            `${unreadCount} invitation${unreadCount > 1 ? 's' : ''} non lue${unreadCount > 1 ? 's' : ''}`
+            `${channelNotificationCount} notification${channelNotificationCount > 1 ? 's' : ''} non lue${channelNotificationCount > 1 ? 's' : ''}`
           "
         >
           {{
-            unreadCount > 99
+            channelNotificationCount > 99
               ? '99+'
-              : unreadCount
+              : channelNotificationCount
           }}
         </span>
       </RouterLink>
