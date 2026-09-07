@@ -1765,3 +1765,86 @@ h3 { margin-bottom: .35rem; }
     width: 100%;
   }
 }
+
+.channel-notes-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.channel-notes-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.channel-notes-toolbar h2 {
+  margin-bottom: .25rem;
+}
+
+.channel-note-scope {
+  flex: 0 0 auto;
+}
+
+.channel-note-composer {
+  margin-right: 0;
+  margin-left: 0;
+}
+
+.channel-notes-grid {
+  width: 100%;
+}
+
+.channel-note-version {
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.channel-note-author {
+  margin: .7rem 0 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: .74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channel-note-editor-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 1rem;
+  margin-top: .65rem;
+  color: var(--muted);
+  font-size: .75rem;
+}
+
+.channel-note-conflict {
+  display: grid;
+  gap: .65rem;
+  margin-top: .8rem;
+  padding: .8rem;
+  border: 1px solid #e8b7ba;
+  border-radius: 10px;
+  background: #fff7f7;
+}
+
+.channel-note-conflict p {
+  margin: 0;
+}
+
+.channel-task-hint {
+  margin-top: .75rem;
+  font-size: .75rem;
+}
+
+@media (max-width: 720px) {
+  .channel-notes-toolbar {
+    flex-direction: column;
+  }
+
+  .channel-note-scope {
+    width: 100%;
+    overflow-x: auto;
+  }
+}

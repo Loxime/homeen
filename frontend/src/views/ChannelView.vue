@@ -12,6 +12,7 @@ import {
 } from 'vue-router'
 
 import AppIcon from '../components/AppIcon.vue'
+import ChannelNotesPanel from '../components/ChannelNotesPanel.vue'
 
 import {
   ApiError,
@@ -487,15 +488,9 @@ onMounted(() => {
             activeTab === 'notes'
           "
         >
-          <h2>
-            Notes
-          </h2>
-
-          <p class="muted">
-            Les notes collaboratives seront
-            branchées après validation du
-            système de membres.
-          </p>
+          <ChannelNotesPanel
+            :channel-code="channel.code"
+          />
         </template>
 
         <template
