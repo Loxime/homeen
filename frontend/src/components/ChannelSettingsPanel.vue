@@ -54,6 +54,9 @@ const saving =
 const closing =
   ref(false)
 
+const exporting =
+  ref(false)
+
 const error =
   ref('')
 
@@ -125,6 +128,77 @@ async function save(): Promise<void> {
         : 'Impossible d’enregistrer les paramètres.'
   } finally {
     saving.value = false
+  }
+}
+
+async function exportChannel(): Promise<void> {
+  if (
+    !props.channel.isCreator
+    || exporting.value
+  ) {
+    return
+  }
+
+  exporting.value = true
+  error.value = ''
+  success.value = ''
+
+  try {
+    const exported =
+      await api<Record<string, unknown>>(
+        `/api/channels/${props.channel.code}/export`,
+      )
+
+    const blob =
+      new Blob(
+        [
+          JSON.stringify(
+            exported,
+            null,
+            2,
+          ),
+        ],
+        {
+          type:
+            'application/json;charset=utf-8',
+        },
+      )
+
+    const url =
+      URL.createObjectURL(
+        blob,
+      )
+
+    const link =
+      document.createElement(
+        'a',
+      )
+
+    link.href = url
+
+    link.download =
+      `homeen-channel-${props.channel.code}.json`
+
+    document.body.appendChild(
+      link,
+    )
+
+    link.click()
+    link.remove()
+
+    URL.revokeObjectURL(
+      url,
+    )
+
+    success.value =
+      'Export du canal généré.'
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible d’exporter le canal.'
+  } finally {
+    exporting.value = false
   }
 }
 
@@ -285,6 +359,40 @@ async function closeChannel(): Promise<void> {
         Seul le créateur du canal peut modifier
         son nom, sa description et son image.
       </p>
+    </section>
+
+    <section
+      v-if="channel.isCreator"
+      class="settings-card channel-content"
+    >
+      <div class="settings-heading">
+        <div>
+          <h2>
+            Exporter le canal
+          </h2>
+
+          <p class="muted">
+            Télécharge une copie JSON des
+            métadonnées, membres, notes,
+            tâches et messages du canal.
+          </p>
+        </div>
+      </div>
+
+      <div class="channel-settings-actions">
+        <button
+          type="button"
+          class="primary"
+          :disabled="exporting"
+          @click="exportChannel"
+        >
+          {{
+            exporting
+              ? 'Export en cours…'
+              : 'Télécharger l’export'
+          }}
+        </button>
+      </div>
     </section>
 
     <section
