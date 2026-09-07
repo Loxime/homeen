@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Repository\ChannelMessageRepository;
+use App\Service\ChannelMercureTopic;
 use App\Service\JsonInput;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Mercure\HubInterface;
+use Symfony\Component\Mercure\Update;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route(
@@ -17,6 +20,8 @@ final readonly class ChannelMessageController
 {
     public function __construct(
         private ChannelMessageRepository $messages,
+        private ChannelMercureTopic $topics,
+        private HubInterface $hub,
         private JsonInput $input,
     ) {
     }
@@ -69,14 +74,53 @@ final readonly class ChannelMessageController
             );
 
         try {
-            return new JsonResponse(
+            $message =
                 $this->messages->create(
                     $code,
                     (string) (
                         $data['content']
                         ?? ''
                     ),
-                ),
+                );
+
+            /*
+             * PostgreSQL remains the source
+             * of truth. Mercure only transports
+             * the newly persisted representation.
+             */
+            try {
+                $payload =
+                    json_encode(
+                        $message,
+                        JSON_THROW_ON_ERROR,
+                    );
+
+                $this->hub->publish(
+                    new Update(
+                        $this->topics
+                            ->messages(
+                                $code
+                            ),
+                        $payload,
+                        true,
+                        (string) $message[
+                            'id'
+                        ],
+                    ),
+                );
+            } catch (\Throwable) {
+                /*
+                 * A temporary realtime outage
+                 * must not turn an already stored
+                 * message into a failed send.
+                 *
+                 * A reload still retrieves it
+                 * from PostgreSQL.
+                 */
+            }
+
+            return new JsonResponse(
+                $message,
                 201,
             );
         } catch (\Throwable $exception) {

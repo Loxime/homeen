@@ -7,8 +7,13 @@ import {
   watch,
 } from 'vue'
 
-import { api } from '../services/api'
-import { formatDate } from '../services/format'
+import {
+  api,
+} from '../services/api'
+
+import {
+  formatDate,
+} from '../services/format'
 
 interface ChannelMessage {
   id: number
@@ -19,6 +24,12 @@ interface ChannelMessage {
   updatedAt: string
   editedAt: string | null
   isMine: boolean
+}
+
+interface MercureAuthorization {
+  hubUrl: string
+  topic: string
+  currentUserId: number
 }
 
 const props = defineProps<{
@@ -33,11 +44,21 @@ const sending = ref(false)
 const loading = ref(true)
 const error = ref('')
 
+const currentUserId =
+  ref<number | null>(null)
+
+const realtimeStatus =
+  ref<
+    | 'connecting'
+    | 'connected'
+    | 'reconnecting'
+  >('connecting')
+
 const messageList =
   ref<HTMLElement | null>(null)
 
-let pollingId:
-  ReturnType<typeof window.setInterval>
+let eventSource:
+  EventSource
   | null = null
 
 async function scrollBottom(): Promise<void> {
@@ -51,6 +72,41 @@ async function scrollBottom(): Promise<void> {
     messageList.value.scrollHeight
 }
 
+function appendMessage(
+  message: ChannelMessage,
+): boolean {
+  const exists =
+    messages.value.some(
+      current =>
+        current.id === message.id,
+    )
+
+  if (exists) {
+    return false
+  }
+
+  const normalized: ChannelMessage = {
+    ...message,
+
+    isMine:
+      currentUserId.value !== null
+        ? message.authorUserId
+          === currentUserId.value
+        : message.isMine,
+  }
+
+  messages.value.push(
+    normalized,
+  )
+
+  messages.value.sort(
+    (a, b) =>
+      a.id - b.id,
+  )
+
+  return true
+}
+
 async function markRead(): Promise<void> {
   try {
     await api(
@@ -60,7 +116,10 @@ async function markRead(): Promise<void> {
       },
     )
   } catch {
-    // Reading state must never break the chat.
+    /*
+     * Reading state is secondary and must
+     * never interrupt the live conversation.
+     */
   }
 }
 
@@ -76,8 +135,19 @@ async function loadInitial(): Promise<void> {
         `/api/channels/${props.channelCode}/messages`,
       )
 
-    messages.value =
-      response.messages
+    /*
+     * Merge instead of replacing because a
+     * realtime message may arrive while this
+     * HTTP request is still in progress.
+     */
+    for (
+      const message
+      of response.messages
+    ) {
+      appendMessage(
+        message,
+      )
+    }
 
     await scrollBottom()
     await markRead()
@@ -91,57 +161,114 @@ async function loadInitial(): Promise<void> {
   }
 }
 
-async function poll(): Promise<void> {
-  const last =
-    messages.value.at(-1)
-
-  if (!last) {
-    await loadInitial()
+function closeRealtime(): void {
+  if (!eventSource) {
     return
   }
 
-  try {
-    const response =
-      await api<{
-        messages: ChannelMessage[]
-      }>(
-        `/api/channels/${props.channelCode}/messages?after=${last.id}`,
-      )
+  eventSource.close()
+  eventSource = null
+}
 
-    if (
-      response.messages.length
-      === 0
-    ) {
-      return
-    }
+async function connectRealtime(): Promise<void> {
+  closeRealtime()
 
-    const existing =
-      new Set(
-        messages.value.map(
-          message =>
-            message.id,
-        ),
-      )
+  realtimeStatus.value =
+    'connecting'
 
-    for (
-      const message
-      of response.messages
-    ) {
+  const authorization =
+    await api<MercureAuthorization>(
+      `/api/channels/${props.channelCode}/mercure-auth`,
+      {
+        method: 'POST',
+      },
+    )
+
+  currentUserId.value =
+    authorization.currentUserId
+
+  const url =
+    new URL(
+      authorization.hubUrl,
+      window.location.origin,
+    )
+
+  url.searchParams.append(
+    'topic',
+    authorization.topic,
+  )
+
+  const source =
+    new EventSource(
+      url.toString(),
+      {
+        withCredentials: true,
+      },
+    )
+
+  eventSource = source
+
+  source.onopen = () => {
+    realtimeStatus.value =
+      'connected'
+  }
+
+  source.onerror = () => {
+    /*
+     * EventSource automatically reconnects.
+     * We therefore keep the same instance.
+     */
+    realtimeStatus.value =
+      'reconnecting'
+  }
+
+  source.onmessage = event => {
+    try {
+      const message =
+        JSON.parse(
+          event.data,
+        ) as ChannelMessage
+
       if (
-        !existing.has(
-          message.id
+        appendMessage(
+          message,
         )
       ) {
-        messages.value.push(
-          message
-        )
+        void scrollBottom()
+        void markRead()
       }
+    } catch {
+      /*
+       * Ignore malformed events instead of
+       * breaking the live stream.
+       */
     }
+  }
+}
 
-    await scrollBottom()
-    await markRead()
-  } catch {
-    // Temporary polling failures are ignored.
+async function openChannel(): Promise<void> {
+  closeRealtime()
+
+  messages.value = []
+  content.value = ''
+  currentUserId.value = null
+  error.value = ''
+
+  try {
+    /*
+     * Connect first, then hydrate history.
+     * Any message arriving while history is
+     * loading is merged by appendMessage().
+     */
+    await connectRealtime()
+    await loadInitial()
+  } catch (exception) {
+    loading.value = false
+
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible d’établir le temps réel.'
   }
 }
 
@@ -172,8 +299,13 @@ async function send(): Promise<void> {
         },
       )
 
-    messages.value.push(
-      message
+    /*
+     * Immediate local rendering.
+     * The Mercure copy will be ignored
+     * by appendMessage() thanks to its ID.
+     */
+    appendMessage(
+      message,
     )
 
     content.value = ''
@@ -190,53 +322,19 @@ async function send(): Promise<void> {
   }
 }
 
-function startPolling(): void {
-  if (pollingId !== null) {
-    return
-  }
-
-  pollingId =
-    window.setInterval(
-      () => {
-        void poll()
-      },
-      5000,
-    )
-}
-
-function stopPolling(): void {
-  if (pollingId === null) {
-    return
-  }
-
-  window.clearInterval(
-    pollingId
-  )
-
-  pollingId = null
-}
-
 watch(
   () => props.channelCode,
-  async () => {
-    stopPolling()
-
-    messages.value = []
-
-    await loadInitial()
-
-    startPolling()
+  () => {
+    void openChannel()
   },
 )
 
-onMounted(async () => {
-  await loadInitial()
-
-  startPolling()
+onMounted(() => {
+  void openChannel()
 })
 
 onUnmounted(() => {
-  stopPolling()
+  closeRealtime()
 })
 </script>
 
@@ -254,8 +352,38 @@ onUnmounted(() => {
         </p>
       </div>
 
-      <span class="channel-chat-status">
-        Actualisation automatique
+      <span
+        class="channel-chat-status"
+        :class="{
+          connected:
+            realtimeStatus
+              === 'connected',
+          reconnecting:
+            realtimeStatus
+              === 'reconnecting',
+        }"
+      >
+        <template
+          v-if="
+            realtimeStatus
+              === 'connected'
+          "
+        >
+          Temps réel actif
+        </template>
+
+        <template
+          v-else-if="
+            realtimeStatus
+              === 'reconnecting'
+          "
+        >
+          Reconnexion…
+        </template>
+
+        <template v-else>
+          Connexion…
+        </template>
       </span>
     </header>
 
@@ -271,7 +399,10 @@ onUnmounted(() => {
       class="channel-chat-messages"
     >
       <div
-        v-if="loading"
+        v-if="
+          loading
+          && messages.length === 0
+        "
         class="empty-state"
       >
         Chargement des messages…
