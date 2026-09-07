@@ -191,6 +191,139 @@ final readonly class ChannelMessageController
     }
 
     #[Route(
+        '/{messageId<\d+>}',
+        name: 'api_channel_messages_update',
+        methods: ['PATCH'],
+    )]
+    public function update(
+        string $code,
+        int $messageId,
+        Request $request,
+    ): JsonResponse {
+        $data =
+            $this->input->read(
+                $request
+            );
+
+        try {
+            $message =
+                $this->messages
+                    ->updateOwn(
+                        $code,
+                        $messageId,
+                        (string) (
+                            $data['content']
+                            ?? ''
+                        ),
+                    );
+
+            /*
+             * Editing does not create a new unread
+             * notification. Only open channel chats
+             * need to receive the mutation.
+             */
+            try {
+                $payload =
+                    json_encode(
+                        [
+                            'type' =>
+                                'updated',
+
+                            'message' =>
+                                $message,
+                        ],
+                        JSON_THROW_ON_ERROR,
+                    );
+
+                $this->hub->publish(
+                    new Update(
+                        $this->topics
+                            ->messages(
+                                $code
+                            ),
+                        $payload,
+                        true,
+                    ),
+                );
+            } catch (\Throwable) {
+                /*
+                 * PostgreSQL remains authoritative.
+                 * Reloading restores the edited state.
+                 */
+            }
+
+            return new JsonResponse(
+                $message
+            );
+        } catch (\Throwable $exception) {
+            return $this->error(
+                $exception
+            );
+        }
+    }
+
+    #[Route(
+        '/{messageId<\d+>}',
+        name: 'api_channel_messages_delete',
+        methods: ['DELETE'],
+    )]
+    public function delete(
+        string $code,
+        int $messageId,
+    ): JsonResponse {
+        try {
+            $this->messages
+                ->deleteOwn(
+                    $code,
+                    $messageId,
+                );
+
+            /*
+             * Deletion is also a realtime mutation,
+             * not a new unread channel message.
+             */
+            try {
+                $payload =
+                    json_encode(
+                        [
+                            'type' =>
+                                'deleted',
+
+                            'messageId' =>
+                                $messageId,
+                        ],
+                        JSON_THROW_ON_ERROR,
+                    );
+
+                $this->hub->publish(
+                    new Update(
+                        $this->topics
+                            ->messages(
+                                $code
+                            ),
+                        $payload,
+                        true,
+                    ),
+                );
+            } catch (\Throwable) {
+                /*
+                 * Reloading reflects the deletion
+                 * because PostgreSQL is authoritative.
+                 */
+            }
+
+            return new JsonResponse(
+                null,
+                204,
+            );
+        } catch (\Throwable $exception) {
+            return $this->error(
+                $exception
+            );
+        }
+    }
+
+    #[Route(
         '/read',
         name: 'api_channel_messages_read',
         methods: ['POST'],
@@ -238,8 +371,30 @@ final readonly class ChannelMessageController
 
         if (
             $exception
+            instanceof \DomainException
+            && $exception->getMessage()
+                === 'CHANNEL_MESSAGE_FORBIDDEN'
+        ) {
+            return new JsonResponse(
+                [
+                    'error' =>
+                        'You can only modify your own messages.',
+
+                    'code' =>
+                        'CHANNEL_MESSAGE_FORBIDDEN',
+                ],
+                403,
+            );
+        }
+
+        if (
+            $exception
             instanceof \OutOfBoundsException
         ) {
+            $messageNotFound =
+                $exception->getMessage()
+                    === 'Message not found.';
+
             return new JsonResponse(
                 [
                     'error' =>
@@ -247,7 +402,9 @@ final readonly class ChannelMessageController
                             ->getMessage(),
 
                     'code' =>
-                        'CHANNEL_NOT_FOUND',
+                        $messageNotFound
+                            ? 'CHANNEL_MESSAGE_NOT_FOUND'
+                            : 'CHANNEL_NOT_FOUND',
                 ],
                 404,
             );

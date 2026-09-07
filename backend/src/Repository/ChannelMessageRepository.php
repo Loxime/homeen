@@ -232,6 +232,150 @@ SQL,
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function updateOwn(
+        string $code,
+        int $messageId,
+        string $content,
+    ): array {
+        $content = trim($content);
+
+        if (
+            $content === ''
+            || mb_strlen($content) > 4000
+        ) {
+            throw new \InvalidArgumentException(
+                'Message content must contain between 1 and 4000 characters.'
+            );
+        }
+
+        $channelId =
+            $this->accessibleChannelId(
+                $code
+            );
+
+        $userId =
+            $this->currentUser->id();
+
+        $row = $this->connection
+            ->fetchAssociative(
+                <<<'SQL'
+UPDATE channel_message
+SET
+    content = :content,
+    updated_at = NOW(),
+    edited_at = NOW()
+WHERE id = :messageId
+  AND channel_id = :channelId
+  AND author_user_id = :userId
+RETURNING
+    id,
+    content,
+    author_user_id
+        AS "authorUserId",
+    created_at
+        AS "createdAt",
+    updated_at
+        AS "updatedAt",
+    edited_at
+        AS "editedAt"
+SQL,
+                [
+                    'messageId' =>
+                        $messageId,
+
+                    'channelId' =>
+                        $channelId,
+
+                    'userId' =>
+                        $userId,
+
+                    'content' =>
+                        $content,
+                ],
+            );
+
+        if ($row === false) {
+            $this->throwMessageMutationFailure(
+                $channelId,
+                $messageId,
+                $userId,
+            );
+        }
+
+        $authorEmail =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT email
+FROM user_email
+WHERE user_id = :userId
+  AND is_primary = TRUE
+LIMIT 1
+SQL,
+                    [
+                        'userId' =>
+                            $userId,
+                    ],
+                );
+
+        $row['authorEmail'] =
+            $authorEmail !== false
+                ? (string) $authorEmail
+                : null;
+
+        $row['isMine'] = true;
+
+        return $this->normalize(
+            $row
+        );
+    }
+
+    public function deleteOwn(
+        string $code,
+        int $messageId,
+    ): void {
+        $channelId =
+            $this->accessibleChannelId(
+                $code
+            );
+
+        $userId =
+            $this->currentUser->id();
+
+        $deletedId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+DELETE FROM channel_message
+WHERE id = :messageId
+  AND channel_id = :channelId
+  AND author_user_id = :userId
+RETURNING id
+SQL,
+                    [
+                        'messageId' =>
+                            $messageId,
+
+                        'channelId' =>
+                            $channelId,
+
+                        'userId' =>
+                            $userId,
+                    ],
+                );
+
+        if ($deletedId === false) {
+            $this->throwMessageMutationFailure(
+                $channelId,
+                $messageId,
+                $userId,
+            );
+        }
+    }
+
     public function markRead(
         string $code,
     ): void {
@@ -258,6 +402,55 @@ SQL,
                             ->id(),
                 ],
             );
+    }
+
+    private function throwMessageMutationFailure(
+        int $channelId,
+        int $messageId,
+        int $userId,
+    ): never {
+        $authorUserId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT author_user_id
+FROM channel_message
+WHERE id = :messageId
+  AND channel_id = :channelId
+LIMIT 1
+SQL,
+                    [
+                        'messageId' =>
+                            $messageId,
+
+                        'channelId' =>
+                            $channelId,
+                    ],
+                );
+
+        if ($authorUserId === false) {
+            throw new \OutOfBoundsException(
+                'Message not found.'
+            );
+        }
+
+        if (
+            $authorUserId === null
+            || (int) $authorUserId
+                !== $userId
+        ) {
+            throw new \DomainException(
+                'CHANNEL_MESSAGE_FORBIDDEN'
+            );
+        }
+
+        /*
+         * The message disappeared between
+         * the mutation and ownership check.
+         */
+        throw new \OutOfBoundsException(
+            'Message not found.'
+        );
     }
 
     private function accessibleChannelId(

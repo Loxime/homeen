@@ -36,6 +36,21 @@ interface MercureAuthorization {
   currentUserId: number
 }
 
+interface ChannelMessageUpdatedEvent {
+  type: 'updated'
+  message: ChannelMessage
+}
+
+interface ChannelMessageDeletedEvent {
+  type: 'deleted'
+  messageId: number
+}
+
+type ChannelRealtimeEvent =
+  | ChannelMessage
+  | ChannelMessageUpdatedEvent
+  | ChannelMessageDeletedEvent
+
 const props = defineProps<{
   channelCode: string
 }>()
@@ -51,6 +66,18 @@ const content = ref('')
 const sending = ref(false)
 const loading = ref(true)
 const error = ref('')
+
+const editingMessageId =
+  ref<number | null>(null)
+
+const editingContent =
+  ref('')
+
+const updatingMessageId =
+  ref<number | null>(null)
+
+const deletingMessageId =
+  ref<number | null>(null)
 
 const currentUserId =
   ref<number | null>(null)
@@ -113,6 +140,55 @@ function appendMessage(
   )
 
   return true
+}
+
+function replaceMessage(
+  message: ChannelMessage,
+): void {
+  const index =
+    messages.value.findIndex(
+      current =>
+        current.id === message.id,
+    )
+
+  const normalized: ChannelMessage = {
+    ...message,
+
+    isMine:
+      currentUserId.value !== null
+        ? message.authorUserId
+          === currentUserId.value
+        : message.isMine,
+  }
+
+  if (index === -1) {
+    appendMessage(
+      normalized,
+    )
+
+    return
+  }
+
+  messages.value[index] =
+    normalized
+}
+
+function removeMessage(
+  messageId: number,
+): void {
+  messages.value =
+    messages.value.filter(
+      message =>
+        message.id !== messageId,
+    )
+
+  if (
+    editingMessageId.value
+    === messageId
+  ) {
+    editingMessageId.value = null
+    editingContent.value = ''
+  }
 }
 
 async function markRead(): Promise<void> {
@@ -234,14 +310,37 @@ async function connectRealtime(): Promise<void> {
 
   source.onmessage = event => {
     try {
-      const message =
+      const payload =
         JSON.parse(
           event.data,
-        ) as ChannelMessage
+        ) as ChannelRealtimeEvent
 
       if (
-        appendMessage(
-          message,
+        'type' in payload
+        && payload.type === 'updated'
+      ) {
+        replaceMessage(
+          payload.message,
+        )
+
+        return
+      }
+
+      if (
+        'type' in payload
+        && payload.type === 'deleted'
+      ) {
+        removeMessage(
+          payload.messageId,
+        )
+
+        return
+      }
+
+      if (
+        !('type' in payload)
+        && appendMessage(
+          payload,
         )
       ) {
         void scrollBottom()
@@ -261,6 +360,10 @@ async function openChannel(): Promise<void> {
 
   messages.value = []
   content.value = ''
+  editingMessageId.value = null
+  editingContent.value = ''
+  updatingMessageId.value = null
+  deletingMessageId.value = null
   currentUserId.value = null
   error.value = ''
 
@@ -329,6 +432,119 @@ async function send(): Promise<void> {
         : 'Impossible d’envoyer le message.'
   } finally {
     sending.value = false
+  }
+}
+
+function startEdit(
+  message: ChannelMessage,
+): void {
+  if (!message.isMine) {
+    return
+  }
+
+  editingMessageId.value =
+    message.id
+
+  editingContent.value =
+    message.content
+
+  error.value = ''
+}
+
+function cancelEdit(): void {
+  editingMessageId.value = null
+  editingContent.value = ''
+}
+
+async function saveEdit(
+  message: ChannelMessage,
+): Promise<void> {
+  const value =
+    editingContent.value.trim()
+
+  if (
+    !message.isMine
+    || !value
+    || updatingMessageId.value !== null
+  ) {
+    return
+  }
+
+  updatingMessageId.value =
+    message.id
+
+  error.value = ''
+
+  try {
+    const updated =
+      await api<ChannelMessage>(
+        `/api/channels/${props.channelCode}/messages/${message.id}`,
+        {
+          method: 'PATCH',
+
+          body: JSON.stringify({
+            content: value,
+          }),
+        },
+      )
+
+    replaceMessage(
+      updated,
+    )
+
+    cancelEdit()
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de modifier le message.'
+  } finally {
+    updatingMessageId.value = null
+  }
+}
+
+async function deleteMessage(
+  message: ChannelMessage,
+): Promise<void> {
+  if (
+    !message.isMine
+    || deletingMessageId.value !== null
+  ) {
+    return
+  }
+
+  const confirmed =
+    window.confirm(
+      'Supprimer ce message ?',
+    )
+
+  if (!confirmed) {
+    return
+  }
+
+  deletingMessageId.value =
+    message.id
+
+  error.value = ''
+
+  try {
+    await api(
+      `/api/channels/${props.channelCode}/messages/${message.id}`,
+      {
+        method: 'DELETE',
+      },
+    )
+
+    removeMessage(
+      message.id,
+    )
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de supprimer le message.'
+  } finally {
+    deletingMessageId.value = null
   }
 }
 
@@ -454,16 +670,123 @@ onUnmounted(() => {
             }}
           </strong>
 
-          <span>
-            {{
-              formatDate(
-                message.createdAt,
-              )
-            }}
-          </span>
+          <div class="channel-message-meta-right">
+            <span>
+              {{
+                formatDate(
+                  message.createdAt,
+                )
+              }}
+
+              <template
+                v-if="message.editedAt"
+              >
+                · modifié
+              </template>
+            </span>
+
+            <div
+              v-if="
+                message.isMine
+                && editingMessageId !== message.id
+              "
+              class="channel-message-actions"
+            >
+              <button
+                type="button"
+                class="channel-message-action"
+                :disabled="
+                  deletingMessageId === message.id
+                "
+                @click="
+                  startEdit(message)
+                "
+              >
+                Modifier
+              </button>
+
+              <button
+                type="button"
+                class="channel-message-action danger"
+                :disabled="
+                  deletingMessageId === message.id
+                "
+                @click="
+                  deleteMessage(message)
+                "
+              >
+                {{
+                  deletingMessageId === message.id
+                    ? 'Suppression…'
+                    : 'Supprimer'
+                }}
+              </button>
+            </div>
+          </div>
         </div>
 
-        <p>
+        <div
+          v-if="
+            editingMessageId === message.id
+          "
+          class="channel-message-edit"
+        >
+          <textarea
+            v-model="editingContent"
+            maxlength="4000"
+            rows="3"
+            :disabled="
+              updatingMessageId === message.id
+            "
+            @keydown.esc.prevent="
+              cancelEdit
+            "
+            @keydown.enter.exact.prevent="
+              saveEdit(message)
+            "
+          />
+
+          <div class="channel-message-edit-footer">
+            <span class="char-count">
+              {{ editingContent.length }}/4000
+            </span>
+
+            <div class="channel-message-edit-actions">
+              <button
+                type="button"
+                class="channel-message-action"
+                :disabled="
+                  updatingMessageId === message.id
+                "
+                @click="
+                  cancelEdit
+                "
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                class="primary"
+                :disabled="
+                  updatingMessageId === message.id
+                  || !editingContent.trim()
+                "
+                @click="
+                  saveEdit(message)
+                "
+              >
+                {{
+                  updatingMessageId === message.id
+                    ? 'Enregistrement…'
+                    : 'Enregistrer'
+                }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <p v-else>
           {{ message.content }}
         </p>
       </article>
