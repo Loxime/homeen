@@ -303,6 +303,12 @@ function handleChannelClosed(): void {
   )
 }
 
+function handleChannelLeft(): void {
+  void router.replace(
+    '/channels',
+  )
+}
+
 function selectTab(
   tab: ChannelTab,
 ): void {
@@ -692,6 +698,7 @@ onMounted(() => {
         :channel="channel"
         @updated="applyChannelUpdate"
         @closed="handleChannelClosed"
+        @left="handleChannelLeft"
       />
       </section>
     </template>

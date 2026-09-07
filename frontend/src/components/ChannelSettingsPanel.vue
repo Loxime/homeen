@@ -30,6 +30,7 @@ const emit =
   defineEmits<{
     updated: [channel: Channel]
     closed: []
+    left: []
   }>()
 
 const name =
@@ -52,6 +53,9 @@ const saving =
   ref(false)
 
 const closing =
+  ref(false)
+
+const leaving =
   ref(false)
 
 const exporting =
@@ -199,6 +203,48 @@ async function exportChannel(): Promise<void> {
         : 'Impossible d’exporter le canal.'
   } finally {
     exporting.value = false
+  }
+}
+
+async function leaveChannel(): Promise<void> {
+  if (
+    props.channel.isCreator
+    || leaving.value
+  ) {
+    return
+  }
+
+  const confirmed =
+    window.confirm(
+      `Quitter le canal « ${props.channel.name} » ?\n\nVous perdrez immédiatement l’accès à ses notes, tâches et messages.`,
+    )
+
+  if (!confirmed) {
+    return
+  }
+
+  leaving.value = true
+  error.value = ''
+  success.value = ''
+
+  try {
+    await api(
+      `/api/channels/${props.channel.code}/leave`,
+      {
+        method: 'POST',
+      },
+    )
+
+    emit(
+      'left',
+    )
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de quitter le canal.'
+  } finally {
+    leaving.value = false
   }
 }
 
