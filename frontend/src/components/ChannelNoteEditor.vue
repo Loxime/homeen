@@ -16,6 +16,10 @@ import type {
   ChannelNote,
 } from '../types/channel'
 
+import type {
+  Task,
+} from '../types/domain'
+
 const props = defineProps<{
   channelCode: string
   note: ChannelNote | null
@@ -37,6 +41,10 @@ const saving = ref(false)
 const error = ref('')
 const conflict = ref(false)
 const reloading = ref(false)
+
+const taskText = ref('')
+const taskCreating = ref(false)
+const taskBusyId = ref<number | null>(null)
 
 const isNew = computed(
   () => localNote.value === null,
@@ -88,6 +96,7 @@ function applyNote(
 
   error.value = ''
   conflict.value = false
+  taskText.value = ''
 }
 
 watch(
@@ -197,6 +206,123 @@ async function reloadLatest(): Promise<void> {
         : 'Impossible de recharger la note.'
   } finally {
     reloading.value = false
+  }
+}
+
+async function addTask(): Promise<void> {
+  if (
+    !localNote.value
+    || !taskText.value.trim()
+  ) {
+    return
+  }
+
+  taskCreating.value = true
+  error.value = ''
+
+  try {
+    const task =
+      await api<Task>(
+        `/api/channels/${props.channelCode}/notes/${localNote.value.id}/tasks`,
+        {
+          method: 'POST',
+
+          body: JSON.stringify({
+            content:
+              taskText.value.trim(),
+          }),
+        },
+      )
+
+    localNote.value.tasks.push(
+      task,
+    )
+
+    taskText.value = ''
+
+    emit('changed')
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de créer la tâche.'
+  } finally {
+    taskCreating.value = false
+  }
+}
+
+async function toggleTask(
+  task: Task,
+): Promise<void> {
+  if (!localNote.value) {
+    return
+  }
+
+  taskBusyId.value = task.id
+  error.value = ''
+
+  try {
+    const updated =
+      await api<Task>(
+        `/api/channels/${props.channelCode}/notes/${localNote.value.id}/tasks/${task.id}/completed`,
+        {
+          method: 'PUT',
+
+          body: JSON.stringify({
+            completed:
+              !task.isCompleted,
+          }),
+        },
+      )
+
+    Object.assign(
+      task,
+      updated,
+    )
+
+    emit('changed')
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de modifier la tâche.'
+  } finally {
+    taskBusyId.value = null
+  }
+}
+
+async function deleteTask(
+  task: Task,
+): Promise<void> {
+  if (!localNote.value) {
+    return
+  }
+
+  taskBusyId.value = task.id
+  error.value = ''
+
+  try {
+    await api(
+      `/api/channels/${props.channelCode}/notes/${localNote.value.id}/tasks/${task.id}`,
+      {
+        method: 'DELETE',
+      },
+    )
+
+    localNote.value.tasks =
+      localNote.value.tasks.filter(
+        candidate =>
+          candidate.id !== task.id,
+      )
+
+    emit('changed')
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de supprimer la tâche.'
+  } finally {
+    taskBusyId.value = null
   }
 }
 
@@ -410,10 +536,7 @@ async function restore(): Promise<void> {
         </div>
 
         <section
-          v-if="
-            localNote
-            && localNote.tasks.length
-          "
+          v-if="localNote"
           class="tasks-panel keep-tasks-panel"
         >
           <div class="section-heading keep-task-heading">
@@ -436,6 +559,27 @@ async function restore(): Promise<void> {
             </div>
           </div>
 
+          <form
+            class="task-entry keep-task-entry"
+            @submit.prevent="addTask"
+          >
+            <AppIcon
+              name="plus"
+              :size="19"
+            />
+
+            <input
+              v-model="taskText"
+              maxlength="255"
+              placeholder="Ajouter une tâche"
+              :disabled="taskCreating"
+            />
+
+            <span class="char-count">
+              {{ taskText.length }}/255
+            </span>
+          </form>
+
           <div class="task-list">
             <div
               v-for="task in localNote.tasks"
@@ -449,21 +593,46 @@ async function restore(): Promise<void> {
               <input
                 type="checkbox"
                 :checked="task.isCompleted"
-                disabled
+                :disabled="
+                  taskBusyId === task.id
+                "
+                @change="
+                  toggleTask(task)
+                "
               />
 
               <span>
                 {{ task.content }}
               </span>
+
+              <button
+                class="icon-button small"
+                type="button"
+                title="Supprimer la tâche"
+                aria-label="Supprimer la tâche"
+                :disabled="
+                  taskBusyId === task.id
+                "
+                @click="
+                  deleteTask(task)
+                "
+              >
+                <AppIcon
+                  name="close"
+                  :size="16"
+                />
+              </button>
             </div>
           </div>
-
-          <p class="muted channel-task-hint">
-            La modification des tâches
-            collaboratives arrive à l’étape
-            suivante.
-          </p>
         </section>
+
+        <p
+          v-else
+          class="keep-task-hint"
+        >
+          Enregistrez d’abord la note
+          pour ajouter des tâches.
+        </p>
       </div>
 
       <footer class="keep-editor-footer">
