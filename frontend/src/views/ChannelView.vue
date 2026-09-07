@@ -14,6 +14,7 @@ import {
 import AppIcon from '../components/AppIcon.vue'
 import ChannelNotesPanel from '../components/ChannelNotesPanel.vue'
 import ChannelTasksPanel from '../components/ChannelTasksPanel.vue'
+import ChannelChatPanel from '../components/ChannelChatPanel.vue'
 
 import {
   ApiError,
@@ -667,15 +668,9 @@ onMounted(() => {
             activeTab === 'chat'
           "
         >
-          <h2>
-            Chat
-          </h2>
-
-          <p class="muted">
-            Le chat sera ajouté après les
-            notes partagées et avant le
-            temps réel.
-          </p>
+          <ChannelChatPanel
+            :channel-code="channel.code"
+          />
         </template>
 
         <template v-else>
