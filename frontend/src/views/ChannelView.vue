@@ -13,6 +13,7 @@ import {
 
 import AppIcon from '../components/AppIcon.vue'
 import ChannelNotesPanel from '../components/ChannelNotesPanel.vue'
+import ChannelTasksPanel from '../components/ChannelTasksPanel.vue'
 
 import {
   ApiError,
@@ -498,15 +499,9 @@ onMounted(() => {
             activeTab === 'tasks'
           "
         >
-          <h2>
-            Tâches
-          </h2>
-
-          <p class="muted">
-            Les tâches du canal seront
-            rattachées aux notes
-            collaboratives.
-          </p>
+          <ChannelTasksPanel
+            :channel-code="channel.code"
+          />
         </template>
 
         <template

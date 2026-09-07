@@ -18,6 +18,75 @@ final readonly class ChannelTaskRepository
     }
 
     /**
+     * @return list<array<string, mixed>>
+     */
+    public function list(
+        string $code,
+    ): array {
+        $channelId =
+            $this->accessibleChannelId(
+                $code
+            );
+
+        $rows = $this->connection
+            ->fetchAllAssociative(
+                <<<'SQL'
+SELECT
+    t.id,
+    t.note_id
+        AS "noteId",
+    n.title
+        AS "noteTitle",
+    t.content,
+    t.is_completed
+        AS "isCompleted",
+    t.completed_at
+        AS "completedAt",
+    t.created_at
+        AS "createdAt",
+    t.updated_at
+        AS "updatedAt"
+FROM task t
+INNER JOIN note n
+    ON n.id = t.note_id
+WHERE n.channel_id = :channelId
+  AND n.user_id IS NULL
+  AND n.deleted_at IS NULL
+  AND n.archived_at IS NULL
+ORDER BY
+    t.is_completed ASC,
+    t.updated_at DESC,
+    t.id DESC
+SQL,
+                [
+                    'channelId' =>
+                        $channelId,
+                ],
+            );
+
+        return array_map(
+            function (
+                array $row,
+            ): array {
+                $row['id'] =
+                    (int) $row['id'];
+
+                $row['noteId'] =
+                    (int) $row['noteId'];
+
+                $row['isCompleted'] =
+                    filter_var(
+                        $row['isCompleted'],
+                        FILTER_VALIDATE_BOOLEAN,
+                    );
+
+                return $row;
+            },
+            $rows,
+        );
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function create(
