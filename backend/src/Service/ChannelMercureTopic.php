@@ -14,4 +14,13 @@ final readonly class ChannelMercureTopic
             $code,
         );
     }
+
+    public function notifications(
+        int $userId,
+    ): string {
+        return sprintf(
+            'urn:homeen:user:%d:channel-notifications',
+            $userId,
+        );
+    }
 }

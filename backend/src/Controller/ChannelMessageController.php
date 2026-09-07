@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Repository\ChannelMercureAudienceRepository;
 use App\Repository\ChannelMessageRepository;
 use App\Service\ChannelMercureTopic;
 use App\Service\JsonInput;
@@ -20,6 +21,7 @@ final readonly class ChannelMessageController
 {
     public function __construct(
         private ChannelMessageRepository $messages,
+        private ChannelMercureAudienceRepository $mercureAudience,
         private ChannelMercureTopic $topics,
         private HubInterface $hub,
         private JsonInput $input,
@@ -108,6 +110,64 @@ final readonly class ChannelMessageController
                         ],
                     ),
                 );
+
+                /*
+                 * Notify every other member
+                 * without duplicating the actual
+                 * message content on their
+                 * personal notification topic.
+                 */
+                $notificationTopics = [];
+
+                foreach (
+                    $this->mercureAudience
+                        ->recipientUserIds(
+                            $code,
+                            (int) $message[
+                                'authorUserId'
+                            ],
+                        )
+                    as $recipientUserId
+                ) {
+                    $notificationTopics[] =
+                        $this->topics
+                            ->notifications(
+                                $recipientUserId,
+                            );
+                }
+
+                if ([] !== $notificationTopics) {
+                    $notificationPayload =
+                        json_encode(
+                            [
+                                'type' =>
+                                    'channel-message',
+
+                                'channelCode' =>
+                                    $code,
+
+                                'messageId' =>
+                                    (int) $message[
+                                        'id'
+                                    ],
+                            ],
+                            JSON_THROW_ON_ERROR,
+                        );
+
+                    $this->hub->publish(
+                        new Update(
+                            $notificationTopics,
+                            $notificationPayload,
+                            true,
+                            sprintf(
+                                'channel-message-%d',
+                                (int) $message[
+                                    'id'
+                                ],
+                            ),
+                        ),
+                    );
+                }
             } catch (\Throwable) {
                 /*
                  * A temporary realtime outage

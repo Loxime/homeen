@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Repository\ChannelRepository;
+use App\Service\ChannelMercureAuthorizationService;
 use App\Service\ChannelMercureTopic;
-use App\Service\CurrentUser;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Mercure\Authorization;
 use Symfony\Component\Mercure\HubInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -18,8 +17,7 @@ final readonly class ChannelMercureController
     public function __construct(
         private ChannelRepository $channels,
         private ChannelMercureTopic $topics,
-        private CurrentUser $currentUser,
-        private Authorization $authorization,
+        private ChannelMercureAuthorizationService $authorization,
         private HubInterface $hub,
     ) {
     }
@@ -35,29 +33,19 @@ final readonly class ChannelMercureController
     ): JsonResponse {
         try {
             /*
-             * Security boundary:
-             * never issue a Mercure subscriber token
-             * before verifying channel membership.
+             * The requested channel must still
+             * be accessible before its topic is
+             * exposed to the frontend.
              */
             $this->channels->getAccessible(
                 $code
             );
 
-            $topic =
-                $this->topics->messages(
-                    $code
-                );
-
-            /*
-             * Symfony Mercure 0.8 interprets a
-             * flat topic list as subscribe grants.
-             */
-            $this->authorization->setCookie(
-                $request,
-                [
-                    $topic,
-                ],
-            );
+            $authorization =
+                $this->authorization
+                    ->authorize(
+                        $request,
+                    );
 
             return new JsonResponse([
                 'hubUrl' =>
@@ -65,11 +53,15 @@ final readonly class ChannelMercureController
                         ->getPublicUrl(),
 
                 'topic' =>
-                    $topic,
+                    $this->topics
+                        ->messages(
+                            $code,
+                        ),
 
                 'currentUserId' =>
-                    $this->currentUser
-                        ->id(),
+                    $authorization[
+                        'currentUserId'
+                    ],
             ]);
         } catch (
             \DomainException $exception
