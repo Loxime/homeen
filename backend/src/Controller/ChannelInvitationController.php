@@ -31,6 +31,20 @@ final readonly class ChannelInvitationController
     }
 
     #[Route(
+        '/unread-count',
+        name: 'api_channel_invitations_unread_count',
+        methods: ['GET'],
+    )]
+    public function unreadCount(): JsonResponse
+    {
+        return new JsonResponse([
+            'count' =>
+                $this->invitations
+                    ->unreadCount(),
+        ]);
+    }
+
+    #[Route(
         '/seen',
         name: 'api_channel_invitations_seen',
         methods: ['POST'],

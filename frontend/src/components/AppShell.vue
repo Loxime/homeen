@@ -21,7 +21,13 @@ import {
   stopUsageTracking,
 } from '../composables/useUsageTracking'
 
-import { usePomodoro } from '../composables/usePomodoro'
+import {
+  usePomodoro,
+} from '../composables/usePomodoro'
+
+import {
+  useChannelInvitations,
+} from '../composables/useChannelInvitations'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,6 +37,11 @@ const {
   stopGlobalTimer,
   loadPresets,
 } = usePomodoro()
+
+const {
+  startInvitationPolling,
+  stopInvitationPolling,
+} = useChannelInvitations()
 
 const MOBILE_QUERY =
   '(max-width: 720px)'
@@ -128,6 +139,7 @@ onMounted(() => {
 
   startUsageTracking()
   startGlobalTimer()
+  startInvitationPolling()
 
   void loadPresets()
 })
@@ -140,6 +152,7 @@ onUnmounted(() => {
 
   stopUsageTracking()
   stopGlobalTimer()
+  stopInvitationPolling()
 })
 </script>
 
@@ -204,7 +217,9 @@ onUnmounted(() => {
         deniedChannelCode !== null
       "
       title="Accès au canal refusé"
-      @close="closeDeniedModal"
+      @close="
+        closeDeniedModal
+      "
     >
       <div class="channel-denied-modal">
         <p>
@@ -218,7 +233,9 @@ onUnmounted(() => {
         <button
           class="primary"
           type="button"
-          @click="closeDeniedModal"
+          @click="
+            closeDeniedModal
+          "
         >
           Fermer
         </button>

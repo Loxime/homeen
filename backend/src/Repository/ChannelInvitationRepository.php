@@ -404,6 +404,23 @@ SQL,
         }
     }
 
+    public function unreadCount(): int
+    {
+        return (int) $this->connection
+            ->fetchOne(
+                <<<'SQL'
+SELECT COUNT(*)
+FROM channel_invitation
+WHERE invited_user_id = :userId
+  AND seen_at IS NULL
+SQL,
+                [
+                    'userId' =>
+                        $this->currentUser->id(),
+                ],
+            );
+    }
+
     public function markAllSeen(): void
     {
         $this->connection

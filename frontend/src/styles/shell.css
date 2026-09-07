@@ -538,3 +538,76 @@
 
   .mobile-sidebar-backdrop { display: none; }
 }
+
+/* Channel invitation notification */
+
+/*
+ * Channel entries contain three columns:
+ * icon / label / notification badge.
+ */
+.sidebar .nav-list a.channel-entry {
+  grid-template-columns:
+    72px
+    minmax(0,1fr)
+    auto;
+}
+
+.sidebar-notification-badge {
+  min-width: 22px;
+  height: 22px;
+
+  margin: 0 14px 0 8px;
+  padding: 0 7px;
+
+  display: inline-grid;
+  place-items: center;
+
+  justify-self: end;
+  align-self: center;
+
+  border-radius: 999px;
+
+  background: var(--success);
+  color: #fff;
+
+  font-size: .68rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.sidebar-notification-dot {
+  position: absolute;
+  z-index: 4;
+
+  top: 7px;
+  right: 13px;
+
+  width: 10px;
+  height: 10px;
+
+  display: block;
+
+  border: 2px solid #fff;
+  border-radius: 50%;
+
+  background: var(--success);
+
+  box-shadow:
+    0 0 0 2px
+    rgba(19,138,99,.12);
+}
+
+@media (min-width: 721px) {
+  /*
+   * In collapsed mode the entry goes back to
+   * one 72px icon column. The numeric badge is
+   * not rendered; the small dot is displayed
+   * inside the icon slot instead.
+   */
+  .sidebar.collapsed
+  .nav-list
+  a.channel-entry {
+    grid-template-columns:
+      var(--homeen-sidebar-rail);
+  }
+}

@@ -9,6 +9,10 @@ import { useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import { api } from '../services/api'
 
+import {
+  useChannelInvitations,
+} from '../composables/useChannelInvitations'
+
 interface Channel {
   id: number
   code: string
@@ -43,6 +47,10 @@ interface InvitationResponse {
 }
 
 const router = useRouter()
+
+const {
+  markLocallySeen,
+} = useChannelInvitations()
 
 const channels = ref<Channel[]>([])
 const invitations = ref<ChannelInvitation[]>([])
@@ -105,6 +113,8 @@ async function loadInvitations(): Promise<void> {
           method: 'POST',
         },
       )
+
+      markLocallySeen()
 
       invitations.value =
         invitations.value.map(
