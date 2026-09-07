@@ -103,6 +103,172 @@ SQL,
      *     joinedAt:string
      * }
      */
+    /**
+     * @return array{
+     *     previousCreatorUserId:int,
+     *     newCreatorUserId:int
+     * }
+     */
+    public function transferOwnership(
+        string $code,
+        int $newCreatorUserId,
+    ): array {
+        $channel =
+            $this->accessibleChannel(
+                $code,
+            );
+
+        $currentUserId =
+            $this->currentUser
+                ->id();
+
+        if (
+            (int) $channel[
+                'creator_user_id'
+            ]
+            !== $currentUserId
+        ) {
+            throw new \DomainException(
+                'CHANNEL_ROLE_CREATOR_REQUIRED',
+            );
+        }
+
+        if (
+            $newCreatorUserId
+            === $currentUserId
+        ) {
+            throw new \DomainException(
+                'CHANNEL_NEW_CREATOR_SAME_USER',
+            );
+        }
+
+        $targetRole =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT role
+FROM channel_member
+WHERE channel_id = :channelId
+  AND user_id = :userId
+LIMIT 1
+SQL,
+                    [
+                        'channelId' =>
+                            (int) $channel['id'],
+
+                        'userId' =>
+                            $newCreatorUserId,
+                    ],
+                );
+
+        if ($targetRole === false) {
+            throw new \OutOfBoundsException(
+                'Channel member not found.',
+            );
+        }
+
+        return $this->connection
+            ->transactional(
+                function (
+                    Connection $connection,
+                ) use (
+                    $channel,
+                    $currentUserId,
+                    $newCreatorUserId,
+                ): array {
+                    /*
+                     * Conditional update prevents a stale
+                     * creator session from transferring a
+                     * channel after ownership changed.
+                     */
+                    $affected =
+                        $connection
+                            ->executeStatement(
+                                <<<'SQL'
+UPDATE channel
+SET
+    creator_user_id = :newCreatorUserId,
+    updated_at = NOW()
+WHERE id = :channelId
+  AND creator_user_id = :previousCreatorUserId
+  AND closed_at IS NULL
+SQL,
+                                [
+                                    'newCreatorUserId' =>
+                                        $newCreatorUserId,
+
+                                    'previousCreatorUserId' =>
+                                        $currentUserId,
+
+                                    'channelId' =>
+                                        (int) $channel['id'],
+                                ],
+                            );
+
+                    if ($affected !== 1) {
+                        throw new \DomainException(
+                            'CHANNEL_ROLE_CREATOR_REQUIRED',
+                        );
+                    }
+
+                    /*
+                     * The former creator remains able to
+                     * help manage the channel.
+                     */
+                    $connection
+                        ->executeStatement(
+                            <<<'SQL'
+UPDATE channel_member
+SET role = 'admin'
+WHERE channel_id = :channelId
+  AND user_id = :userId
+SQL,
+                            [
+                                'channelId' =>
+                                    (int) $channel['id'],
+
+                                'userId' =>
+                                    $currentUserId,
+                            ],
+                        );
+
+                    /*
+                     * Ownership is represented by
+                     * channel.creator_user_id, not by
+                     * the membership role.
+                     *
+                     * Resetting the target membership
+                     * prevents a stale admin role if
+                     * ownership is transferred again.
+                     */
+                    $connection
+                        ->executeStatement(
+                            <<<'SQL'
+UPDATE channel_member
+SET role = 'member'
+WHERE channel_id = :channelId
+  AND user_id = :userId
+SQL,
+                            [
+                                'channelId' =>
+                                    (int) $channel['id'],
+
+                                'userId' =>
+                                    $newCreatorUserId,
+                            ],
+                        );
+
+                    return [
+                        'previousCreatorUserId' =>
+                            $currentUserId,
+
+                        'newCreatorUserId' =>
+                            $newCreatorUserId,
+                    ];
+                },
+            );
+    }
+
     public function setRole(
         string $code,
         int $memberUserId,

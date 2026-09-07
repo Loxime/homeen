@@ -26,6 +26,11 @@ const props =
     channelCode: string
   }>()
 
+const emit =
+  defineEmits<{
+    transferred: []
+  }>()
+
 const members =
   ref<ChannelRoleMember[]>([])
 
@@ -33,6 +38,9 @@ const loading =
   ref(true)
 
 const updatingUserId =
+  ref<number | null>(null)
+
+const transferringUserId =
   ref<number | null>(null)
 
 const error =
@@ -131,6 +139,57 @@ async function updateRole(
   }
 }
 
+async function transferOwnership(
+  member: ChannelRoleMember,
+): Promise<void> {
+  if (
+    member.role === 'creator'
+    || transferringUserId.value !== null
+  ) {
+    return
+  }
+
+  const confirmed =
+    window.confirm(
+      `Transférer définitivement la propriété du canal à ${member.email} ?\n\nVous resterez membre avec le rôle administrateur.`,
+    )
+
+  if (!confirmed) {
+    return
+  }
+
+  transferringUserId.value =
+    member.userId
+
+  error.value = ''
+  success.value = ''
+
+  try {
+    await api(
+      `/api/channels/${props.channelCode}/ownership`,
+      {
+        method: 'PATCH',
+
+        body: JSON.stringify({
+          newCreatorUserId:
+            member.userId,
+        }),
+      },
+    )
+
+    emit(
+      'transferred',
+    )
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de transférer la propriété.'
+  } finally {
+    transferringUserId.value = null
+  }
+}
+
 watch(
   () => props.channelCode,
   () => {
@@ -210,27 +269,50 @@ onMounted(
           </span>
         </div>
 
-        <select
+        <div
           v-if="member.role !== 'creator'"
-          :value="member.role"
-          :disabled="
-            updatingUserId === member.userId
-          "
-          @change="
-            updateRole(
-              member,
-              $event,
-            )
-          "
+          class="channel-role-actions"
         >
-          <option value="member">
-            Membre
-          </option>
+          <select
+            :value="member.role"
+            :disabled="
+              updatingUserId === member.userId
+              || transferringUserId !== null
+            "
+            @change="
+              updateRole(
+                member,
+                $event,
+              )
+            "
+          >
+            <option value="member">
+              Membre
+            </option>
 
-          <option value="admin">
-            Administrateur
-          </option>
-        </select>
+            <option value="admin">
+              Administrateur
+            </option>
+          </select>
+
+          <button
+            type="button"
+            class="channel-role-transfer"
+            :disabled="
+              transferringUserId !== null
+              || updatingUserId !== null
+            "
+            @click="
+              transferOwnership(member)
+            "
+          >
+            {{
+              transferringUserId === member.userId
+                ? 'Transfert…'
+                : 'Transférer la propriété'
+            }}
+          </button>
+        </div>
       </article>
     </div>
   </section>
@@ -285,8 +367,40 @@ onMounted(
   min-width: 160px;
 }
 
+.channel-role-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .55rem;
+}
+
+.channel-role-transfer {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.channel-role-transfer:hover {
+  text-decoration: underline;
+}
+
+.channel-role-transfer:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
 @media (max-width: 720px) {
   .channel-role-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .channel-role-actions {
     align-items: stretch;
     flex-direction: column;
   }

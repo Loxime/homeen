@@ -137,6 +137,28 @@ async function save(): Promise<void> {
   }
 }
 
+async function refreshAfterOwnershipTransfer(): Promise<void> {
+  error.value = ''
+  success.value = ''
+
+  try {
+    const updated =
+      await api<Channel>(
+        `/api/channels/${props.channel.code}`,
+      )
+
+    emit(
+      'updated',
+      updated,
+    )
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'La propriété a été transférée, mais le canal n’a pas pu être rechargé.'
+  }
+}
+
 async function exportChannel(): Promise<void> {
   if (
     !props.channel.isCreator
@@ -412,6 +434,7 @@ async function closeChannel(): Promise<void> {
         <ChannelRolesPanel
       v-if="channel.isCreator"
       :channel-code="channel.code"
+      @transferred="refreshAfterOwnershipTransfer"
     />
 
 <section

@@ -77,6 +77,55 @@ final readonly class ChannelRoleController
         }
     }
 
+    #[Route(
+        '/ownership',
+        name: 'api_channel_ownership_transfer',
+        methods: ['PATCH'],
+    )]
+    public function transferOwnership(
+        string $code,
+        Request $request,
+    ): JsonResponse {
+        $data =
+            $this->input
+                ->read(
+                    $request,
+                );
+
+        $newCreatorUserId =
+            (int) (
+                $data['newCreatorUserId']
+                ?? 0
+            );
+
+        if ($newCreatorUserId <= 0) {
+            return new JsonResponse(
+                [
+                    'error' =>
+                        'newCreatorUserId must be a valid user identifier.',
+
+                    'code' =>
+                        'INVALID_CHANNEL_OWNER',
+                ],
+                422,
+            );
+        }
+
+        try {
+            return new JsonResponse(
+                $this->roles
+                    ->transferOwnership(
+                        $code,
+                        $newCreatorUserId,
+                    ),
+            );
+        } catch (\Throwable $exception) {
+            return $this->error(
+                $exception,
+            );
+        }
+    }
+
     private function error(
         \Throwable $exception,
     ): JsonResponse {
@@ -116,6 +165,18 @@ final readonly class ChannelRoleController
                         403,
                     ),
 
+                'CHANNEL_NEW_CREATOR_SAME_USER' =>
+                    new JsonResponse(
+                        [
+                            'error' =>
+                                'You already own this channel.',
+
+                            'code' =>
+                                'CHANNEL_NEW_CREATOR_SAME_USER',
+                        ],
+                        409,
+                    ),
+
                 'CHANNEL_CREATOR_ROLE_IMMUTABLE' =>
                     new JsonResponse(
                         [
@@ -153,7 +214,10 @@ final readonly class ChannelRoleController
                             ->getMessage(),
 
                     'code' =>
-                        'CHANNEL_NOT_FOUND',
+                        $exception->getMessage()
+                            === 'Channel member not found.'
+                            ? 'CHANNEL_MEMBER_NOT_FOUND'
+                            : 'CHANNEL_NOT_FOUND',
                 ],
                 404,
             );
