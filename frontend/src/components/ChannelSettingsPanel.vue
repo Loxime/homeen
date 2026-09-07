@@ -8,6 +8,8 @@ import {
   api,
 } from '../services/api'
 
+import ChannelRolesPanel from './ChannelRolesPanel.vue'
+
 interface Channel {
   id: number
   code: string
@@ -407,7 +409,12 @@ async function closeChannel(): Promise<void> {
       </p>
     </section>
 
-    <section
+        <ChannelRolesPanel
+      v-if="channel.isCreator"
+      :channel-code="channel.code"
+    />
+
+<section
       v-if="channel.isCreator"
       class="settings-card channel-content"
     >
@@ -439,6 +446,37 @@ async function closeChannel(): Promise<void> {
           }}
         </button>
       </div>
+    </section>
+
+    <section
+      v-if="!channel.isCreator"
+      class="settings-card danger-zone channel-danger-zone"
+    >
+      <div class="settings-heading">
+        <div>
+          <h2>
+            Quitter le canal
+          </h2>
+
+          <p class="muted">
+            Vous perdrez immédiatement l’accès
+            aux notes, tâches et messages de ce canal.
+          </p>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        class="channel-danger-button"
+        :disabled="leaving"
+        @click="leaveChannel"
+      >
+        {{
+          leaving
+            ? 'Départ…'
+            : 'Quitter le canal'
+        }}
+      </button>
     </section>
 
     <section
