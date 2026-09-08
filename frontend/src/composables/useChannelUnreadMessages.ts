@@ -25,6 +25,7 @@ interface ChannelUnreadResponse {
 interface MercureAuthorization {
   hubUrl: string
   topic: string
+  currentUserId: number
 }
 
 interface PersonalNotification {
@@ -79,6 +80,10 @@ let reconnectTimer:
   | null = null
 
 let connecting = false
+
+let authorizedUserId:
+  number
+  | null = null
 
 const {
   initialize:
@@ -212,6 +217,33 @@ function handleNotification(
     structureEventVersion.value += 1
 
     /*
+     * Immediately reissue the Mercure cookie
+     * when this user's channel access changed.
+     *
+     * Even before this finishes, channel message
+     * delivery is already safe because publishers
+     * only target current members' user-scoped
+     * topics.
+     */
+    const currentMembershipRevoked =
+      (
+        notification.event
+        === 'member-left'
+        || notification.event
+        === 'member-removed'
+      )
+      && notification.userId
+        === authorizedUserId
+
+    if (
+      currentMembershipRevoked
+      || notification.event
+        === 'channel-closed'
+    ) {
+      void connectRealtime()
+    }
+
+    /*
      * Membership changes can also alter the
      * unread-channel response. Keep the shared
      * badge state authoritative.
@@ -276,6 +308,9 @@ async function connectRealtime(): Promise<void> {
     if (consumers === 0) {
       return
     }
+
+    authorizedUserId =
+      authorization.currentUserId
 
     const url =
       new URL(

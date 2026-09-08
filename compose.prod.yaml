@@ -1,0 +1,128 @@
+services:
+  database:
+    image: postgres:16-alpine
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${APP_TIMEZONE:-Europe/Paris}
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+    restart: unless-stopped
+
+  php:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.prod
+
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: "0"
+
+      APP_SECRET: ${APP_SECRET}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Paris}
+
+      DEFAULT_URI: ${DEFAULT_URI}
+      ACCESS_KEY: ${ACCESS_KEY}
+
+      DATABASE_URL: >-
+        postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8
+
+      MERCURE_URL: >-
+        http://mercure/.well-known/mercure
+
+      MERCURE_PUBLIC_URL: ${MERCURE_PUBLIC_URL}
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET}
+
+    volumes:
+      - backend_var:/app/var
+
+    depends_on:
+      database:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.prod
+
+    command:
+      - /usr/local/bin/homeen-scheduler
+
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: "0"
+
+      APP_SECRET: ${APP_SECRET}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Paris}
+
+      DEFAULT_URI: ${DEFAULT_URI}
+      ACCESS_KEY: ${ACCESS_KEY}
+
+      DATABASE_URL: >-
+        postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8
+
+      MERCURE_URL: >-
+        http://mercure/.well-known/mercure
+
+      MERCURE_PUBLIC_URL: ${MERCURE_PUBLIC_URL}
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET}
+
+    volumes:
+      - backend_var:/app/var
+
+    depends_on:
+      database:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+  mercure:
+    image: dunglas/mercure:v0.24.2
+
+    environment:
+      SERVER_NAME: ":80"
+
+      MERCURE_PUBLISHER_JWT_KEY: ${MERCURE_JWT_SECRET}
+      MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_JWT_SECRET}
+
+      USE_FORWARDED_HEADERS: "1"
+
+    volumes:
+      - mercure_data:/data
+      - mercure_config:/config
+
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile.prod
+
+    ports:
+      - "127.0.0.1:${HOMEEN_HTTP_PORT:-3032}:80"
+
+    depends_on:
+      - php
+      - mercure
+
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  backend_var:
+  mercure_data:
+  mercure_config:

@@ -20,15 +20,16 @@ final readonly class ChannelMercureAuthorizationService
 
     /**
      * @return array{
-     *     currentUserId: int,
-     *     notificationTopic: string
+     *     currentUserId:int,
+     *     notificationTopic:string
      * }
      */
     public function authorize(
         Request $request,
     ): array {
         $userId =
-            $this->currentUser->id();
+            $this->currentUser
+                ->id();
 
         $grantedTopics = [
             $this->topics
@@ -37,6 +38,15 @@ final readonly class ChannelMercureAuthorizationService
                 ),
         ];
 
+        /*
+         * Every channel topic is scoped both to
+         * the channel and to the authenticated
+         * user.
+         *
+         * Possessing a stale JWT therefore does
+         * not grant access to another member's
+         * stream.
+         */
         foreach (
             $this->audience
                 ->accessibleChannelCodes()
@@ -44,8 +54,9 @@ final readonly class ChannelMercureAuthorizationService
         ) {
             $grantedTopics[] =
                 $this->topics
-                    ->messages(
+                    ->messagesForUser(
                         $code,
+                        $userId,
                     );
         }
 

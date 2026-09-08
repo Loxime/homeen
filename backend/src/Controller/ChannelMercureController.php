@@ -54,8 +54,11 @@ final readonly class ChannelMercureController
 
                 'topic' =>
                     $this->topics
-                        ->messages(
+                        ->messagesForUser(
                             $code,
+                            (int) $authorization[
+                                'currentUserId'
+                            ],
                         ),
 
                 'currentUserId' =>

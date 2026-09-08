@@ -6,11 +6,13 @@ namespace App\Service;
 
 final readonly class ChannelMercureTopic
 {
-    public function messages(
+    public function messagesForUser(
         string $code,
+        int $userId,
     ): string {
         return sprintf(
-            'urn:homeen:channel:%s:messages',
+            'urn:homeen:user:%d:channel:%s:messages',
+            $userId,
             $code,
         );
     }

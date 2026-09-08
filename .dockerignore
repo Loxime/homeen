@@ -1,0 +1,11 @@
+.git
+/.env
+/.env.*
+/backups
+
+/backend/vendor
+/backend/var
+
+/frontend/node_modules
+/frontend/dist
+/frontend/coverage

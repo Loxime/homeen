@@ -41,6 +41,11 @@ final readonly class ChannelNotificationMercureController
                 $authorization[
                     'notificationTopic'
                 ],
+
+            'currentUserId' =>
+                $authorization[
+                    'currentUserId'
+                ],
         ]);
     }
 }
