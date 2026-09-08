@@ -59,8 +59,8 @@ async function signOut(): Promise<void> {
         type="button"
         :aria-label="
           sidebarCollapsed
-            ? 'Expand sidebar'
-            : 'Collapse sidebar'
+            ? 'Afficher le menu'
+            : 'Réduire le menu'
         "
         @click="emit('toggle-sidebar')"
       >
@@ -93,8 +93,8 @@ async function signOut(): Promise<void> {
       <input
         v-model="query"
         type="search"
-        placeholder="Search your notes"
-        aria-label="Search your notes"
+        placeholder="Rechercher dans vos notes"
+        aria-label="Rechercher dans vos notes"
       />
     </form>
 

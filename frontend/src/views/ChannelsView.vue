@@ -315,10 +315,6 @@ onMounted(() => {
   <section class="page-stack channels-page">
     <header class="page-heading">
       <div>
-        <p class="eyebrow">
-          COLLABORATION
-        </p>
-
         <h1>
           Canaux
         </h1>
@@ -351,10 +347,6 @@ onMounted(() => {
       class="settings-card channel-invitations"
     >
       <div>
-        <p class="eyebrow">
-          INVITATIONS
-        </p>
-
         <h2>
           Invitations reçues
         </h2>

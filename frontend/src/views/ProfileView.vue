@@ -65,7 +65,7 @@ async function load(): Promise<void> {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Unable to load profile.'
+        : 'Impossible de charger le profil.'
   } finally {
     loading.value = false
   }
@@ -89,14 +89,14 @@ async function addEmail(): Promise<void> {
 
     newEmail.value = ''
     success.value =
-      'Login email added.'
+      'Adresse de connexion ajoutée.'
 
     await load()
   } catch (exception) {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Unable to add email.'
+        : 'Impossible d’ajouter l’adresse e-mail.'
   } finally {
     addingEmail.value = false
   }
@@ -108,13 +108,13 @@ async function deleteAccount(): Promise<void> {
 
   if (!deletePassword.value) {
     error.value =
-      'Enter your current password.'
+      'Saisissez votre mot de passe actuel.'
 
     return
   }
 
   const confirmed = window.confirm(
-    'Delete your Homeen account and all personal data? This action cannot be undone.',
+    'Supprimer définitivement votre compte et toutes vos données personnelles ? Cette action est irréversible.',
   )
 
   if (!confirmed) {
@@ -145,7 +145,7 @@ async function deleteAccount(): Promise<void> {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Unable to delete account.'
+        : 'Impossible de supprimer le compte.'
 
     deletingAccount.value = false
   }
@@ -160,7 +160,7 @@ async function removeEmail(
 
   if (
     !window.confirm(
-      `Remove ${email.email} from your login addresses?`,
+      `Retirer ${email.email} de vos adresses de connexion ?`,
     )
   ) {
     return
@@ -178,14 +178,14 @@ async function removeEmail(
     )
 
     success.value =
-      'Login email removed.'
+      'Adresse de connexion supprimée.'
 
     await load()
   } catch (exception) {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Unable to remove email.'
+        : 'Impossible de supprimer l’adresse e-mail.'
   }
 }
 
@@ -197,7 +197,7 @@ async function changePassword(): Promise<void> {
     password.value !== confirmation.value
   ) {
     error.value =
-      'Passwords do not match.'
+      'Les mots de passe ne correspondent pas.'
     return
   }
 
@@ -223,12 +223,12 @@ async function changePassword(): Promise<void> {
     confirmation.value = ''
 
     success.value =
-      'Password updated.'
+      'Mot de passe mis à jour.'
   } catch (exception) {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Unable to change password.'
+        : 'Impossible de modifier le mot de passe.'
   } finally {
     changingPassword.value = false
   }
@@ -264,7 +264,7 @@ async function toggleSound(): Promise<void> {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Unable to update notifications.'
+        : 'Impossible de modifier les notifications.'
   }
 }
 
@@ -275,10 +275,10 @@ onMounted(() => void load())
   <section class="page-stack profile-page">
     <header class="page-heading">
       <div>
-        <p class="eyebrow">
-          ACCOUNT
-        </p>
-        <h1>Profile</h1>
+        <h1>
+          Profil
+        </h1>
+
         <p class="muted">
           {{ state.email }}
         </p>
@@ -300,7 +300,7 @@ onMounted(() => void load())
     </p>
 
     <p v-if="loading">
-      Loading profile…
+      Chargement du profil…
     </p>
 
     <template v-else-if="profile">
@@ -308,11 +308,13 @@ onMounted(() => void load())
         <div class="settings-heading">
           <div>
             <h2>
-              Login addresses
+              Adresses de connexion
             </h2>
+
             <p class="muted">
-              You can use any linked
-              email address to sign in.
+              Vous pouvez utiliser
+              n’importe quelle adresse liée
+              à votre compte pour vous connecter.
             </p>
           </div>
         </div>
@@ -332,7 +334,7 @@ onMounted(() => void load())
                 v-if="email.isPrimary"
                 class="profile-badge"
               >
-                Primary
+                Principale
               </span>
             </div>
 
@@ -342,7 +344,7 @@ onMounted(() => void load())
               type="button"
               @click="removeEmail(email)"
             >
-              Remove
+              Retirer
             </button>
           </div>
         </div>
@@ -355,7 +357,7 @@ onMounted(() => void load())
             v-model.trim="newEmail"
             type="email"
             autocomplete="email"
-            placeholder="Add another email"
+            placeholder="Ajouter une adresse e-mail"
             required
           />
 
@@ -368,8 +370,8 @@ onMounted(() => void load())
           >
             {{
               addingEmail
-                ? 'Adding…'
-                : 'Add'
+                ? 'Ajout…'
+                : 'Ajouter'
             }}
           </button>
         </form>
@@ -377,12 +379,12 @@ onMounted(() => void load())
 
       <section class="settings-card">
         <h2>
-          Password
+          Mot de passe
         </h2>
 
         <p class="muted">
-          Changing your password here
-          requires your current password.
+          La modification du mot de passe
+          nécessite votre mot de passe actuel.
         </p>
 
         <form
@@ -390,7 +392,8 @@ onMounted(() => void load())
           @submit.prevent="changePassword"
         >
           <label>
-            Current password
+            Mot de passe actuel
+
             <input
               v-model="currentPassword"
               type="password"
@@ -400,7 +403,8 @@ onMounted(() => void load())
           </label>
 
           <label>
-            New password
+            Nouveau mot de passe
+
             <input
               v-model="password"
               type="password"
@@ -412,7 +416,8 @@ onMounted(() => void load())
           </label>
 
           <label>
-            Confirm new password
+            Confirmer le nouveau mot de passe
+
             <input
               v-model="confirmation"
               type="password"
@@ -434,8 +439,8 @@ onMounted(() => void load())
           >
             {{
               changingPassword
-                ? 'Updating…'
-                : 'Change password'
+                ? 'Modification…'
+                : 'Modifier le mot de passe'
             }}
           </button>
         </form>
@@ -445,12 +450,12 @@ onMounted(() => void load())
         <div class="preference-row">
           <div>
             <h2>
-              Notification sounds
+              Sons de notification
             </h2>
 
             <p class="muted">
-              Visual notifications
-              will always remain enabled.
+              Les notifications visuelles
+              restent toujours actives.
             </p>
           </div>
 
@@ -471,8 +476,8 @@ onMounted(() => void load())
             {{
               profile
                 .notificationSoundEnabled
-                ? 'On'
-                : 'Off'
+                ? 'Activés'
+                : 'Désactivés'
             }}
           </button>
         </div>
@@ -480,35 +485,23 @@ onMounted(() => void load())
 
       <section class="settings-card danger-zone">
         <h2>
-          Delete account
+          Supprimer le compte
         </h2>
 
         <p class="muted">
-          Account deletion will become
-          available once Homeen personal
-          data ownership has been migrated
-          to individual users.
-        </p>
-
-      <section class="settings-card danger-zone">
-        <h2>
-          Delete account
-        </h2>
-
-        <p class="muted">
-          Permanently delete your Homeen
-          account and all personal data.
-          This action cannot be undone.
+          Supprime définitivement votre compte
+          et toutes vos données personnelles.
+          Cette action est irréversible.
         </p>
 
         <label class="delete-account-password">
-          Current password
+          Mot de passe actuel
 
           <input
             v-model="deletePassword"
             type="password"
             autocomplete="current-password"
-            placeholder="Confirm your password"
+            placeholder="Confirmez votre mot de passe"
           />
         </label>
 
@@ -523,12 +516,10 @@ onMounted(() => void load())
         >
           {{
             deletingAccount
-              ? 'Deleting…'
-              : 'Delete my account'
+              ? 'Suppression…'
+              : 'Supprimer mon compte'
           }}
         </button>
-      </section>
-
       </section>
     </template>
   </section>

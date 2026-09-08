@@ -37,14 +37,14 @@ async function submit(): Promise<void> {
 
   if (!passwordsMatch.value) {
     error.value =
-      'Password confirmation does not match.'
+      'La confirmation ne correspond pas.'
 
     return
   }
 
   if (!passwordValid.value) {
     error.value =
-      'Password must contain between 12 and 72 characters.'
+      'Le mot de passe doit contenir entre 12 et 72 caractères.'
 
     return
   }
@@ -63,7 +63,7 @@ async function submit(): Promise<void> {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Unable to update password.'
+        : 'Impossible de modifier le mot de passe.'
   } finally {
     submitting.value = false
   }
@@ -73,21 +73,20 @@ async function submit(): Promise<void> {
 <template>
   <main class="access-screen">
     <section class="access-card">
-      <div class="access-mark">
-        H
-      </div>
-
-      <p class="eyebrow">
-        FIRST LOGIN
-      </p>
+      <img
+        class="access-logo"
+        src="/favicon.svg"
+        alt=""
+      />
 
       <h1>
-        Choose your password
+        Choisissez votre mot de passe
       </h1>
 
       <p class="muted">
-        Your temporary password has
-        now been consumed.
+        Votre mot de passe temporaire
+        a été utilisé. Définissez maintenant
+        votre mot de passe personnel.
       </p>
 
       <p
@@ -99,7 +98,7 @@ async function submit(): Promise<void> {
 
       <form @submit.prevent="submit">
         <label for="new-password">
-          New password
+          Nouveau mot de passe
         </label>
 
         <input
@@ -114,7 +113,7 @@ async function submit(): Promise<void> {
         />
 
         <label for="confirm-password">
-          Confirm password
+          Confirmer le mot de passe
         </label>
 
         <input
@@ -128,7 +127,7 @@ async function submit(): Promise<void> {
         />
 
         <p class="muted">
-          12 to 72 characters.
+          De 12 à 72 caractères.
         </p>
 
         <p
@@ -138,7 +137,7 @@ async function submit(): Promise<void> {
           "
           class="form-error"
         >
-          Passwords do not match.
+          Les mots de passe ne correspondent pas.
         </p>
 
         <p
@@ -154,8 +153,8 @@ async function submit(): Promise<void> {
         >
           {{
             submitting
-              ? 'Saving…'
-              : 'Set password'
+              ? 'Enregistrement…'
+              : 'Enregistrer le mot de passe'
           }}
         </button>
       </form>

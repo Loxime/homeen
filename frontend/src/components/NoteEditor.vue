@@ -92,7 +92,7 @@ async function save(): Promise<Note | null> {
     error.value =
       e instanceof Error
         ? e.message
-        : 'Unable to save note.'
+        : 'Impossible d’enregistrer la note.'
 
     return null
   } finally {
@@ -131,11 +131,11 @@ async function addTask(): Promise<void> {
 
 async function toggleTask(task: Task): Promise<void> {
   const updated = await api<Task>(
-    `/api/tasks/${task.id}/completed`,
+    `/api/tasks/${task.id}/terminées`,
     {
       method: 'PUT',
       body: JSON.stringify({
-        completed: !task.isCompleted,
+        terminées: !task.isCompleted,
       }),
     },
   )
@@ -217,17 +217,17 @@ async function restore(): Promise<void> {
   <div class="note-editor keep-note-editor">
     <template v-if="isTrash">
       <div class="trash-message">
-        <strong>This note is in trash.</strong>
+        <strong>Cette note est dans la corbeille.</strong>
 
         <p>
-          It will be permanently deleted automatically
-          30 days after it was trashed.
+          Elle sera supprimée définitivement
+          30 jours après sa mise à la corbeille.
         </p>
       </div>
 
       <div class="keep-editor-footer">
         <button class="secondary" @click="restore">
-          Restore note
+          Restaurer la note
         </button>
 
         <button
@@ -245,13 +245,13 @@ async function restore(): Promise<void> {
           v-model="title"
           class="keep-title-input"
           maxlength="255"
-          placeholder="Title"
+          placeholder="Titre"
         />
 
         <textarea
           v-model="content"
           class="keep-content-input"
-          placeholder="Take a note…"
+          placeholder="Écrivez votre note…"
         />
 
         <div class="keep-label-row">
@@ -264,7 +264,7 @@ async function restore(): Promise<void> {
             class="keep-label-select"
           >
             <option :value="null">
-              No label
+              Aucun libellé
             </option>
 
             <option
@@ -288,7 +288,7 @@ async function restore(): Promise<void> {
           <div class="section-heading keep-task-heading">
             <div>
               <span class="keep-section-label">
-                Tasks
+                Tâches
               </span>
 
               <small>
@@ -299,7 +299,7 @@ async function restore(): Promise<void> {
                 }}
                 /
                 {{ localNote.tasks.length }}
-                completed
+                terminées
               </small>
             </div>
           </div>
@@ -313,7 +313,7 @@ async function restore(): Promise<void> {
             <input
               v-model="taskText"
               maxlength="255"
-              placeholder="Add a task"
+              placeholder="Ajouter une tâche"
             />
 
             <span class="char-count">
@@ -338,8 +338,8 @@ async function restore(): Promise<void> {
 
               <button
                 class="icon-button small"
-                title="Delete task"
-                aria-label="Delete task"
+                title="Supprimer la tâche"
+                aria-label="Supprimer la tâche"
                 @click="deleteTask(task)"
               >
                 <AppIcon name="close" :size="16" />
@@ -349,7 +349,7 @@ async function restore(): Promise<void> {
         </section>
 
         <p v-else class="keep-task-hint">
-          Save the note once to start adding tasks.
+          Enregistrez d’abord la note pour pouvoir ajouter des tâches.
         </p>
       </div>
 
@@ -358,7 +358,7 @@ async function restore(): Promise<void> {
           <button
             v-if="!isNew"
             class="keep-tool-button"
-            title="Duplicate"
+            title="Dupliquer"
             @click="duplicate"
           >
             <AppIcon name="copy" :size="19" />
@@ -367,7 +367,7 @@ async function restore(): Promise<void> {
           <button
             v-if="!isNew"
             class="keep-tool-button"
-            :title="isArchived ? 'Unarchive' : 'Archive'"
+            :title="isArchived ? 'Désarchiver' : 'Archiver'"
             @click="setArchive(!isArchived)"
           >
             <AppIcon name="archive" :size="19" />
@@ -376,7 +376,7 @@ async function restore(): Promise<void> {
           <button
             v-if="!isNew"
             class="keep-tool-button danger"
-            title="Move to trash"
+            title="Mettre à la corbeille"
             @click="trash"
           >
             <AppIcon name="trash" :size="19" />
@@ -388,7 +388,7 @@ async function restore(): Promise<void> {
           :disabled="saving"
           @click="done"
         >
-          {{ saving ? 'Saving…' : 'Done' }}
+          {{ saving ? 'Enregistrement…' : 'Terminer' }}
         </button>
       </footer>
     </template>

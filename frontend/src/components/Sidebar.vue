@@ -69,15 +69,15 @@ const quickLoading = ref(false)
 
 const quickLabel = computed(() => {
   if (store.active) {
-    return 'Focus running'
+    return 'Concentration en cours'
   }
 
   const latest =
     store.presets[0]
 
   return latest
-    ? `Start ${latest.workMinutes}m`
-    : 'New session'
+    ? `Démarrer ${latest.workMinutes} min`
+    : 'Nouvelle session'
 })
 
 async function quickFocus(): Promise<void> {
@@ -149,7 +149,7 @@ async function quickFocus(): Promise<void> {
       <span class="sidebar-label">
         {{
           quickLoading
-            ? 'Starting…'
+            ? 'Démarrage…'
             : quickLabel
         }}
       </span>
@@ -178,7 +178,7 @@ async function quickFocus(): Promise<void> {
         </span>
 
         <span class="sidebar-label">
-          Labels
+          Libellés
         </span>
       </RouterLink>
 
@@ -204,7 +204,7 @@ async function quickFocus(): Promise<void> {
         </span>
 
         <span class="sidebar-label">
-          Statistics
+          Statistiques
         </span>
       </RouterLink>
 
@@ -255,7 +255,7 @@ async function quickFocus(): Promise<void> {
         </span>
 
         <span class="sidebar-label">
-          Archived
+          Archives
         </span>
       </RouterLink>
 
@@ -268,7 +268,7 @@ async function quickFocus(): Promise<void> {
         </span>
 
         <span class="sidebar-label">
-          Trash
+          Corbeille
         </span>
       </RouterLink>
 
@@ -281,7 +281,7 @@ async function quickFocus(): Promise<void> {
         </span>
 
         <span class="sidebar-label">
-          Profile
+          Profil
         </span>
       </RouterLink>
     </nav>

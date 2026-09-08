@@ -110,7 +110,7 @@ function tick(): void {
   if (!store.active) {
     store.live = null
     previousPhase = null
-    document.title = 'Homeen'
+    document.title = 'Notes'
     return
   }
 
@@ -125,7 +125,7 @@ function tick(): void {
   store.live = next
   const minutes = Math.floor(next.remainingSeconds / 60).toString().padStart(2, '0')
   const seconds = (next.remainingSeconds % 60).toString().padStart(2, '0')
-  document.title = `[${minutes}:${seconds}] ${next.phase === 'work' ? 'Work' : 'Break'} — Homeen`
+  document.title = `[${minutes}:${seconds}] ${next.phase === 'work' ? 'Travail' : 'Pause'} — Pomodoro`
 }
 
 async function loadActive(): Promise<void> {
@@ -168,7 +168,7 @@ async function stop(): Promise<void> {
   store.active = null
   store.live = null
   previousPhase = null
-  document.title = 'Homeen'
+  document.title = 'Notes'
   channel?.postMessage({ type: 'stopped' })
 }
 
@@ -192,7 +192,7 @@ function stopGlobalTimer(): void {
   store.active = null
   store.live = null
   previousPhase = null
-  document.title = 'Homeen'
+  document.title = 'Notes'
 }
 
 export function usePomodoro() {

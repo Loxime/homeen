@@ -24,7 +24,7 @@ async function submit(): Promise<void> {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Unable to sign in.'
+        : 'Impossible de se connecter.'
   } finally {
     submitting.value = false
   }
@@ -34,26 +34,24 @@ async function submit(): Promise<void> {
 <template>
   <main class="access-screen">
     <section class="access-card">
-      <div class="access-mark">
-        H
-      </div>
-
-      <p class="eyebrow">
-        USER ACCOUNT
-      </p>
+      <img
+        class="access-logo"
+        src="/favicon.svg"
+        alt=""
+      />
 
       <h1>
-        Sign in
+        Connexion
       </h1>
 
       <p class="muted">
-        Use any email address linked
-        to your Homeen account.
+        Utilisez une adresse e-mail
+        associée à votre compte.
       </p>
 
       <form @submit.prevent="submit">
         <label for="login-email">
-          Email
+          Adresse e-mail
         </label>
 
         <input
@@ -66,7 +64,7 @@ async function submit(): Promise<void> {
         />
 
         <label for="login-password">
-          Password
+          Mot de passe
         </label>
 
         <input
@@ -94,8 +92,8 @@ async function submit(): Promise<void> {
         >
           {{
             submitting
-              ? 'Signing in…'
-              : 'Sign in'
+              ? 'Connexion…'
+              : 'Se connecter'
           }}
         </button>
       </form>
