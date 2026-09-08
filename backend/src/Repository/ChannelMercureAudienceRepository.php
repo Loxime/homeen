@@ -49,6 +49,43 @@ SQL,
     }
 
     /**
+     * All current channel members receive the
+     * realtime chat representation, including
+     * the author for their other browser tabs.
+     *
+     * @return list<int>
+     */
+    public function memberUserIds(
+        string $code,
+    ): array {
+        $rows =
+            $this->connection
+                ->fetchFirstColumn(
+                    <<<'SQL'
+SELECT member.user_id
+FROM channel_member member
+INNER JOIN channel
+    ON channel.id = member.channel_id
+WHERE channel.code = :code
+  AND channel.closed_at IS NULL
+ORDER BY member.user_id
+SQL,
+                    [
+                        'code' =>
+                            $code,
+                    ],
+                );
+
+        return array_map(
+            static fn (
+                mixed $userId,
+            ): int =>
+                (int) $userId,
+            $rows,
+        );
+    }
+
+    /**
      * @return list<int>
      */
     public function recipientUserIds(

@@ -101,10 +101,9 @@ final readonly class ChannelMessageController
 
                 $this->hub->publish(
                     new Update(
-                        $this->topics
-                            ->messages(
-                                $code
-                            ),
+                        $this->messageTopics(
+                            $code
+                        ),
                         $payload,
                         true,
                         (string) $message[
@@ -239,10 +238,9 @@ final readonly class ChannelMessageController
 
                 $this->hub->publish(
                     new Update(
-                        $this->topics
-                            ->messages(
-                                $code
-                            ),
+                        $this->messageTopics(
+                            $code
+                        ),
                         $payload,
                         true,
                     ),
@@ -299,10 +297,9 @@ final readonly class ChannelMessageController
 
                 $this->hub->publish(
                     new Update(
-                        $this->topics
-                            ->messages(
-                                $code
-                            ),
+                        $this->messageTopics(
+                            $code
+                        ),
                         $payload,
                         true,
                     ),
@@ -408,6 +405,32 @@ final readonly class ChannelMessageController
                 $exception
             );
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function messageTopics(
+        string $code,
+    ): array {
+        $topics = [];
+
+        foreach (
+            $this->mercureAudience
+                ->memberUserIds(
+                    $code,
+                )
+            as $userId
+        ) {
+            $topics[] =
+                $this->topics
+                    ->messagesForUser(
+                        $code,
+                        $userId,
+                    );
+        }
+
+        return $topics;
     }
 
     private function error(
