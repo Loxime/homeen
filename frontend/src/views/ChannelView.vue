@@ -472,6 +472,63 @@ function selectTab(
 }
 
 watch(
+  channelStructureVersion,
+  () => {
+    const event =
+      channelStructureEvent.value
+
+    if (
+      !event
+      || event.channelCode !== code.value
+    ) {
+      return
+    }
+
+    /*
+     * Closing a channel invalidates it for
+     * every open tab immediately.
+     */
+    if (
+      event.event === 'channel-closed'
+    ) {
+      void router.replace(
+        '/channels',
+      )
+
+      return
+    }
+
+    /*
+     * A user who leaves or is removed must
+     * lose the open channel immediately,
+     * even if their old Mercure cookie still
+     * exists for a short time.
+     */
+    if (
+      (
+        event.event === 'member-left'
+        || event.event === 'member-removed'
+      )
+      && event.userId
+        === currentUserId.value
+    ) {
+      void router.replace(
+        '/channels',
+      )
+
+      return
+    }
+
+    /*
+     * Membership, roles, ownership and
+     * settings are reloaded from the API.
+     * PostgreSQL remains authoritative.
+     */
+    void refreshChannelStructure()
+  },
+)
+
+watch(
   () => route.params.code,
   () => {
     members.value = []

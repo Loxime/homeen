@@ -86,10 +86,6 @@ onUnmounted(() => {
   stopUnreadMessages()
 })
 
-const {
-  markLocallySeen,
-} = useChannelInvitations()
-
 const channels = ref<Channel[]>([])
 const invitations = ref<ChannelInvitation[]>([])
 
@@ -151,8 +147,6 @@ async function loadInvitations(): Promise<void> {
           method: 'POST',
         },
       )
-
-      markLocallySeen()
 
       invitations.value =
         invitations.value.map(

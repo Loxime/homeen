@@ -39,8 +39,10 @@ const {
 } = usePomodoro()
 
 const {
-  startInvitationPolling,
-  stopInvitationPolling,
+  start:
+    startInvitationNotifications,
+  stop:
+    stopInvitationNotifications,
 } = useChannelInvitations()
 
 const MOBILE_QUERY =
@@ -139,7 +141,7 @@ onMounted(() => {
 
   startUsageTracking()
   startGlobalTimer()
-  startInvitationPolling()
+  startInvitationNotifications()
 
   void loadPresets()
 })
@@ -152,7 +154,7 @@ onUnmounted(() => {
 
   stopUsageTracking()
   stopGlobalTimer()
-  stopInvitationPolling()
+  stopInvitationNotifications()
 })
 </script>
 
