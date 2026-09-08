@@ -97,14 +97,6 @@ SQL,
 
     /**
      * @return array{
-     *     userId:int,
-     *     email:string,
-     *     role:string,
-     *     joinedAt:string
-     * }
-     */
-    /**
-     * @return array{
      *     previousCreatorUserId:int,
      *     newCreatorUserId:int
      * }
@@ -269,6 +261,14 @@ SQL,
             );
     }
 
+    /**
+     * @return array{
+     *     userId:int,
+     *     email:string,
+     *     role:string,
+     *     joinedAt:string
+     * }
+     */
     public function setRole(
         string $code,
         int $memberUserId,

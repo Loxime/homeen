@@ -415,6 +415,14 @@ onMounted(() => {
             >
               · Vous êtes le créateur
             </template>
+
+            <template
+              v-else-if="
+                channelPermissions?.isAdmin
+              "
+            >
+              · Administrateur
+            </template>
           </p>
         </div>
       </header>
