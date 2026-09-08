@@ -59,23 +59,25 @@ async function signOut(): Promise<void> {
         type="button"
         :aria-label="
           sidebarCollapsed
-            ? 'Expand sidebar'
-            : 'Collapse sidebar'
+            ? 'Afficher le menu'
+            : 'Réduire le menu'
         "
         @click="emit('toggle-sidebar')"
       >
         <AppIcon name="menu" :size="22" />
       </button>
 
-      <div class="topbar-brand">
-        <span class="homeen-mark">
-          H
-        </span>
-
-        <strong>
-          Homeen
-        </strong>
-      </div>
+      <RouterLink
+        class="topbar-brand"
+        to="/notes"
+        aria-label="Accueil"
+      >
+        <img
+          class="homeen-mark"
+          src="/favicon.svg"
+          alt=""
+        />
+      </RouterLink>
     </div>
 
     <form
@@ -91,25 +93,25 @@ async function signOut(): Promise<void> {
       <input
         v-model="query"
         type="search"
-        placeholder="Search your notes"
-        aria-label="Search your notes"
+        placeholder="Rechercher dans vos notes"
+        aria-label="Rechercher dans vos notes"
       />
     </form>
 
     <button
-      class="topbar-lock"
+      class="topbar-logout"
       type="button"
-      title="Lock Homeen"
-      aria-label="Lock Homeen"
+      title="Se déconnecter"
+      aria-label="Se déconnecter"
       @click="signOut"
     >
       <AppIcon
-        name="lock"
+        name="logout"
         :size="19"
       />
 
       <span>
-        Lock
+        Déconnexion
       </span>
     </button>
   </header>

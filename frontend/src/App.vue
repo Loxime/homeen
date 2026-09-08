@@ -25,11 +25,15 @@ onMounted(
     class="center-screen"
   >
     <div class="brand-loader">
-      H
+      <img
+        class="access-logo"
+        src="/favicon.svg"
+        alt=""
+      />
     </div>
 
     <p>
-      Opening Homeen…
+      Chargement…
     </p>
   </main>
 
