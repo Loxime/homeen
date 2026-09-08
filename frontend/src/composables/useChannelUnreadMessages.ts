@@ -7,6 +7,10 @@ import {
   api,
 } from '../services/api'
 
+import {
+  useNotificationSound,
+} from './useNotificationSound'
+
 interface ChannelUnreadCount {
   channelId: number
   channelCode: string
@@ -23,11 +27,46 @@ interface MercureAuthorization {
   topic: string
 }
 
+interface PersonalNotification {
+  type?: string
+  channelCode?: string
+  messageId?: number
+}
+
+export interface ChannelStructureEvent {
+  type: 'channel-structure'
+
+  event:
+    | 'member-joined'
+    | 'member-left'
+    | 'member-removed'
+    | 'role-changed'
+    | 'ownership-transferred'
+    | 'channel-updated'
+    | 'channel-closed'
+
+  channelCode: string
+
+  userId?: number
+  role?: string
+
+  previousCreatorUserId?: number
+  newCreatorUserId?: number
+}
+
 const total =
   ref(0)
 
 const channels =
   ref<ChannelUnreadCount[]>([])
+
+const lastStructureEvent =
+  ref<ChannelStructureEvent | null>(
+    null,
+  )
+
+const structureEventVersion =
+  ref(0)
 
 let consumers = 0
 
@@ -40,6 +79,13 @@ let reconnectTimer:
   | null = null
 
 let connecting = false
+
+const {
+  initialize:
+    initializeNotificationSound,
+  play:
+    playNotificationSound,
+} = useNotificationSound()
 
 async function refresh(): Promise<void> {
   try {
@@ -55,8 +101,9 @@ async function refresh(): Promise<void> {
       response.channels
   } catch {
     /*
-     * A badge refresh failure must not
-     * interrupt navigation.
+     * Notification state is secondary.
+     * Navigation must remain usable if
+     * this refresh temporarily fails.
      */
   }
 }
@@ -106,10 +153,102 @@ function scheduleReconnect(): void {
     window.setTimeout(
       () => {
         reconnectTimer = null
+
         void connectRealtime()
       },
       2_000,
     )
+}
+
+function isStructureEvent(
+  value: unknown,
+): value is ChannelStructureEvent {
+  if (
+    typeof value !== 'object'
+    || value === null
+  ) {
+    return false
+  }
+
+  const candidate =
+    value as Partial<ChannelStructureEvent>
+
+  return (
+    candidate.type
+      === 'channel-structure'
+    && typeof candidate.event
+      === 'string'
+    && typeof candidate.channelCode
+      === 'string'
+  )
+}
+
+function handleNotification(
+  event: MessageEvent<string>,
+): void {
+  let notification:
+    PersonalNotification
+    | ChannelStructureEvent
+
+  try {
+    notification =
+      JSON.parse(
+        event.data,
+      ) as
+        PersonalNotification
+        | ChannelStructureEvent
+  } catch {
+    return
+  }
+
+  if (
+    isStructureEvent(
+      notification,
+    )
+  ) {
+    lastStructureEvent.value =
+      notification
+
+    structureEventVersion.value += 1
+
+    /*
+     * Membership changes can also alter the
+     * unread-channel response. Keep the shared
+     * badge state authoritative.
+     */
+    void refresh()
+
+    return
+  }
+
+  if (
+    notification.type
+    === 'channel-message-state-changed'
+  ) {
+    /*
+     * Deletion/edit state is not a new message:
+     * recalculate without any sound.
+     */
+    void refresh()
+
+    return
+  }
+
+  if (
+    notification.type
+    !== 'channel-message'
+  ) {
+    /*
+     * Invitation events have their own
+     * composable and must not trigger the
+     * channel-message notification sound.
+     */
+    return
+  }
+
+  playNotificationSound()
+
+  void refresh()
 }
 
 async function connectRealtime(): Promise<void> {
@@ -159,43 +298,8 @@ async function connectRealtime(): Promise<void> {
 
     eventSource = source
 
-    source.onmessage = event => {
-      /*
-       * Deleting an unread message can lower
-       * the badge count. This is a state-change
-       * signal, not a new-message notification:
-       * refresh without playing any sound.
-       */
-      try {
-        const notification =
-          JSON.parse(
-            event.data,
-          ) as {
-            type?: string
-          }
-
-        if (
-          notification.type
-          === 'channel-message-state-changed'
-        ) {
-          void refresh()
-
-          return
-        }
-      } catch {
-        /*
-         * Let the existing handler deal with
-         * unrelated or malformed notifications.
-         */
-      }
-
-      /*
-       * The notification carries no message
-       * contents. PostgreSQL remains the source
-       * of truth for the unread count.
-       */
-      void refresh()
-    }
+    source.onmessage =
+      handleNotification
 
     source.onerror = () => {
       if (
@@ -223,6 +327,7 @@ function start(): void {
     return
   }
 
+  void initializeNotificationSound()
   void refresh()
   void connectRealtime()
 }
@@ -254,6 +359,18 @@ export function useChannelUnreadMessages() {
       computed(
         () =>
           channels.value,
+      ),
+
+    lastStructureEvent:
+      computed(
+        () =>
+          lastStructureEvent.value,
+      ),
+
+    structureEventVersion:
+      computed(
+        () =>
+          structureEventVersion.value,
       ),
 
     unreadFor,

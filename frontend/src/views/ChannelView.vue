@@ -4,6 +4,7 @@ import {
   onMounted,
   ref,
   watch,
+  onUnmounted,
 } from 'vue'
 
 import {
@@ -21,6 +22,10 @@ import {
   ApiError,
   api,
 } from '../services/api'
+
+import {
+  useChannelUnreadMessages,
+} from '../composables/useChannelUnreadMessages'
 
 interface Channel {
   id: number
@@ -76,6 +81,17 @@ type ChannelTab =
 
 const route = useRoute()
 const router = useRouter()
+
+const {
+  lastStructureEvent:
+    channelStructureEvent,
+  structureEventVersion:
+    channelStructureVersion,
+  start:
+    startChannelStructureRealtime,
+  stop:
+    stopChannelStructureRealtime,
+} = useChannelUnreadMessages()
 
 const channel = ref<Channel | null>(null)
 
@@ -403,6 +419,45 @@ function handleChannelLeft(): void {
   )
 }
 
+async function refreshChannelStructure(): Promise<void> {
+  try {
+    channel.value =
+      await api<Channel>(
+        `/api/channels/${code.value}`,
+      )
+
+    await loadPermissions()
+
+    if (
+      membersLoaded.value
+      || activeTab.value === 'members'
+    ) {
+      membersLoaded.value = false
+
+      await loadMembers()
+    }
+  } catch (exception) {
+    if (
+      exception instanceof ApiError
+      && (
+        exception.code === 'CHANNEL_FORBIDDEN'
+        || exception.code === 'CHANNEL_NOT_FOUND'
+      )
+    ) {
+      await router.replace(
+        '/channels',
+      )
+
+      return
+    }
+
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de rafraîchir le canal.'
+  }
+}
+
 function selectTab(
   tab: ChannelTab,
 ): void {
@@ -429,7 +484,13 @@ watch(
 )
 
 onMounted(() => {
+  startChannelStructureRealtime()
+
   void load()
+})
+
+onUnmounted(() => {
+  stopChannelStructureRealtime()
 })
 </script>
 

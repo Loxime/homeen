@@ -55,6 +55,13 @@ import {
 const router = useRouter()
 
 const {
+  lastStructureEvent:
+    channelStructureEvent,
+  structureEventVersion:
+    channelStructureVersion,
+} = useChannelUnreadMessages()
+
+const {
   eventVersion:
     invitationEventVersion,
   refresh:
@@ -288,6 +295,19 @@ watch(
 onUnmounted(() => {
   stopInvitationNotifications()
 })
+
+watch(
+  channelStructureVersion,
+  () => {
+    if (
+      !channelStructureEvent.value
+    ) {
+      return
+    }
+
+    void load()
+  },
+)
 
 onMounted(() => {
   void Promise.all([
