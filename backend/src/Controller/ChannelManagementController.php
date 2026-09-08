@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Repository\ChannelManagementRepository;
+use App\Service\ChannelMercureTopic;
 use App\Service\JsonInput;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Mercure\HubInterface;
+use Symfony\Component\Mercure\Update;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route(
@@ -18,6 +21,8 @@ final readonly class ChannelManagementController
     public function __construct(
         private ChannelManagementRepository $management,
         private JsonInput $input,
+        private ChannelMercureTopic $topics,
+        private HubInterface $hub,
     ) {
     }
 
@@ -59,7 +64,7 @@ final readonly class ChannelManagementController
                 );
 
         try {
-            return new JsonResponse(
+            $invitation =
                 $this->management
                     ->invite(
                         $code,
@@ -67,7 +72,49 @@ final readonly class ChannelManagementController
                             $data['email']
                             ?? ''
                         ),
-                    ),
+                    );
+
+            /*
+             * PostgreSQL remains authoritative.
+             * Mercure only signals the recipient
+             * that its invitation state changed.
+             */
+            try {
+                $payload =
+                    json_encode(
+                        [
+                            'type' =>
+                                'channel-invitation',
+
+                            'channelCode' =>
+                                $code,
+                        ],
+                        JSON_THROW_ON_ERROR,
+                    );
+
+                $this->hub
+                    ->publish(
+                        new Update(
+                            $this->topics
+                                ->notifications(
+                                    (int) $invitation[
+                                        'invitedUserId'
+                                    ],
+                                ),
+                            $payload,
+                            true,
+                        ),
+                    );
+            } catch (\Throwable) {
+                /*
+                 * A Mercure outage must never
+                 * turn an already persisted
+                 * invitation into an API failure.
+                 */
+            }
+
+            return new JsonResponse(
+                $invitation,
                 201,
             );
         } catch (\Throwable $exception) {

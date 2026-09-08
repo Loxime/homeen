@@ -40,6 +40,8 @@ const {
 
 const {
   unreadCount,
+  start: startInvitationNotifications,
+  stop: stopInvitationNotifications,
 } = useChannelInvitations()
 
 const {
@@ -55,9 +57,11 @@ const channelNotificationCount =
       + unreadMessageCount.value,
   )
 
+startInvitationNotifications()
 startUnreadMessages()
 
 onUnmounted(() => {
+  stopInvitationNotifications()
   stopUnreadMessages()
 })
 

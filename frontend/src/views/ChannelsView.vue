@@ -3,6 +3,7 @@ import {
   onMounted,
   ref,
   onUnmounted,
+  watch,
 } from 'vue'
 
 import { useRouter } from 'vue-router'
@@ -52,6 +53,19 @@ import {
 } from '../composables/useChannelUnreadMessages'
 
 const router = useRouter()
+
+const {
+  eventVersion:
+    invitationEventVersion,
+  refresh:
+    refreshInvitationUnread,
+  start:
+    startInvitationNotifications,
+  stop:
+    stopInvitationNotifications,
+} = useChannelInvitations()
+
+startInvitationNotifications()
 
 const {
   unreadFor,
@@ -142,6 +156,8 @@ async function loadInvitations(): Promise<void> {
               ?? new Date().toISOString(),
           }),
         )
+
+      await refreshInvitationUnread()
     }
   } catch (exception) {
     invitationError.value =
@@ -220,6 +236,8 @@ async function acceptInvitation(
         },
       )
 
+    await refreshInvitationUnread()
+
     await router.push(
       `/canal/${response.code}`,
     )
@@ -250,6 +268,8 @@ async function rejectInvitation(
           candidate.id
           !== invitation.id,
       )
+
+    await refreshInvitationUnread()
   } catch (exception) {
     invitationError.value =
       exception instanceof Error
@@ -257,6 +277,17 @@ async function rejectInvitation(
         : 'Impossible de refuser l’invitation.'
   }
 }
+
+watch(
+  invitationEventVersion,
+  () => {
+    void loadInvitations()
+  },
+)
+
+onUnmounted(() => {
+  stopInvitationNotifications()
+})
 
 onMounted(() => {
   void Promise.all([
