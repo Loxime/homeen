@@ -2,6 +2,7 @@ import { reactive } from 'vue'
 
 import {
   api,
+  getCsrfToken,
   setCsrfToken,
 } from '../services/api'
 
@@ -55,6 +56,27 @@ function resetUser(): void {
   setCsrfToken(null)
 }
 
+async function fetchAccessStatus():
+Promise<AccessStatusResponse> {
+  return api<AccessStatusResponse>(
+    '/api/access/status',
+  )
+}
+
+async function ensureCsrfToken():
+Promise<void> {
+  if (getCsrfToken()) {
+    return
+  }
+
+  const response =
+    await fetchAccessStatus()
+
+  setCsrfToken(
+    response.csrfToken,
+  )
+}
+
 window.addEventListener(
   'homeen:user-auth-required',
   resetUser,
@@ -72,9 +94,7 @@ export function useAccess() {
 
     try {
       const response =
-        await api<AccessStatusResponse>(
-          '/api/access/status',
-        )
+        await fetchAccessStatus()
 
       state.userAuthenticated =
         response.userAuthenticated
@@ -95,9 +115,10 @@ export function useAccess() {
       state.error =
         error instanceof Error
           ? error.message
-          : 'Unable to check authentication.'
+          : 'Impossible de vérifier la session.'
 
       resetUser()
+      initialized = false
     } finally {
       state.loading = false
     }
@@ -108,6 +129,15 @@ export function useAccess() {
     password: string,
   ): Promise<void> {
     state.error = null
+
+    /*
+     * Logout invalidates the Symfony session,
+     * therefore the previous CSRF token becomes
+     * invalid as well. Always reacquire one when
+     * the client no longer has a valid token
+     * before posting credentials.
+     */
+    await ensureCsrfToken()
 
     const response =
       await api<UserLoginResponse>(
@@ -179,7 +209,24 @@ export function useAccess() {
       },
     )
 
+    /*
+     * Symfony invalidates the current session
+     * during logout. The old CSRF token must not
+     * survive that boundary.
+     */
     resetUser()
+
+    /*
+     * Prepare the anonymous session immediately
+     * so the next login works without a reload.
+     * If this refresh fails, loginUser() retries
+     * lazily through ensureCsrfToken().
+     */
+    try {
+      await ensureCsrfToken()
+    } catch {
+      setCsrfToken(null)
+    }
   }
 
   return {
