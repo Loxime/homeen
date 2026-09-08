@@ -1,0 +1,53 @@
+FROM php:8.4-fpm-alpine
+
+RUN apk add --no-cache \
+        bash \
+        git \
+        icu-dev \
+        libxml2-dev \
+        libzip-dev \
+        oniguruma-dev \
+        postgresql-dev \
+    && docker-php-ext-install -j"$(nproc)" \
+        dom \
+        intl \
+        mbstring \
+        opcache \
+        pdo_pgsql \
+        xml \
+        xmlwriter \
+        zip
+
+COPY --from=composer:2 \
+    /usr/bin/composer \
+    /usr/bin/composer
+
+WORKDIR /app
+
+COPY backend /app
+
+RUN composer install \
+        --no-dev \
+        --no-interaction \
+        --prefer-dist \
+        --no-progress \
+        --classmap-authoritative \
+        --no-scripts \
+    && mkdir -p \
+        /app/var/cache \
+        /app/var/log \
+        /app/var/sessions
+
+COPY docker/php/prod-entrypoint.sh \
+    /usr/local/bin/homeen-prod-entrypoint
+
+COPY docker/php/scheduler.sh \
+    /usr/local/bin/homeen-scheduler
+
+RUN chmod +x \
+        /usr/local/bin/homeen-prod-entrypoint \
+        /usr/local/bin/homeen-scheduler
+
+ENTRYPOINT ["homeen-prod-entrypoint"]
+
+CMD ["php-fpm", "-F"]

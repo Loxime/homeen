@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Service\ActivityLogger;
+use App\Service\CurrentUser;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 
 final readonly class LabelRepository
 {
-    public function __construct(private Connection $connection, private ActivityLogger $logger)
-    {
+    public function __construct(
+        private Connection $connection,
+        private ActivityLogger $logger,
+        private CurrentUser $currentUser,
+    ) {
     }
 
     /** @return list<array<string, mixed>> */
@@ -22,10 +26,13 @@ SELECT l.id, l.name, l.color,
        l.created_at AS "createdAt", l.updated_at AS "updatedAt",
        COUNT(n.id) FILTER (WHERE n.deleted_at IS NULL) AS "noteCount"
 FROM label l
-LEFT JOIN note n ON n.label_id = l.id
+LEFT JOIN note n
+    ON n.label_id = l.id
+   AND n.user_id = :userId
+WHERE l.user_id = :userId
 GROUP BY l.id
 ORDER BY lower(l.name)
-SQL);
+SQL, ['userId' => $this->currentUser->id()]);
 
         return array_map($this->normalize(...), $rows);
     }
@@ -38,8 +45,12 @@ SQL);
 
         try {
             $row = $this->connection->fetchAssociative(
-                'INSERT INTO label (name, color) VALUES (:name, :color) RETURNING id, name, color, created_at AS "createdAt", updated_at AS "updatedAt"',
-                ['name' => $name, 'color' => $color],
+                'INSERT INTO label (user_id, name, color) VALUES (:userId, :name, :color) RETURNING id, name, color, created_at AS "createdAt", updated_at AS "updatedAt"',
+                [
+                    'userId' => $this->currentUser->id(),
+                    'name' => $name,
+                    'color' => $color,
+                ],
             );
         } catch (UniqueConstraintViolationException) {
             throw new \DomainException('A label with this name already exists.');
@@ -63,8 +74,13 @@ SQL);
 
         try {
             $row = $this->connection->fetchAssociative(
-                'UPDATE label SET name = :name, color = :color, updated_at = NOW() WHERE id = :id RETURNING id, name, color, created_at AS "createdAt", updated_at AS "updatedAt"',
-                ['id' => $id, 'name' => $name, 'color' => $color],
+                'UPDATE label SET name = :name, color = :color, updated_at = NOW() WHERE id = :id AND user_id = :userId RETURNING id, name, color, created_at AS "createdAt", updated_at AS "updatedAt"',
+                [
+                    'id' => $id,
+                    'userId' => $this->currentUser->id(),
+                    'name' => $name,
+                    'color' => $color,
+                ],
             );
         } catch (UniqueConstraintViolationException) {
             throw new \DomainException('A label with this name already exists.');
@@ -74,7 +90,10 @@ SQL);
             throw new \OutOfBoundsException('Label not found.');
         }
 
-        $row['noteCount'] = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM note WHERE label_id = :id AND deleted_at IS NULL', ['id' => $id]);
+        $row['noteCount'] = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM note WHERE label_id = :id AND user_id = :userId AND deleted_at IS NULL',
+            ['id' => $id, 'userId' => $this->currentUser->id()],
+        );
         $this->logger->log('LABEL_UPDATED', 'label', $id, ['name' => $name, 'color' => $color]);
 
         return $this->normalize($row);
@@ -82,12 +101,19 @@ SQL);
 
     public function delete(int $id): void
     {
-        $label = $this->connection->fetchAssociative('SELECT name, color FROM label WHERE id = :id', ['id' => $id]);
+        $userId = $this->currentUser->id();
+        $label = $this->connection->fetchAssociative(
+            'SELECT name, color FROM label WHERE id = :id AND user_id = :userId',
+            ['id' => $id, 'userId' => $userId],
+        );
         if ($label === false) {
             throw new \OutOfBoundsException('Label not found.');
         }
 
-        $this->connection->delete('label', ['id' => $id]);
+        $this->connection->delete(
+            'label',
+            ['id' => $id, 'user_id' => $userId],
+        );
         $this->logger->log('LABEL_DELETED', 'label', $id, $label);
     }
 

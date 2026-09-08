@@ -10,6 +10,8 @@ defineProps<{
     | 'trash'
     | 'search'
     | 'lock'
+    | 'user'
+    | 'users'
     | 'plus'
     | 'grid'
     | 'list'
@@ -73,6 +75,18 @@ defineProps<{
     <template v-else-if="name === 'lock'">
       <rect x="5" y="10" width="14" height="11" rx="2" />
       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </template>
+
+    <template v-else-if="name === 'user'">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
+    </template>
+
+    <template v-else-if="name === 'users'">
+      <circle cx="9" cy="8" r="3" />
+      <circle cx="17" cy="9" r="2.5" />
+      <path d="M3 20a6 6 0 0 1 12 0" />
+      <path d="M14 15a5 5 0 0 1 7 5" />
     </template>
 
     <template v-else-if="name === 'plus'">

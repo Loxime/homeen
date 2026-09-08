@@ -28,6 +28,9 @@ services:
       DEFAULT_URI: ${DEFAULT_URI:-http://localhost:8080}
       ACCESS_KEY: ${ACCESS_KEY}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8
+      MERCURE_URL: http://mercure/.well-known/mercure
+      MERCURE_PUBLIC_URL: ${MERCURE_PUBLIC_URL:-http://localhost:8080/.well-known/mercure}
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET}
     volumes:
       - ./backend:/app
       - backend_vendor:/app/vendor
@@ -52,6 +55,18 @@ services:
       exec npm run dev -- --host 0.0.0.0"
     restart: unless-stopped
 
+  mercure:
+    image: dunglas/mercure:v0.24.2
+    environment:
+      SERVER_NAME: ":80"
+      MERCURE_PUBLISHER_JWT_KEY: ${MERCURE_JWT_SECRET}
+      MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_JWT_SECRET}
+      USE_FORWARDED_HEADERS: "1"
+    volumes:
+      - mercure_data:/data
+      - mercure_config:/config
+    restart: unless-stopped
+
   nginx:
     image: nginx:1.29-alpine
     ports:
@@ -62,6 +77,7 @@ services:
     depends_on:
       - php
       - frontend
+      - mercure
     restart: unless-stopped
 
   scheduler:
@@ -78,6 +94,9 @@ services:
       DEFAULT_URI: ${DEFAULT_URI:-http://localhost:8080}
       ACCESS_KEY: ${ACCESS_KEY}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8
+      MERCURE_URL: http://mercure/.well-known/mercure
+      MERCURE_PUBLIC_URL: ${MERCURE_PUBLIC_URL:-http://localhost:8080/.well-known/mercure}
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET}
     volumes:
       - ./backend:/app
       - backend_vendor:/app/vendor
@@ -92,3 +111,5 @@ volumes:
   postgres_data:
   backend_vendor:
   frontend_node_modules:
+  mercure_data:
+  mercure_config:
