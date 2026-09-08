@@ -346,6 +346,28 @@ final readonly class ProfileController
             );
         }
 
+        $ownedChannels =
+            $this->users
+                ->countOwnedOpenChannels(
+                    $userId
+                );
+
+        if ($ownedChannels > 0) {
+            return new JsonResponse(
+                [
+                    'error' =>
+                        'Close your channels before deleting your account.',
+
+                    'code' =>
+                        'CHANNEL_OWNERSHIP_BLOCKS_ACCOUNT_DELETION',
+
+                    'channelCount' =>
+                        $ownedChannels,
+                ],
+                409,
+            );
+        }
+
         $this->users->deleteAccount(
             $userId
         );

@@ -2,6 +2,9 @@
 import { onMounted, ref } from 'vue'
 import { api } from '../services/api'
 import { useAccess } from '../composables/useAccess'
+import {
+  useNotificationSound,
+} from '../composables/useNotificationSound'
 
 interface ProfileEmail {
   id: number
@@ -17,6 +20,13 @@ interface Profile {
 }
 
 const { state } = useAccess()
+
+const {
+  syncEnabled:
+    syncNotificationSoundEnabled,
+  setEnabled:
+    setNotificationSoundEnabled,
+} = useNotificationSound()
 
 const profile = ref<Profile | null>(null)
 const loading = ref(true)
@@ -39,10 +49,18 @@ async function load(): Promise<void> {
   error.value = ''
 
   try {
-    profile.value =
+    const loadedProfile =
       await api<Profile>(
         '/api/profile',
       )
+
+    profile.value =
+      loadedProfile
+
+    syncNotificationSoundEnabled(
+      loadedProfile
+        .notificationSoundEnabled,
+    )
   } catch (exception) {
     error.value =
       exception instanceof Error
@@ -225,20 +243,18 @@ async function toggleSound(): Promise<void> {
     profile.value
       .notificationSoundEnabled
 
-  const next = !previous
+  const next =
+    !previous
 
   profile.value
-    .notificationSoundEnabled = next
+    .notificationSoundEnabled =
+      next
+
+  error.value = ''
 
   try {
-    await api(
-      '/api/profile/notifications',
-      {
-        method: 'PATCH',
-        body: JSON.stringify({
-          soundEnabled: next,
-        }),
-      },
+    await setNotificationSoundEnabled(
+      next,
     )
   } catch (exception) {
     profile.value

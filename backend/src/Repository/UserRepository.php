@@ -471,21 +471,76 @@ SQL,
     }
 }
 
-    public function deleteAccount(int $userId): void
-    {
-        $affected = $this->connection->delete(
-            'app_user',
-            [
-                'id' => $userId,
-            ],
-        );
+public function deleteAccount(int $userId): void
+{
+    $affected = $this->connection->delete(
+        'app_user',
+        [
+            'id' => $userId,
+        ],
+    );
 
-        if ($affected !== 1) {
-            throw new \RuntimeException(
-                'Unable to delete user account.'
-            );
-        }
+    if ($affected !== 1) {
+        throw new \RuntimeException(
+            'Unable to delete user account.'
+        );
     }
+}
+
+/**
+ * @return array{
+ *     id:int,
+ *     email:string
+ * }|null
+ */
+public function findIdentityByEmail(
+    string $email,
+): ?array {
+    $row = $this->connection->fetchAssociative(
+        <<<'SQL'
+SELECT
+    u.id,
+    primary_email.email
+FROM app_user u
+INNER JOIN user_email lookup_email
+    ON lookup_email.user_id = u.id
+INNER JOIN user_email primary_email
+    ON primary_email.user_id = u.id
+   AND primary_email.is_primary = TRUE
+WHERE lookup_email.normalized_email = :email
+LIMIT 1
+SQL,
+        [
+            'email' =>
+                self::normalizeEmail($email),
+        ],
+    );
+
+    if ($row === false) {
+        return null;
+    }
+
+    return [
+        'id' => (int) $row['id'],
+        'email' => (string) $row['email'],
+    ];
+}
+
+public function countOwnedOpenChannels(
+    int $userId,
+): int {
+    return (int) $this->connection->fetchOne(
+        <<<'SQL'
+SELECT COUNT(*)
+FROM channel
+WHERE creator_user_id = :userId
+  AND closed_at IS NULL
+SQL,
+        [
+            'userId' => $userId,
+        ],
+    );
+}
 
     public static function normalizeEmail(
         string $email,
