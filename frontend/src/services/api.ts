@@ -85,16 +85,6 @@ export async function api<T>(
 
   if (!response.ok) {
     if (
-      data.code === 'ACCESS_REQUIRED'
-    ) {
-      window.dispatchEvent(
-        new CustomEvent(
-          'homeen:access-required',
-        ),
-      )
-    }
-
-    if (
       data.code === 'USER_AUTH_REQUIRED'
     ) {
       window.dispatchEvent(

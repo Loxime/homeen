@@ -26,7 +26,6 @@ services:
       APP_SECRET: ${APP_SECRET}
       APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Paris}
       DEFAULT_URI: ${DEFAULT_URI:-http://localhost:8080}
-      ACCESS_KEY: ${ACCESS_KEY}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8
       MERCURE_URL: http://mercure/.well-known/mercure
       MERCURE_PUBLIC_URL: ${MERCURE_PUBLIC_URL:-http://localhost:8080/.well-known/mercure}
@@ -92,7 +91,6 @@ services:
       APP_SECRET: ${APP_SECRET}
       APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Paris}
       DEFAULT_URI: ${DEFAULT_URI:-http://localhost:8080}
-      ACCESS_KEY: ${ACCESS_KEY}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8
       MERCURE_URL: http://mercure/.well-known/mercure
       MERCURE_PUBLIC_URL: ${MERCURE_PUBLIC_URL:-http://localhost:8080/.well-known/mercure}

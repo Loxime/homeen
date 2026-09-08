@@ -10,7 +10,8 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
-final class ApiAccessSubscriber implements EventSubscriberInterface
+final class ApiAccessSubscriber
+    implements EventSubscriberInterface
 {
     /**
      * @return array<string, array{0:string, 1:int}>
@@ -32,43 +33,36 @@ final class ApiAccessSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $request = $event->getRequest();
-        $path = $request->getPathInfo();
+        $request =
+            $event->getRequest();
 
-        if (!str_starts_with($path, '/api/')) {
+        $path =
+            $request->getPathInfo();
+
+        if (
+            !str_starts_with(
+                $path,
+                '/api/',
+            )
+        ) {
             return;
         }
 
+        /*
+         * Public endpoints required before
+         * user authentication.
+         */
         if (
             $path === '/api/health'
-            || $path === '/api/access/login'
             || $path === '/api/access/status'
         ) {
             return;
         }
 
-        $session = $request->getSession();
-
-        if (
-            $session->get(
-                'homeen_access_granted'
-            ) !== true
-        ) {
-            $event->setResponse(
-                new JsonResponse(
-                    [
-                        'error' =>
-                            'Access key required.',
-                        'code' =>
-                            'ACCESS_REQUIRED',
-                    ],
-                    401,
-                ),
-            );
-
-            return;
-        }
-
+        /*
+         * Login and logout are protected by
+         * the session-scoped CSRF token.
+         */
         if (
             $path === '/api/auth/login'
             || $path === '/api/access/logout'
@@ -81,10 +75,14 @@ final class ApiAccessSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $userId = (int) $session->get(
-            'homeen_user_id',
-            0,
-        );
+        $session =
+            $request->getSession();
+
+        $userId =
+            (int) $session->get(
+                'homeen_user_id',
+                0,
+            );
 
         if ($userId <= 0) {
             $event->setResponse(
@@ -92,6 +90,7 @@ final class ApiAccessSubscriber implements EventSubscriberInterface
                     [
                         'error' =>
                             'User authentication required.',
+
                         'code' =>
                             'USER_AUTH_REQUIRED',
                     ],
@@ -109,7 +108,7 @@ final class ApiAccessSubscriber implements EventSubscriberInterface
 
         if (
             $path
-                === '/api/auth/change-temporary-password'
+            === '/api/auth/change-temporary-password'
         ) {
             $this->validateCsrf(
                 $event,
@@ -125,6 +124,7 @@ final class ApiAccessSubscriber implements EventSubscriberInterface
                     [
                         'error' =>
                             'Password change required.',
+
                         'code' =>
                             'PASSWORD_CHANGE_REQUIRED',
                     ],
@@ -159,19 +159,22 @@ final class ApiAccessSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $session = $request->getSession();
+        $session =
+            $request->getSession();
 
-        $expected = (string) $session->get(
-            'homeen_csrf',
-            '',
-        );
-
-        $provided = (string) $request
-            ->headers
-            ->get(
-                'X-CSRF-TOKEN',
+        $expected =
+            (string) $session->get(
+                'homeen_csrf',
                 '',
             );
+
+        $provided =
+            (string) $request
+                ->headers
+                ->get(
+                    'X-CSRF-TOKEN',
+                    '',
+                );
 
         if (
             $expected === ''
@@ -186,6 +189,7 @@ final class ApiAccessSubscriber implements EventSubscriberInterface
                     [
                         'error' =>
                             'Invalid CSRF token.',
+
                         'code' =>
                             'INVALID_CSRF_TOKEN',
                     ],
