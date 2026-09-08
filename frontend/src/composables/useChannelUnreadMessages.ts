@@ -159,7 +159,36 @@ async function connectRealtime(): Promise<void> {
 
     eventSource = source
 
-    source.onmessage = () => {
+    source.onmessage = event => {
+      /*
+       * Deleting an unread message can lower
+       * the badge count. This is a state-change
+       * signal, not a new-message notification:
+       * refresh without playing any sound.
+       */
+      try {
+        const notification =
+          JSON.parse(
+            event.data,
+          ) as {
+            type?: string
+          }
+
+        if (
+          notification.type
+          === 'channel-message-state-changed'
+        ) {
+          void refresh()
+
+          return
+        }
+      } catch {
+        /*
+         * Let the existing handler deal with
+         * unrelated or malformed notifications.
+         */
+      }
+
       /*
        * The notification carries no message
        * contents. PostgreSQL remains the source

@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Repository\ChannelMercureAudienceRepository;
 use App\Repository\ChannelMessageRepository;
 use App\Service\ChannelMercureTopic;
+use App\Service\CurrentUser;
 use App\Service\JsonInput;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -24,6 +25,7 @@ final readonly class ChannelMessageController
         private ChannelMercureAudienceRepository $mercureAudience,
         private ChannelMercureTopic $topics,
         private HubInterface $hub,
+        private CurrentUser $currentUser,
         private JsonInput $input,
     ) {
     }
@@ -305,6 +307,66 @@ final readonly class ChannelMessageController
                         true,
                     ),
                 );
+
+                /*
+                 * A deleted unread message changes
+                 * the authoritative unread count for
+                 * every other channel member.
+                 *
+                 * This signal deliberately differs
+                 * from "channel-message": clients
+                 * refresh their badge without playing
+                 * the new-message notification sound.
+                 */
+                $notificationTopics = [];
+
+                foreach (
+                    $this->mercureAudience
+                        ->recipientUserIds(
+                            $code,
+                            $this->currentUser
+                                ->id(),
+                        )
+                    as $recipientUserId
+                ) {
+                    $notificationTopics[] =
+                        $this->topics
+                            ->notifications(
+                                $recipientUserId,
+                            );
+                }
+
+                if ([] !== $notificationTopics) {
+                    $notificationPayload =
+                        json_encode(
+                            [
+                                'type' =>
+                                    'channel-message-state-changed',
+
+                                'channelCode' =>
+                                    $code,
+
+                                'messageId' =>
+                                    $messageId,
+
+                                'mutation' =>
+                                    'deleted',
+                            ],
+                            JSON_THROW_ON_ERROR,
+                        );
+
+                    $this->hub->publish(
+                        new Update(
+                            $notificationTopics,
+                            $notificationPayload,
+                            true,
+                            sprintf(
+                                'channel-message-state-changed-%d-deleted',
+                                $messageId,
+                            ),
+                        ),
+                    );
+                }
             } catch (\Throwable) {
                 /*
                  * Reloading reflects the deletion
