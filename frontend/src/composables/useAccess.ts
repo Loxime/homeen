@@ -1,16 +1,16 @@
 import { reactive } from 'vue'
+
 import {
   api,
   setCsrfToken,
 } from '../services/api'
 
 interface AccessStatusResponse {
-  accessGranted: boolean
   userAuthenticated: boolean
   mustChangePassword: boolean
   authenticated: boolean
   email: string | null
-  csrfToken: string | null
+  csrfToken: string
 }
 
 interface UserLoginResponse {
@@ -27,7 +27,6 @@ interface PasswordChangeResponse
 
 interface AccessState {
   loading: boolean
-  accessGranted: boolean
   userAuthenticated: boolean
   mustChangePassword: boolean
   authenticated: boolean
@@ -35,38 +34,26 @@ interface AccessState {
   error: string | null
 }
 
-const state = reactive<AccessState>({
-  loading: true,
-  accessGranted: false,
-  userAuthenticated: false,
-  mustChangePassword: false,
-  authenticated: false,
-  email: null,
-  error: null,
-})
+const state =
+  reactive<AccessState>({
+    loading: true,
+    userAuthenticated: false,
+    mustChangePassword: false,
+    authenticated: false,
+    email: null,
+    error: null,
+  })
 
 let initialized = false
-
-function resetAll(): void {
-  state.accessGranted = false
-  state.userAuthenticated = false
-  state.mustChangePassword = false
-  state.authenticated = false
-  state.email = null
-  setCsrfToken(null)
-}
 
 function resetUser(): void {
   state.userAuthenticated = false
   state.mustChangePassword = false
   state.authenticated = false
   state.email = null
-}
 
-window.addEventListener(
-  'homeen:access-required',
-  resetAll,
-)
+  setCsrfToken(null)
+}
 
 window.addEventListener(
   'homeen:user-auth-required',
@@ -89,9 +76,6 @@ export function useAccess() {
           '/api/access/status',
         )
 
-      state.accessGranted =
-        response.accessGranted
-
       state.userAuthenticated =
         response.userAuthenticated
 
@@ -101,7 +85,8 @@ export function useAccess() {
       state.authenticated =
         response.authenticated
 
-      state.email = response.email
+      state.email =
+        response.email
 
       setCsrfToken(
         response.csrfToken,
@@ -110,47 +95,12 @@ export function useAccess() {
       state.error =
         error instanceof Error
           ? error.message
-          : 'Unable to check access.'
+          : 'Unable to check authentication.'
 
-      resetAll()
+      resetUser()
     } finally {
       state.loading = false
     }
-  }
-
-  async function loginAccess(
-    accessKey: string,
-  ): Promise<void> {
-    state.error = null
-
-    const response =
-      await api<AccessStatusResponse>(
-        '/api/access/login',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            accessKey,
-          }),
-        },
-      )
-
-    state.accessGranted =
-      response.accessGranted
-
-    state.userAuthenticated =
-      response.userAuthenticated
-
-    state.mustChangePassword =
-      response.mustChangePassword
-
-    state.authenticated =
-      response.authenticated
-
-    state.email = response.email
-
-    setCsrfToken(
-      response.csrfToken,
-    )
   }
 
   async function loginUser(
@@ -164,6 +114,7 @@ export function useAccess() {
         '/api/auth/login',
         {
           method: 'POST',
+
           body: JSON.stringify({
             email,
             password,
@@ -180,7 +131,8 @@ export function useAccess() {
     state.authenticated =
       response.authenticated
 
-    state.email = response.email
+    state.email =
+      response.email
   }
 
   async function changeTemporaryPassword(
@@ -194,6 +146,7 @@ export function useAccess() {
         '/api/auth/change-temporary-password',
         {
           method: 'POST',
+
           body: JSON.stringify({
             password,
             confirmation,
@@ -210,7 +163,8 @@ export function useAccess() {
     state.authenticated =
       response.authenticated
 
-    state.email = response.email
+    state.email =
+      response.email
 
     setCsrfToken(
       response.csrfToken,
@@ -225,13 +179,12 @@ export function useAccess() {
       },
     )
 
-    resetAll()
+    resetUser()
   }
 
   return {
     state,
     initialize,
-    loginAccess,
     loginUser,
     changeTemporaryPassword,
     logout,
