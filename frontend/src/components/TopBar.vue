@@ -67,15 +67,17 @@ async function signOut(): Promise<void> {
         <AppIcon name="menu" :size="22" />
       </button>
 
-      <div class="topbar-brand">
-        <span class="homeen-mark">
-          H
-        </span>
-
-        <strong>
-          Homeen
-        </strong>
-      </div>
+      <RouterLink
+        class="topbar-brand"
+        to="/notes"
+        aria-label="Accueil"
+      >
+        <img
+          class="homeen-mark"
+          src="/favicon.svg"
+          alt=""
+        />
+      </RouterLink>
     </div>
 
     <form
