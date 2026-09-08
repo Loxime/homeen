@@ -473,18 +473,97 @@ SQL,
 
 public function deleteAccount(int $userId): void
 {
-    $affected = $this->connection->delete(
-        'app_user',
-        [
-            'id' => $userId,
-        ],
-    );
+    $this->connection->transactional(
+        function (
+            Connection $connection,
+        ) use (
+            $userId,
+        ): void {
+            /*
+             * Lock owned OPEN channels so ownership
+             * cannot change underneath this deletion.
+             *
+             * An active channel must always retain
+             * a valid creator.
+             */
+            $ownedOpenChannels =
+                $connection->fetchFirstColumn(
+                    <<<'SQL'
+SELECT id
+FROM channel
+WHERE creator_user_id = :userId
+  AND closed_at IS NULL
+FOR UPDATE
+SQL,
+                    [
+                        'userId' =>
+                            $userId,
+                    ],
+                );
 
-    if ($affected !== 1) {
-        throw new \RuntimeException(
-            'Unable to delete user account.'
-        );
-    }
+            if ($ownedOpenChannels !== []) {
+                throw new \DomainException(
+                    'CHANNEL_OWNERSHIP_BLOCKS_ACCOUNT_DELETION',
+                );
+            }
+
+            /*
+             * A pending invitation should not outlive
+             * the account that issued it.
+             *
+             * This also clears the RESTRICT foreign key
+             * on channel_invitation.invited_by_user_id.
+             */
+            $connection->executeStatement(
+                <<<'SQL'
+DELETE FROM channel_invitation
+WHERE invited_by_user_id = :userId
+SQL,
+                [
+                    'userId' =>
+                        $userId,
+                ],
+            );
+
+            /*
+             * Closed collaboration history is retained,
+             * but no longer references the deleted user
+             * as its creator.
+             *
+             * creator_user_id remains RESTRICT at DB
+             * level, so open channels cannot be orphaned.
+             */
+            $connection->executeStatement(
+                <<<'SQL'
+UPDATE channel
+SET
+    creator_user_id = NULL,
+    updated_at = NOW()
+WHERE creator_user_id = :userId
+  AND closed_at IS NOT NULL
+SQL,
+                [
+                    'userId' =>
+                        $userId,
+                ],
+            );
+
+            $affected =
+                $connection->delete(
+                    'app_user',
+                    [
+                        'id' =>
+                            $userId,
+                    ],
+                );
+
+            if ($affected !== 1) {
+                throw new \RuntimeException(
+                    'Unable to delete user account.'
+                );
+            }
+        },
+    );
 }
 
 /**

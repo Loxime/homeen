@@ -368,9 +368,31 @@ final readonly class ProfileController
             );
         }
 
-        $this->users->deleteAccount(
-            $userId
-        );
+        try {
+            $this->users->deleteAccount(
+                $userId
+            );
+        } catch (
+            \DomainException $exception
+        ) {
+            if (
+                $exception->getMessage()
+                === 'CHANNEL_OWNERSHIP_BLOCKS_ACCOUNT_DELETION'
+            ) {
+                return new JsonResponse(
+                    [
+                        'error' =>
+                            'Transfer or close your channels before deleting your account.',
+
+                        'code' =>
+                            'CHANNEL_OWNERSHIP_BLOCKS_ACCOUNT_DELETION',
+                    ],
+                    409,
+                );
+            }
+
+            throw $exception;
+        }
 
         /*
          * The account no longer exists.
