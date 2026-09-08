@@ -99,19 +99,19 @@ async function signOut(): Promise<void> {
     </form>
 
     <button
-      class="topbar-lock"
+      class="topbar-logout"
       type="button"
-      title="Lock Homeen"
-      aria-label="Lock Homeen"
+      title="Se déconnecter"
+      aria-label="Se déconnecter"
       @click="signOut"
     >
       <AppIcon
-        name="lock"
+        name="logout"
         :size="19"
       />
 
       <span>
-        Lock
+        Déconnexion
       </span>
     </button>
   </header>

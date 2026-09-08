@@ -10,6 +10,7 @@ defineProps<{
     | 'trash'
     | 'search'
     | 'lock'
+    | 'logout'
     | 'user'
     | 'users'
     | 'plus'
@@ -75,6 +76,12 @@ defineProps<{
     <template v-else-if="name === 'lock'">
       <rect x="5" y="10" width="14" height="11" rx="2" />
       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </template>
+
+    <template v-else-if="name === 'logout'">
+      <path d="M10 17l5-5-5-5" />
+      <path d="M15 12H3" />
+      <path d="M21 3v18h-7" />
     </template>
 
     <template v-else-if="name === 'user'">
