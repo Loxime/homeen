@@ -35,15 +35,36 @@ interface Channel {
   createdAt: string
 }
 
+type ChannelMemberRole =
+  | 'creator'
+  | 'admin'
+  | 'member'
+
 interface ChannelMember {
   userId: number
   email: string
   isCreator: boolean
+  role: ChannelMemberRole
+  joinedAt: string
+}
+
+interface RoleMember {
+  userId: number
+  email: string
+  role: ChannelMemberRole
   joinedAt: string
 }
 
 interface MembersResponse {
-  members: ChannelMember[]
+  members: RoleMember[]
+}
+
+interface ChannelPermissions {
+  currentUserId: number
+  role: ChannelMemberRole
+  isCreator: boolean
+  isAdmin: boolean
+  canManageMembers: boolean
 }
 
 type ChannelTab =
@@ -57,6 +78,24 @@ const route = useRoute()
 const router = useRouter()
 
 const channel = ref<Channel | null>(null)
+
+const channelPermissions =
+  ref<ChannelPermissions | null>(null)
+
+const canManageMembers =
+  computed(
+    () =>
+      channelPermissions.value?.canManageMembers
+      ?? channel.value?.isCreator
+      ?? false,
+  )
+
+const currentUserId =
+  computed(
+    () =>
+      channelPermissions.value?.currentUserId
+      ?? null,
+  )
 
 const loading = ref(true)
 const error = ref('')
@@ -111,6 +150,8 @@ async function load(): Promise<void> {
       await api<Channel>(
         `/api/channels/${code.value}`,
       )
+
+    await loadPermissions()
   } catch (exception) {
     if (
       exception instanceof ApiError
@@ -151,6 +192,23 @@ async function load(): Promise<void> {
   }
 }
 
+async function loadPermissions(): Promise<void> {
+  if (!channel.value) {
+    channelPermissions.value = null
+
+    return
+  }
+
+  try {
+    channelPermissions.value =
+      await api<ChannelPermissions>(
+        `/api/channels/${channel.value.code}/management/permissions`,
+      )
+  } catch {
+    channelPermissions.value = null
+  }
+}
+
 async function loadMembers(
   force = false,
 ): Promise<void> {
@@ -171,11 +229,18 @@ async function loadMembers(
   try {
     const response =
       await api<MembersResponse>(
-        `/api/channels/${channel.value.code}/members`,
+        `/api/channels/${channel.value.code}/roles`,
       )
 
     members.value =
-      response.members
+      response.members.map(
+        member => ({
+          ...member,
+
+          isCreator:
+            member.role === 'creator',
+        }),
+      )
 
     membersLoaded.value = true
   } catch (exception) {
@@ -191,6 +256,7 @@ async function loadMembers(
 async function inviteMember(): Promise<void> {
   if (
     !channel.value
+    || !canManageMembers.value
     || !inviteEmail.value.trim()
   ) {
     return
@@ -202,7 +268,7 @@ async function inviteMember(): Promise<void> {
 
   try {
     await api(
-      `/api/channels/${channel.value.code}/invitations`,
+      `/api/channels/${channel.value.code}/management/invitations`,
       {
         method: 'POST',
 
@@ -227,13 +293,37 @@ async function inviteMember(): Promise<void> {
   }
 }
 
+function canRemoveMember(
+  member: ChannelMember,
+): boolean {
+  if (
+    !channel.value
+    || !canManageMembers.value
+    || member.isCreator
+    || member.userId === currentUserId.value
+  ) {
+    return false
+  }
+
+  /*
+   * Le créateur peut retirer membres et admins.
+   * Un admin ne peut retirer qu'un membre simple.
+   */
+  if (channel.value.isCreator) {
+    return true
+  }
+
+  return member.role === 'member'
+}
+
 async function removeMember(
   member: ChannelMember,
 ): Promise<void> {
   if (
     !channel.value
-    || member.isCreator
-    || !channel.value.isCreator
+    || !canRemoveMember(
+      member,
+    )
   ) {
     return
   }
@@ -255,7 +345,7 @@ async function removeMember(
 
   try {
     await api(
-      `/api/channels/${channel.value.code}/members/${member.userId}`,
+      `/api/channels/${channel.value.code}/management/members/${member.userId}`,
       {
         method: 'DELETE',
       },
@@ -295,6 +385,10 @@ function applyChannelUpdate(
 ): void {
   channel.value =
     updatedChannel
+
+  membersLoaded.value = false
+
+  void loadPermissions()
 }
 
 function handleChannelClosed(): void {
@@ -327,6 +421,7 @@ watch(
   () => {
     members.value = []
     membersLoaded.value = false
+    channelPermissions.value = null
     activeTab.value = 'notes'
 
     void load()
@@ -572,7 +667,7 @@ onMounted(() => {
           </p>
 
           <form
-            v-if="channel.isCreator"
+            v-if="canManageMembers"
             class="channel-invite-form"
             @submit.prevent="
               inviteMember
@@ -666,10 +761,7 @@ onMounted(() => {
               </div>
 
               <button
-                v-if="
-                  channel.isCreator
-                  && !member.isCreator
-                "
+                v-if="canRemoveMember(member)"
                 class="ghost danger-text"
                 type="button"
                 :disabled="
