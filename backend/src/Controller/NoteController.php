@@ -20,10 +20,28 @@ final readonly class NoteController
     #[Route('', name: 'api_notes_list', methods: ['GET'])]
     public function list(Request $request): JsonResponse
     {
-        return new JsonResponse(['notes' => $this->notes->list(
-            (string) $request->query->get('scope', 'active'),
-            $request->query->getString('q') !== '' ? $request->query->getString('q') : null,
-        )]);
+        $collectionId =
+            $request->query->has('collectionId')
+                ? $request->query->getInt(
+                    'collectionId'
+                )
+                : null;
+
+        return new JsonResponse([
+            'notes' => $this->notes->list(
+                (string) $request->query->get(
+                    'scope',
+                    'active',
+                ),
+                $request->query->getString('q') !== ''
+                    ? $request->query->getString('q')
+                    : null,
+                $collectionId !== null
+                && $collectionId > 0
+                    ? $collectionId
+                    : null,
+            ),
+        ]);
     }
 
     #[Route('/{id<\\d+>}', name: 'api_notes_get', methods: ['GET'])]
@@ -36,23 +54,38 @@ final readonly class NoteController
     public function create(Request $request): JsonResponse
     {
         $data = $this->input->read($request);
-        return new JsonResponse($this->notes->create(
-            (string) ($data['title'] ?? ''),
-            (string) ($data['content'] ?? ''),
-            isset($data['labelId']) ? (int) $data['labelId'] : null,
-        ), 201);
+        return new JsonResponse(
+            $this->notes->create(
+                (string) ($data['title'] ?? ''),
+                (string) ($data['content'] ?? ''),
+                isset($data['labelId'])
+                    ? (int) $data['labelId']
+                    : null,
+                isset($data['collectionId'])
+                    ? (int) $data['collectionId']
+                    : null,
+            ),
+            201,
+        );
     }
 
     #[Route('/{id<\\d+>}', name: 'api_notes_update', methods: ['PUT'])]
     public function update(int $id, Request $request): JsonResponse
     {
         $data = $this->input->read($request);
-        return new JsonResponse($this->notes->update(
-            $id,
-            (string) ($data['title'] ?? ''),
-            (string) ($data['content'] ?? ''),
-            isset($data['labelId']) ? (int) $data['labelId'] : null,
-        ));
+        return new JsonResponse(
+            $this->notes->update(
+                $id,
+                (string) ($data['title'] ?? ''),
+                (string) ($data['content'] ?? ''),
+                isset($data['labelId'])
+                    ? (int) $data['labelId']
+                    : null,
+                isset($data['collectionId'])
+                    ? (int) $data['collectionId']
+                    : null,
+            ),
+        );
     }
 
     #[Route('/{id<\\d+>}/duplicate', name: 'api_notes_duplicate', methods: ['POST'])]

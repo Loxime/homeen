@@ -7,6 +7,15 @@ export interface Label {
   noteCount: number
 }
 
+export interface NoteCollection {
+  id: number
+  name: string
+  color: string
+  createdAt: string
+  updatedAt: string
+  noteCount: number
+}
+
 export interface Task {
   id: number
   content: string
@@ -23,6 +32,9 @@ export interface NoteSummary {
   labelId: number | null
   labelName: string | null
   labelColor: string | null
+  collectionId: number | null
+  collectionName: string | null
+  collectionColor: string | null
   createdAt: string
   updatedAt: string
   archivedAt: string | null

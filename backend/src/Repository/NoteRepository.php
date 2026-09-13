@@ -21,6 +21,7 @@ final readonly class NoteRepository
     public function list(
         string $scope = 'active',
         ?string $query = null,
+        ?int $collectionId = null,
     ): array {
         $userId = $this->currentUser->id();
 
@@ -48,6 +49,18 @@ final readonly class NoteRepository
         $params = [
             'userId' => $userId,
         ];
+
+        if ($collectionId !== null) {
+            $this->validateCollection(
+                $collectionId
+            );
+
+            $where .=
+                ' AND n.collection_id = :collectionId';
+
+            $params['collectionId'] =
+                $collectionId;
+        }
 
         if (
             $query !== null
@@ -79,6 +92,9 @@ SELECT
     n.label_id AS "labelId",
     l.name AS "labelName",
     l.color AS "labelColor",
+    n.collection_id AS "collectionId",
+    collection.name AS "collectionName",
+    collection.color AS "collectionColor",
     n.created_at AS "createdAt",
     n.updated_at AS "updatedAt",
     n.archived_at AS "archivedAt",
@@ -91,10 +107,13 @@ FROM note n
 LEFT JOIN label l
     ON l.id = n.label_id
    AND l.user_id = :userId
+LEFT JOIN note_collection collection
+    ON collection.id = n.collection_id
+   AND collection.user_id = :userId
 LEFT JOIN task t
     ON t.note_id = n.id
 WHERE $where
-GROUP BY n.id, l.id
+GROUP BY n.id, l.id, collection.id
 ORDER BY n.updated_at DESC, n.id DESC
 SQL;
 
@@ -125,6 +144,9 @@ SELECT
     n.label_id AS "labelId",
     l.name AS "labelName",
     l.color AS "labelColor",
+    n.collection_id AS "collectionId",
+    collection.name AS "collectionName",
+    collection.color AS "collectionColor",
     n.created_at AS "createdAt",
     n.updated_at AS "updatedAt",
     n.archived_at AS "archivedAt",
@@ -133,6 +155,9 @@ FROM note n
 LEFT JOIN label l
     ON l.id = n.label_id
    AND l.user_id = :userId
+LEFT JOIN note_collection collection
+    ON collection.id = n.collection_id
+   AND collection.user_id = :userId
 WHERE n.id = :id
   AND n.user_id = :userId
 SQL,
@@ -179,6 +204,11 @@ SQL,
                 ? (int) $note['labelId']
                 : null;
 
+        $note['collectionId'] =
+            $note['collectionId'] !== null
+                ? (int) $note['collectionId']
+                : null;
+
         return $note;
     }
 
@@ -187,9 +217,13 @@ SQL,
         string $title,
         string $content,
         ?int $labelId,
+        ?int $collectionId,
     ): array {
         $this->validateTitle($title);
         $this->validateLabel($labelId);
+        $this->validateCollection(
+            $collectionId
+        );
 
         $userId = $this->currentUser->id();
 
@@ -199,13 +233,15 @@ INSERT INTO note (
     user_id,
     title,
     content,
-    label_id
+    label_id,
+    collection_id
 )
 VALUES (
     :userId,
     :title,
     :content,
-    :labelId
+    :labelId,
+    :collectionId
 )
 RETURNING id
 SQL,
@@ -214,6 +250,8 @@ SQL,
                 'title' => trim($title),
                 'content' => $content,
                 'labelId' => $labelId,
+                'collectionId' =>
+                    $collectionId,
             ],
         );
 
@@ -231,6 +269,8 @@ SQL,
             $noteId,
             [
                 'labelId' => $labelId,
+                'collectionId' =>
+                    $collectionId,
             ],
         );
 
@@ -243,9 +283,13 @@ SQL,
         string $title,
         string $content,
         ?int $labelId,
+        ?int $collectionId,
     ): array {
         $this->validateTitle($title);
         $this->validateLabel($labelId);
+        $this->validateCollection(
+            $collectionId
+        );
 
         $userId = $this->currentUser->id();
 
@@ -256,6 +300,7 @@ UPDATE note
 SET title = :title,
     content = :content,
     label_id = :labelId,
+    collection_id = :collectionId,
     updated_at = NOW()
 WHERE id = :id
   AND user_id = :userId
@@ -267,6 +312,8 @@ SQL,
                     'title' => trim($title),
                     'content' => $content,
                     'labelId' => $labelId,
+                    'collectionId' =>
+                        $collectionId,
                 ],
             );
 
@@ -282,6 +329,8 @@ SQL,
             $id,
             [
                 'labelId' => $labelId,
+                'collectionId' =>
+                    $collectionId,
             ],
         );
 
@@ -316,13 +365,15 @@ INSERT INTO note (
     user_id,
     title,
     content,
-    label_id
+    label_id,
+    collection_id
 )
 VALUES (
     :userId,
     :title,
     :content,
-    :labelId
+    :labelId,
+    :collectionId
 )
 RETURNING id
 SQL,
@@ -345,6 +396,12 @@ SQL,
                                     $original['labelId']
                                         !== null
                                             ? (int) $original['labelId']
+                                            : null,
+
+                                'collectionId' =>
+                                    $original['collectionId']
+                                        !== null
+                                            ? (int) $original['collectionId']
                                             : null,
                             ],
                         );
@@ -525,6 +582,11 @@ SQL,
                 ? (int) $row['labelId']
                 : null;
 
+        $row['collectionId'] =
+            $row['collectionId'] !== null
+                ? (int) $row['collectionId']
+                : null;
+
         $row['taskCount'] =
             (int) $row['taskCount'];
 
@@ -561,6 +623,35 @@ SQL,
         ) {
             throw new \InvalidArgumentException(
                 'Note title cannot exceed 255 characters.'
+            );
+        }
+    }
+
+    private function validateCollection(
+        ?int $collectionId,
+    ): void {
+        if ($collectionId === null) {
+            return;
+        }
+
+        $exists = $this->connection
+            ->fetchOne(
+                <<<'SQL'
+SELECT 1
+FROM note_collection
+WHERE id = :id
+  AND user_id = :userId
+SQL,
+                [
+                    'id' => $collectionId,
+                    'userId' =>
+                        $this->currentUser->id(),
+                ],
+            );
+
+        if ($exists === false) {
+            throw new \InvalidArgumentException(
+                'Selected collection does not exist.'
             );
         }
     }

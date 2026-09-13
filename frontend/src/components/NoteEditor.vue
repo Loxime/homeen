@@ -1,13 +1,31 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import {
+  computed,
+  ref,
+  watch,
+} from 'vue'
+
 import AppIcon from './AppIcon.vue'
 import { api } from '../services/api'
-import type { Label, Note, Task } from '../types/domain'
 
-const props = defineProps<{
-  note: Note | null
-  labels: Label[]
-}>()
+import type {
+  Label,
+  Note,
+  NoteCollection,
+  Task,
+} from '../types/domain'
+
+const props = withDefaults(
+  defineProps<{
+    note: Note | null
+    labels: Label[]
+    collections: NoteCollection[]
+    defaultCollectionId?: number | null
+  }>(),
+  {
+    defaultCollectionId: null,
+  },
+)
 
 const emit = defineEmits<{
   saved: [note: Note]
@@ -18,12 +36,15 @@ const emit = defineEmits<{
 const title = ref('')
 const content = ref('')
 const labelId = ref<number | null>(null)
+const collectionId = ref<number | null>(null)
 const taskText = ref('')
 const saving = ref(false)
 const error = ref('')
 const localNote = ref<Note | null>(null)
 
-const isNew = computed(() => localNote.value === null)
+const isNew = computed(
+  () => localNote.value === null,
+)
 
 const isTrash = computed(
   () =>
@@ -37,61 +58,96 @@ const isArchived = computed(
     && localNote.value?.archivedAt !== undefined,
 )
 
-function cloneNote(note: Note): Note {
+function cloneNote(
+  note: Note,
+): Note {
   return {
     ...note,
-    tasks: note.tasks.map((task) => ({
-      ...task,
-    })),
+    tasks: note.tasks.map(
+      task => ({
+        ...task,
+      }),
+    ),
   }
 }
 
 watch(
-  () => props.note,
-  (value) => {
-    localNote.value = value ? cloneNote(value) : null
+  () => [
+    props.note,
+    props.defaultCollectionId,
+  ] as const,
+  ([value]) => {
+    localNote.value =
+      value
+        ? cloneNote(value)
+        : null
 
-    title.value = value?.title ?? ''
-    content.value = value?.content ?? ''
-    labelId.value = value?.labelId ?? null
+    title.value =
+      value?.title ?? ''
+
+    content.value =
+      value?.content ?? ''
+
+    labelId.value =
+      value?.labelId ?? null
+
+    collectionId.value =
+      value?.collectionId
+      ?? props.defaultCollectionId
+      ?? null
+
     taskText.value = ''
     error.value = ''
   },
-  { immediate: true },
+  {
+    immediate: true,
+  },
 )
 
-async function save(): Promise<Note | null> {
+async function save():
+Promise<Note | null> {
   saving.value = true
   error.value = ''
 
   try {
-    const payload = JSON.stringify({
-      title: title.value,
-      content: content.value,
-      labelId: labelId.value,
-    })
+    const payload =
+      JSON.stringify({
+        title: title.value,
+        content: content.value,
+        labelId: labelId.value,
+        collectionId:
+          collectionId.value,
+      })
 
-    const note = isNew.value
-      ? await api<Note>('/api/notes', {
-          method: 'POST',
-          body: payload,
-        })
-      : await api<Note>(
-          `/api/notes/${localNote.value!.id}`,
-          {
-            method: 'PUT',
-            body: payload,
-          },
-        )
+    const note =
+      isNew.value
+        ? await api<Note>(
+            '/api/notes',
+            {
+              method: 'POST',
+              body: payload,
+            },
+          )
+        : await api<Note>(
+            `/api/notes/${localNote.value!.id}`,
+            {
+              method: 'PUT',
+              body: payload,
+            },
+          )
 
     localNote.value = note
-    emit('saved', note)
+
+    emit(
+      'saved',
+      note,
+    )
 
     return note
-  } catch (e) {
+  } catch (exception) {
     error.value =
-      e instanceof Error
-        ? e.message
+      exception instanceof Error
+        ? exception.message
         : 'Impossible d’enregistrer la note.'
 
     return null
@@ -101,7 +157,8 @@ async function save(): Promise<Note | null> {
 }
 
 async function done(): Promise<void> {
-  const note = await save()
+  const note =
+    await save()
 
   if (note) {
     emit('closed')
@@ -109,19 +166,24 @@ async function done(): Promise<void> {
 }
 
 async function addTask(): Promise<void> {
-  if (!localNote.value || !taskText.value.trim()) {
+  if (
+    !localNote.value
+    || !taskText.value.trim()
+  ) {
     return
   }
 
-  const task = await api<Task>(
-    `/api/notes/${localNote.value.id}/tasks`,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        content: taskText.value.trim(),
-      }),
-    },
-  )
+  const task =
+    await api<Task>(
+      `/api/notes/${localNote.value.id}/tasks`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          content:
+            taskText.value.trim(),
+        }),
+      },
+    )
 
   localNote.value.tasks.push(task)
   taskText.value = ''
@@ -129,59 +191,89 @@ async function addTask(): Promise<void> {
   emit('changed')
 }
 
-async function toggleTask(task: Task): Promise<void> {
-  const updated = await api<Task>(
-    `/api/tasks/${task.id}/terminées`,
-    {
-      method: 'PUT',
-      body: JSON.stringify({
-        terminées: !task.isCompleted,
-      }),
-    },
-  )
+async function toggleTask(
+  task: Task,
+): Promise<void> {
+  const updated =
+    await api<Task>(
+      `/api/tasks/${task.id}/completed`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          completed:
+            !task.isCompleted,
+        }),
+      },
+    )
 
-  Object.assign(task, updated)
+  Object.assign(
+    task,
+    updated,
+  )
 
   emit('changed')
 }
 
-async function deleteTask(task: Task): Promise<void> {
+async function deleteTask(
+  task: Task,
+): Promise<void> {
   if (!localNote.value) {
     return
   }
 
-  await api(`/api/tasks/${task.id}`, {
-    method: 'DELETE',
-  })
+  await api(
+    `/api/tasks/${task.id}`,
+    {
+      method: 'DELETE',
+    },
+  )
 
   localNote.value.tasks =
     localNote.value.tasks.filter(
-      (item) => item.id !== task.id,
+      item =>
+        item.id !== task.id,
     )
 
   emit('changed')
 }
 
 async function duplicate(): Promise<void> {
-  if (!localNote.value) return
+  if (!localNote.value) {
+    return
+  }
 
-  const duplicated = await api<Note>(
-    `/api/notes/${localNote.value.id}/duplicate`,
-    { method: 'POST' },
+  const duplicated =
+    await api<Note>(
+      `/api/notes/${localNote.value.id}/duplicate`,
+      {
+        method: 'POST',
+      },
+    )
+
+  emit(
+    'saved',
+    duplicated,
   )
 
-  emit('saved', duplicated)
   emit('closed')
 }
 
-async function setArchive(archive: boolean): Promise<void> {
-  if (!localNote.value) return
+async function setArchive(
+  archive: boolean,
+): Promise<void> {
+  if (!localNote.value) {
+    return
+  }
 
   await api<Note>(
     `/api/notes/${localNote.value.id}/${
-      archive ? 'archive' : 'unarchive'
+      archive
+        ? 'archive'
+        : 'unarchive'
     }`,
-    { method: 'POST' },
+    {
+      method: 'POST',
+    },
   )
 
   emit('changed')
@@ -189,11 +281,15 @@ async function setArchive(archive: boolean): Promise<void> {
 }
 
 async function trash(): Promise<void> {
-  if (!localNote.value) return
+  if (!localNote.value) {
+    return
+  }
 
   await api(
     `/api/notes/${localNote.value.id}`,
-    { method: 'DELETE' },
+    {
+      method: 'DELETE',
+    },
   )
 
   emit('changed')
@@ -201,11 +297,15 @@ async function trash(): Promise<void> {
 }
 
 async function restore(): Promise<void> {
-  if (!localNote.value) return
+  if (!localNote.value) {
+    return
+  }
 
   await api<Note>(
     `/api/notes/${localNote.value.id}/restore`,
-    { method: 'POST' },
+    {
+      method: 'POST',
+    },
   )
 
   emit('changed')
@@ -217,7 +317,9 @@ async function restore(): Promise<void> {
   <div class="note-editor keep-note-editor">
     <template v-if="isTrash">
       <div class="trash-message">
-        <strong>Cette note est dans la corbeille.</strong>
+        <strong>
+          Cette note est dans la corbeille.
+        </strong>
 
         <p>
           Elle sera supprimée définitivement
@@ -226,7 +328,10 @@ async function restore(): Promise<void> {
       </div>
 
       <div class="keep-editor-footer">
-        <button class="secondary" @click="restore">
+        <button
+          class="secondary"
+          @click="restore"
+        >
           Restaurer la note
         </button>
 
@@ -234,7 +339,7 @@ async function restore(): Promise<void> {
           class="keep-done"
           @click="emit('closed')"
         >
-          Close
+          Fermer
         </button>
       </div>
     </template>
@@ -254,30 +359,58 @@ async function restore(): Promise<void> {
           placeholder="Écrivez votre note…"
         />
 
-        <div class="keep-label-row">
-          <span class="keep-label-caption">
-            Label
-          </span>
+        <div class="note-organization-grid">
+          <label>
+            <span class="keep-label-caption">
+              Collection / projet
+            </span>
 
-          <select
-            v-model="labelId"
-            class="keep-label-select"
-          >
-            <option :value="null">
-              Aucun libellé
-            </option>
-
-            <option
-              v-for="label in labels"
-              :key="label.id"
-              :value="label.id"
+            <select
+              v-model="collectionId"
+              class="keep-label-select"
             >
-              {{ label.name }}
-            </option>
-          </select>
+              <option :value="null">
+                Aucune collection
+              </option>
+
+              <option
+                v-for="collection in collections"
+                :key="collection.id"
+                :value="collection.id"
+              >
+                {{ collection.name }}
+              </option>
+            </select>
+          </label>
+
+          <label>
+            <span class="keep-label-caption">
+              Libellé
+            </span>
+
+            <select
+              v-model="labelId"
+              class="keep-label-select"
+            >
+              <option :value="null">
+                Aucun libellé
+              </option>
+
+              <option
+                v-for="label in labels"
+                :key="label.id"
+                :value="label.id"
+              >
+                {{ label.name }}
+              </option>
+            </select>
+          </label>
         </div>
 
-        <p v-if="error" class="form-error">
+        <p
+          v-if="error"
+          class="form-error"
+        >
           {{ error }}
         </p>
 
@@ -294,7 +427,8 @@ async function restore(): Promise<void> {
               <small>
                 {{
                   localNote.tasks.filter(
-                    (task) => task.isCompleted,
+                    task =>
+                      task.isCompleted,
                   ).length
                 }}
                 /
@@ -308,7 +442,10 @@ async function restore(): Promise<void> {
             class="task-entry keep-task-entry"
             @submit.prevent="addTask"
           >
-            <AppIcon name="plus" :size="19" />
+            <AppIcon
+              name="plus"
+              :size="19"
+            />
 
             <input
               v-model="taskText"
@@ -326,7 +463,10 @@ async function restore(): Promise<void> {
               v-for="task in localNote.tasks"
               :key="task.id"
               class="task-row keep-task-row"
-              :class="{ complete: task.isCompleted }"
+              :class="{
+                complete:
+                  task.isCompleted,
+              }"
             >
               <input
                 type="checkbox"
@@ -334,7 +474,9 @@ async function restore(): Promise<void> {
                 @change="toggleTask(task)"
               />
 
-              <span>{{ task.content }}</span>
+              <span>
+                {{ task.content }}
+              </span>
 
               <button
                 class="icon-button small"
@@ -342,14 +484,21 @@ async function restore(): Promise<void> {
                 aria-label="Supprimer la tâche"
                 @click="deleteTask(task)"
               >
-                <AppIcon name="close" :size="16" />
+                <AppIcon
+                  name="close"
+                  :size="16"
+                />
               </button>
             </div>
           </div>
         </section>
 
-        <p v-else class="keep-task-hint">
-          Enregistrez d’abord la note pour pouvoir ajouter des tâches.
+        <p
+          v-else
+          class="keep-task-hint"
+        >
+          Enregistrez d’abord la note
+          pour pouvoir ajouter des tâches.
         </p>
       </div>
 
@@ -361,16 +510,30 @@ async function restore(): Promise<void> {
             title="Dupliquer"
             @click="duplicate"
           >
-            <AppIcon name="copy" :size="19" />
+            <AppIcon
+              name="copy"
+              :size="19"
+            />
           </button>
 
           <button
             v-if="!isNew"
             class="keep-tool-button"
-            :title="isArchived ? 'Désarchiver' : 'Archiver'"
-            @click="setArchive(!isArchived)"
+            :title="
+              isArchived
+                ? 'Désarchiver'
+                : 'Archiver'
+            "
+            @click="
+              setArchive(
+                !isArchived
+              )
+            "
           >
-            <AppIcon name="archive" :size="19" />
+            <AppIcon
+              name="archive"
+              :size="19"
+            />
           </button>
 
           <button
@@ -379,7 +542,10 @@ async function restore(): Promise<void> {
             title="Mettre à la corbeille"
             @click="trash"
           >
-            <AppIcon name="trash" :size="19" />
+            <AppIcon
+              name="trash"
+              :size="19"
+            />
           </button>
         </div>
 
@@ -388,7 +554,11 @@ async function restore(): Promise<void> {
           :disabled="saving"
           @click="done"
         >
-          {{ saving ? 'Enregistrement…' : 'Terminer' }}
+          {{
+            saving
+              ? 'Enregistrement…'
+              : 'Terminer'
+          }}
         </button>
       </footer>
     </template>
