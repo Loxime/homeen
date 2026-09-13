@@ -85,10 +85,12 @@ function formatDuration(
 const maxGrowthMinutes = computed(
   () =>
     Math.max(
-      60,
-      asNumber(
-        props.maxGrowthMinutes,
-      ) ?? 60,
+      5,
+      Math.round(
+        asNumber(
+          props.maxGrowthMinutes,
+        ) ?? 60,
+      ),
     ),
 )
 
@@ -153,17 +155,43 @@ const elapsedMinutes = computed(() => {
  * - la dernière minute reste au max.
  */
 const visualStage = computed(() => {
+  const maximum =
+    maxGrowthMinutes.value
+
   if (
     elapsedMinutes.value
-    >= maxGrowthMinutes.value - 1
+    >= maximum - 1
   ) {
     return 12
   }
 
-  return clamp(
+  const preMaximumMinutes =
+    Math.max(
+      1,
+      maximum - 1,
+    )
+
+  const totalGrowthSteps =
+    Math.max(
+      1,
+      Math.ceil(
+        preMaximumMinutes / 5,
+      ),
+    )
+
+  const currentGrowthStep =
     Math.floor(
       elapsedMinutes.value / 5,
-    ) + 1,
+    )
+
+  return clamp(
+    1
+    + Math.round(
+      (
+        currentGrowthStep
+        / totalGrowthSteps
+      ) * 10,
+    ),
     1,
     11,
   )
@@ -177,15 +205,23 @@ const currentStageLabel = computed(
 )
 
 const sessionPercent = computed(
-  () =>
-    clamp(
+  () => {
+    if (
+      elapsedMinutes.value
+      >= maxGrowthMinutes.value - 1
+    ) {
+      return 100
+    }
+
+    return clamp(
       (
         elapsedMinutes.value
         / maxGrowthMinutes.value
       ) * 100,
       0,
       100,
-    ),
+    )
+  },
 )
 
 const nextStepLabel = computed(() => {
@@ -193,9 +229,27 @@ const nextStepLabel = computed(() => {
     return 'Taille maximale atteinte'
   }
 
+  const nextFiveMinuteStep =
+    (
+      Math.floor(
+        elapsedMinutes.value / 5,
+      ) + 1
+    ) * 5
+
+  const maximumStep =
+    maxGrowthMinutes.value - 1
+
+  const nextStep =
+    Math.min(
+      nextFiveMinuteStep,
+      maximumStep,
+    )
+
   const remaining =
-    5 - (
-      elapsedMinutes.value % 5
+    Math.max(
+      1,
+      nextStep
+      - elapsedMinutes.value,
     )
 
   return `Prochaine pousse dans ${remaining} min`

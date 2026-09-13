@@ -272,7 +272,22 @@ onMounted(async () => {
     >
       <div class="focus-garden-visual">
         <PomodoroGardenVisual
-          :stage="insights.stage"
+          :total-focus-minutes="
+            insights.totalFocusMinutes
+          "
+          :current-session-seconds="
+            store.live?.focusSeconds ?? 0
+          "
+          :max-growth-minutes="
+            store.active?.workMinutes
+            ?? workMinutes
+          "
+          :recommended-session-minutes="
+            insights.recommendedMinutes
+          "
+          :feedback-count="
+            insights.ratingCount
+          "
         />
 
         <div>
