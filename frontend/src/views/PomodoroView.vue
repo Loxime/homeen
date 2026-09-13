@@ -11,6 +11,8 @@ import {
 
 import { api } from '../services/api'
 
+import PomodoroGardenVisual from '../components/PomodoroGardenVisual.vue'
+
 import {
   formatClock,
   formatDate,
@@ -55,33 +57,6 @@ const phaseLabel =
       store.live?.phase === 'break'
         ? 'Pause'
         : 'Travail',
-  )
-
-const stageSymbol =
-  computed(
-    () => {
-      switch (
-        insights.value?.stage
-      ) {
-        case 'roots':
-          return '🫘'
-
-        case 'sprout':
-          return '🌱'
-
-        case 'sapling':
-          return '🌿'
-
-        case 'tree':
-          return '🌳'
-
-        case 'forest':
-          return '🌲🌳🌲'
-
-        default:
-          return '🫘'
-      }
-    },
   )
 
 const ratingsNeeded =
@@ -296,12 +271,9 @@ onMounted(async () => {
       class="focus-garden panel"
     >
       <div class="focus-garden-visual">
-        <div
-          class="focus-garden-symbol"
-          aria-hidden="true"
-        >
-          {{ stageSymbol }}
-        </div>
+        <PomodoroGardenVisual
+          :stage="insights.stage"
+        />
 
         <div>
           <span class="focus-garden-kicker">
@@ -408,7 +380,7 @@ onMounted(async () => {
             !== null
             && !store.active
           "
-          class="secondary"
+          class="ui-button ui-button--secondary"
           type="button"
           @click="useRecommendation"
         >
@@ -592,7 +564,7 @@ onMounted(async () => {
           </div>
 
           <button
-            class="primary wide"
+            class="ui-button ui-button--primary ui-button--block"
             :disabled="starting"
           >
             {{

@@ -316,7 +316,7 @@ onMounted(
 
         <div>
           <button
-            class="secondary"
+            class="ui-button ui-button--secondary ui-button--compact"
             type="button"
             @click="setPreset(30)"
           >
@@ -324,7 +324,7 @@ onMounted(
           </button>
 
           <button
-            class="secondary"
+            class="ui-button ui-button--secondary ui-button--compact"
             type="button"
             @click="setPreset(90)"
           >
@@ -332,7 +332,7 @@ onMounted(
           </button>
 
           <button
-            class="secondary"
+            class="ui-button ui-button--secondary ui-button--compact"
             type="button"
             @click="setPreset(365)"
           >
@@ -405,7 +405,7 @@ onMounted(
         </fieldset>
 
         <button
-          class="primary period-load"
+          class="ui-button ui-button--primary period-load"
           :disabled="loading"
         >
           {{

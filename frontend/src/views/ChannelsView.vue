@@ -396,7 +396,7 @@ onMounted(() => {
 
           <div class="channel-invitation-actions">
             <button
-              class="ghost"
+              class="ui-button ui-button--ghost"
               type="button"
               @click="
                 rejectInvitation(invitation)
@@ -406,7 +406,7 @@ onMounted(() => {
             </button>
 
             <button
-              class="primary"
+              class="ui-button ui-button--primary"
               type="button"
               @click="
                 acceptInvitation(invitation)
@@ -456,7 +456,7 @@ onMounted(() => {
         </label>
 
         <button
-          class="primary"
+          class="ui-button ui-button--primary"
           type="submit"
           :disabled="
             creating

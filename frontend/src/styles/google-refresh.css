@@ -1165,3 +1165,363 @@ select:focus {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* === Responsive layout refresh === */
+
+/* Statistiques */
+
+.stats-period-controls {
+  container-type: inline-size;
+}
+
+.stats-preset-row {
+  flex-wrap: wrap;
+}
+
+.period-compare-grid {
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+  align-items: stretch;
+}
+
+.period-compare-grid fieldset {
+  min-width: 0;
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+}
+
+.period-compare-grid label,
+.period-compare-grid input {
+  min-width: 0;
+}
+
+.period-compare-grid input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.period-versus {
+  display: none;
+}
+
+.period-load {
+  grid-column: 1 / -1;
+  justify-self: end;
+  min-width: 130px;
+}
+
+@container (max-width: 680px) {
+  .stats-preset-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .stats-preset-row > div {
+    display: grid;
+    grid-template-columns:
+      repeat(
+        3,
+        minmax(0, 1fr)
+      );
+    width: 100%;
+  }
+
+  .stats-preset-row button {
+    width: 100%;
+  }
+
+  .period-compare-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .period-compare-grid fieldset {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+
+  .period-load {
+    grid-column: 1;
+    width: 100%;
+  }
+}
+
+@container (max-width: 460px) {
+  .stats-preset-row > div,
+  .period-compare-grid fieldset {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Pomodoro */
+
+.focus-garden {
+  container-type: inline-size;
+  overflow: hidden;
+}
+
+.focus-garden-visual {
+  min-width: 0;
+}
+
+.ideal-duration {
+  min-width: 0;
+}
+
+@container (max-width: 620px) {
+  .focus-garden-visual {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .focus-garden-symbol {
+    width: 100%;
+  }
+
+  .ideal-duration {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ideal-duration button {
+    width: 100%;
+  }
+}
+
+
+/* Canaux */
+
+.channel-create-form {
+  min-width: 0;
+}
+
+.channel-create-form input,
+.channel-create-form textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  .channel-create-form .primary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .channel-invitation-actions {
+    display: grid;
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+    width: 100%;
+  }
+
+  .channel-invitation-actions button {
+    width: 100%;
+  }
+}
+
+/* === Clean button system === */
+
+.ui-button {
+  appearance: none;
+  min-height: 42px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  font-size: .9rem;
+  font-weight: 650;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 100ms ease;
+}
+
+.ui-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.ui-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.ui-button:focus-visible {
+  outline: 3px solid
+    rgba(26, 115, 232, .18);
+  outline-offset: 2px;
+}
+
+.ui-button:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.ui-button--primary {
+  border-color: var(--g-blue);
+  background: var(--g-blue);
+  color: #fff;
+  box-shadow:
+    0 1px 2px
+    rgba(26, 115, 232, .18),
+    0 3px 9px
+    rgba(26, 115, 232, .13);
+}
+
+.ui-button--primary:hover:not(:disabled) {
+  border-color:
+    var(--g-blue-strong);
+  background:
+    var(--g-blue-strong);
+  box-shadow:
+    0 2px 4px
+    rgba(26, 115, 232, .18),
+    0 5px 14px
+    rgba(26, 115, 232, .14);
+}
+
+.ui-button--secondary {
+  border-color: #c7d7f5;
+  background: #fff;
+  color: var(--g-blue-strong);
+}
+
+.ui-button--secondary:hover:not(:disabled) {
+  border-color: #a8c7fa;
+  background: #f4f8ff;
+}
+
+.ui-button--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: #444746;
+}
+
+.ui-button--ghost:hover:not(:disabled) {
+  background: var(--g-surface-alt);
+  color: var(--g-text);
+}
+
+.ui-button--compact {
+  min-height: 38px;
+  padding-inline: 15px;
+  font-size: .86rem;
+}
+
+.ui-button--block {
+  width: 100%;
+}
+
+
+/* Pomodoro */
+
+.ideal-duration
+.ui-button {
+  flex: 0 0 auto;
+}
+
+.session-builder
+.ui-button--primary {
+  margin-top: 12px;
+}
+
+.preset-button {
+  min-height: 72px;
+  padding: 14px 16px;
+  border: 1px solid
+    var(--g-border);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: none;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 100ms ease;
+}
+
+.preset-button:hover {
+  transform: translateY(-1px);
+  border-color: #a8c7fa;
+  background: #f8fbff;
+}
+
+
+/* Statistiques */
+
+.stats-preset-row
+.ui-button {
+  white-space: nowrap;
+}
+
+.period-load {
+  min-height: 44px;
+  padding-inline: 22px;
+}
+
+
+/* Canaux */
+
+.channel-create-form
+.ui-button--primary {
+  width: fit-content;
+  min-width: 160px;
+  padding-inline: 22px;
+}
+
+.channel-invitation-actions
+.ui-button {
+  min-width: 96px;
+}
+
+
+/* Mobile */
+
+@media (max-width: 640px) {
+  .ideal-duration
+  .ui-button {
+    width: 100%;
+  }
+
+  .channel-create-form
+  .ui-button--primary {
+    width: 100%;
+  }
+
+  .channel-invitation-actions {
+    display: grid;
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+
+  .channel-invitation-actions
+  .ui-button {
+    width: 100%;
+    min-width: 0;
+  }
+}
