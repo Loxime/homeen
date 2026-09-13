@@ -3,52 +3,177 @@ import {
   computed,
   onMounted,
   ref,
-  watch,
 } from 'vue'
 
 import { api } from '../services/api'
-import { formatDuration } from '../services/format'
+
+import {
+  formatDuration,
+} from '../services/format'
+
+import {
+  buildStatisticsSeries,
+} from '../services/statisticsSeries'
 
 import type {
-  DailyStatistic,
   StatisticsResponse,
 } from '../types/domain'
 
-const month =
-  ref(
-    new Date()
-      .toISOString()
-      .slice(0, 7),
+function inputDate(
+  date: Date,
+): string {
+  const local =
+    new Date(
+      date.getTime()
+      - date.getTimezoneOffset()
+      * 60_000,
+    )
+
+  return local
+    .toISOString()
+    .slice(0, 10)
+}
+
+function addDays(
+  value: string,
+  days: number,
+): string {
+  const date =
+    new Date(
+      `${value}T12:00:00`,
+    )
+
+  date.setDate(
+    date.getDate()
+    + days,
   )
 
+  return inputDate(date)
+}
+
+const today =
+  inputDate(
+    new Date(),
+  )
+
+const monthStart =
+  `${today.slice(0, 8)}01`
+
+const periodStart =
+  ref(monthStart)
+
+const periodEnd =
+  ref(today)
+
+const initialPeriodDays =
+  Math.max(
+    1,
+    Math.round(
+      (
+        new Date(
+          `${today}T12:00:00`,
+        ).getTime()
+        - new Date(
+          `${monthStart}T12:00:00`,
+        ).getTime()
+      ) / 86_400_000,
+    ) + 1,
+  )
+
+const initialCompareEnd =
+  addDays(
+    monthStart,
+    -1,
+  )
+
+const initialCompareStart =
+  addDays(
+    initialCompareEnd,
+    -(initialPeriodDays - 1),
+  )
+
+const compareStart =
+  ref(initialCompareStart)
+
+const compareEnd =
+  ref(initialCompareEnd)
+
 const data =
-  ref<StatisticsResponse | null>(null)
+  ref<StatisticsResponse | null>(
+    null,
+  )
 
 const loading = ref(false)
 const error = ref('')
 
-const maxDailyFocus =
+const series =
+  computed(
+    () =>
+      data.value
+        ? buildStatisticsSeries(
+            data.value.days,
+          )
+        : [],
+  )
+
+const maxFocus =
   computed(
     () =>
       Math.max(
         1,
-        ...(
-          data.value?.days.map(
-            day => day.focusSeconds,
-          )
-          ?? [1]
+        ...series.value.map(
+          point =>
+            point.focusSeconds,
         ),
       ),
   )
 
-async function load(): Promise<void> {
+const seriesGranularity =
+  computed(
+    () =>
+      (
+        data.value?.days.length
+        ?? 0
+      ) > 90
+        ? 'mensuelle'
+        : 'quotidienne',
+  )
+
+async function load():
+Promise<void> {
   loading.value = true
   error.value = ''
 
   try {
+    if (
+      !periodStart.value
+      || !periodEnd.value
+      || !compareStart.value
+      || !compareEnd.value
+    ) {
+      throw new Error(
+        'Renseignez les deux périodes à comparer.',
+      )
+    }
+
+    const params =
+      new URLSearchParams({
+        start:
+          periodStart.value,
+
+        end:
+          periodEnd.value,
+
+        compareStart:
+          compareStart.value,
+
+        compareEnd:
+          compareEnd.value,
+      })
+
     data.value =
       await api<StatisticsResponse>(
-        `/api/statistics?month=${encodeURIComponent(month.value)}`,
+        `/api/statistics?${params}`,
       )
   } catch (exception) {
     error.value =
@@ -60,6 +185,32 @@ async function load(): Promise<void> {
   }
 }
 
+async function setPreset(
+  days: number,
+): Promise<void> {
+  periodEnd.value = today
+
+  periodStart.value =
+    addDays(
+      today,
+      -(days - 1),
+    )
+
+  compareEnd.value =
+    addDays(
+      periodStart.value,
+      -1,
+    )
+
+  compareStart.value =
+    addDays(
+      compareEnd.value,
+      -(days - 1),
+    )
+
+  await load()
+}
+
 function changeLabel(
   key: string,
 ): string {
@@ -67,7 +218,7 @@ function changeLabel(
     data.value?.changes[key]
 
   if (value === null) {
-    return 'Nouveau par rapport au mois précédent'
+    return 'Nouveau par rapport à la période comparée'
   }
 
   if (value === undefined) {
@@ -78,7 +229,7 @@ function changeLabel(
     return 'Stable'
   }
 
-  return `${value > 0 ? '+' : ''}${value}% par rapport au mois précédent`
+  return `${value > 0 ? '+' : ''}${value}% vs période comparée`
 }
 
 function cardClass(
@@ -107,25 +258,34 @@ function cardClass(
   return 'neutral'
 }
 
-function dayLabel(
-  day: DailyStatistic,
+function readableRange(
+  start: string,
+  end: string,
 ): string {
-  return new Intl.DateTimeFormat(
-    'fr-FR',
-    {
-      day: '2-digit',
-    },
-  ).format(
-    new Date(
-      `${day.date}T12:00:00`,
-    ),
-  )
-}
+  const formatter =
+    new Intl.DateTimeFormat(
+      'fr-FR',
+      {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      },
+    )
 
-watch(
-  month,
-  () => void load(),
-)
+  return `${
+    formatter.format(
+      new Date(
+        `${start}T12:00:00`,
+      ),
+    )
+  } → ${
+    formatter.format(
+      new Date(
+        `${end}T12:00:00`,
+      ),
+    )
+  }`
+}
 
 onMounted(
   () => void load(),
@@ -141,21 +301,127 @@ onMounted(
         </h1>
 
         <p class="muted">
-          Suivez votre concentration,
-          vos tâches et votre activité
-          au fil du mois.
+          Analysez n’importe quelle période
+          et comparez-la à une autre :
+          mois, trimestre, année ou dates libres.
         </p>
       </div>
-
-      <label class="month-picker">
-        <span>Mois</span>
-
-        <input
-          v-model="month"
-          type="month"
-        />
-      </label>
     </header>
+
+    <section class="panel stats-period-controls">
+      <div class="stats-preset-row">
+        <strong>
+          Raccourcis
+        </strong>
+
+        <div>
+          <button
+            class="secondary"
+            type="button"
+            @click="setPreset(30)"
+          >
+            30 jours
+          </button>
+
+          <button
+            class="secondary"
+            type="button"
+            @click="setPreset(90)"
+          >
+            3 mois
+          </button>
+
+          <button
+            class="secondary"
+            type="button"
+            @click="setPreset(365)"
+          >
+            1 an
+          </button>
+        </div>
+      </div>
+
+      <form
+        class="period-compare-grid"
+        @submit.prevent="load"
+      >
+        <fieldset>
+          <legend>
+            Période A
+          </legend>
+
+          <label>
+            Du
+
+            <input
+              v-model="periodStart"
+              type="date"
+              required
+            />
+          </label>
+
+          <label>
+            Au
+
+            <input
+              v-model="periodEnd"
+              type="date"
+              required
+            />
+          </label>
+        </fieldset>
+
+        <div
+          class="period-versus"
+          aria-hidden="true"
+        >
+          VS
+        </div>
+
+        <fieldset>
+          <legend>
+            Période B
+          </legend>
+
+          <label>
+            Du
+
+            <input
+              v-model="compareStart"
+              type="date"
+              required
+            />
+          </label>
+
+          <label>
+            Au
+
+            <input
+              v-model="compareEnd"
+              type="date"
+              required
+            />
+          </label>
+        </fieldset>
+
+        <button
+          class="primary period-load"
+          :disabled="loading"
+        >
+          {{
+            loading
+              ? 'Calcul…'
+              : 'Comparer'
+          }}
+        </button>
+      </form>
+
+      <p class="muted period-help">
+        Vous pouvez par exemple comparer
+        2026 à 2024 en choisissant
+        manuellement les deux années.
+      </p>
+    </section>
 
     <p
       v-if="error"
@@ -165,13 +431,16 @@ onMounted(
     </p>
 
     <div
-      v-if="loading || !data"
+      v-if="
+        loading
+        && !data
+      "
       class="empty-state"
     >
       Chargement des statistiques…
     </div>
 
-    <template v-else>
+    <template v-else-if="data">
       <div class="quality-gate">
         <div>
           <span class="quality-dot" />
@@ -179,17 +448,21 @@ onMounted(
           <div>
             <strong>
               {{
-                data.summary.pomodoroSessions > 0
-                || data.summary.tasksCompleted > 0
-                  ? 'Activité enregistrée'
-                  : 'Aucune activité pour le moment'
+                readableRange(
+                  data.range.start,
+                  data.range.end,
+                )
               }}
             </strong>
 
             <p class="muted">
-              {{ data.month }}
-              ·
-              {{ data.timezone }}
+              Comparé à
+              {{
+                readableRange(
+                  data.comparisonRange.start,
+                  data.comparisonRange.end,
+                )
+              }}
             </p>
           </div>
         </div>
@@ -197,70 +470,168 @@ onMounted(
 
       <div class="metric-grid">
         <article class="metric-card">
-          <span>Temps de concentration</span>
+          <span>
+            Temps de concentration
+          </span>
+
           <strong>
             {{
               formatDuration(
-                data.summary.focusSeconds,
+                data.summary
+                  .focusSeconds,
               )
             }}
           </strong>
-          <small :class="cardClass('focusSeconds')">
-            {{ changeLabel('focusSeconds') }}
+
+          <small
+            :class="
+              cardClass(
+                'focusSeconds',
+              )
+            "
+          >
+            {{
+              changeLabel(
+                'focusSeconds',
+              )
+            }}
           </small>
         </article>
 
         <article class="metric-card">
-          <span>Sessions Pomodoro</span>
+          <span>
+            Sessions Pomodoro
+          </span>
+
           <strong>
-            {{ data.summary.pomodoroSessions }}
+            {{
+              data.summary
+                .pomodoroSessions
+            }}
           </strong>
-          <small :class="cardClass('pomodoroSessions')">
-            {{ changeLabel('pomodoroSessions') }}
+
+          <small
+            :class="
+              cardClass(
+                'pomodoroSessions',
+              )
+            "
+          >
+            {{
+              changeLabel(
+                'pomodoroSessions',
+              )
+            }}
           </small>
         </article>
 
         <article class="metric-card">
-          <span>Tâches terminées</span>
+          <span>
+            Tâches terminées
+          </span>
+
           <strong>
-            {{ data.summary.tasksCompleted }}
+            {{
+              data.summary
+                .tasksCompleted
+            }}
           </strong>
-          <small :class="cardClass('tasksCompleted')">
-            {{ changeLabel('tasksCompleted') }}
+
+          <small
+            :class="
+              cardClass(
+                'tasksCompleted',
+              )
+            "
+          >
+            {{
+              changeLabel(
+                'tasksCompleted',
+              )
+            }}
           </small>
         </article>
 
         <article class="metric-card">
-          <span>Notes créées</span>
+          <span>
+            Notes créées
+          </span>
+
           <strong>
-            {{ data.summary.notesCreated }}
+            {{
+              data.summary
+                .notesCreated
+            }}
           </strong>
-          <small :class="cardClass('notesCreated')">
-            {{ changeLabel('notesCreated') }}
+
+          <small
+            :class="
+              cardClass(
+                'notesCreated',
+              )
+            "
+          >
+            {{
+              changeLabel(
+                'notesCreated',
+              )
+            }}
           </small>
         </article>
 
         <article class="metric-card">
-          <span>Temps dans l’application</span>
+          <span>
+            Temps dans l’application
+          </span>
+
           <strong>
             {{
               formatDuration(
-                data.summary.activeAppSeconds,
+                data.summary
+                  .activeAppSeconds,
               )
             }}
           </strong>
-          <small :class="cardClass('activeAppSeconds')">
-            {{ changeLabel('activeAppSeconds') }}
+
+          <small
+            :class="
+              cardClass(
+                'activeAppSeconds',
+              )
+            "
+          >
+            {{
+              changeLabel(
+                'activeAppSeconds',
+              )
+            }}
           </small>
         </article>
 
         <article class="metric-card">
-          <span>Taux de travail</span>
+          <span>
+            Taux de travail
+          </span>
+
           <strong>
-            {{ data.summary.focusEfficiency }}%
+            {{
+              data.summary
+                .focusEfficiency
+            }}%
           </strong>
-          <small :class="cardClass('focusEfficiency')">
-            {{ changeLabel('focusEfficiency') }}
+
+          <small
+            :class="
+              cardClass(
+                'focusEfficiency',
+              )
+            "
+          >
+            {{
+              changeLabel(
+                'focusEfficiency',
+              )
+            }}
           </small>
         </article>
       </div>
@@ -268,30 +639,40 @@ onMounted(
       <div class="stats-split">
         <section class="panel evolution-panel">
           <div class="panel-heading">
-            <h2>
-              Concentration quotidienne
-            </h2>
+            <div>
+              <h2>
+                Évolution
+                {{ seriesGranularity }}
+              </h2>
+
+              <p class="muted">
+                Les périodes longues
+                sont regroupées par mois
+                pour rester lisibles.
+              </p>
+            </div>
 
             <span>
               Total
               {{
                 formatDuration(
-                  data.summary.focusSeconds,
+                  data.summary
+                    .focusSeconds,
                 )
               }}
             </span>
           </div>
 
           <div
-            class="daily-chart"
-            aria-label="Temps de concentration quotidien"
+            class="daily-chart period-chart"
+            aria-label="Temps de concentration sur la période"
           >
             <div
-              v-for="day in data.days"
-              :key="day.date"
+              v-for="point in series"
+              :key="point.key"
               class="day-column"
               :title="
-                `${day.date}: ${formatDuration(day.focusSeconds)}`
+                `${point.label}: ${formatDuration(point.focusSeconds)}`
               "
             >
               <div class="bar-track">
@@ -300,12 +681,12 @@ onMounted(
                   :style="{
                     height:
                       `${Math.max(
-                        day.focusSeconds > 0
+                        point.focusSeconds > 0
                           ? 4
                           : 0,
                         (
-                          day.focusSeconds
-                          / maxDailyFocus
+                          point.focusSeconds
+                          / maxFocus
                         ) * 100,
                       )}%`,
                   }"
@@ -313,7 +694,7 @@ onMounted(
               </div>
 
               <span>
-                {{ dayLabel(day) }}
+                {{ point.label }}
               </span>
             </div>
           </div>
@@ -321,29 +702,62 @@ onMounted(
 
         <section class="panel insight-panel">
           <h2>
-            Ce mois-ci
+            Comparaison
           </h2>
 
           <div class="insight-row">
-            <span>Notes actuelles</span>
-            <strong>
-              {{ data.summary.noteCount }}
-            </strong>
-          </div>
+            <span>
+              Concentration A
+            </span>
 
-          <div class="insight-row">
-            <span>Temps de pause</span>
             <strong>
               {{
                 formatDuration(
-                  data.summary.breakSeconds,
+                  data.summary
+                    .focusSeconds,
                 )
               }}
             </strong>
           </div>
 
           <div class="insight-row">
-            <span>Libellé le plus terminé</span>
+            <span>
+              Concentration B
+            </span>
+
+            <strong>
+              {{
+                formatDuration(
+                  data.comparison
+                    .focusSeconds,
+                )
+              }}
+            </strong>
+          </div>
+
+          <div class="insight-row">
+            <span>
+              Tâches A / B
+            </span>
+
+            <strong>
+              {{
+                data.summary
+                  .tasksCompleted
+              }}
+              /
+              {{
+                data.comparison
+                  .tasksCompleted
+              }}
+            </strong>
+          </div>
+
+          <div class="insight-row">
+            <span>
+              Libellé le plus terminé
+            </span>
+
             <strong>
               {{
                 data.mostCompletedLabel
@@ -352,66 +766,71 @@ onMounted(
               }}
             </strong>
           </div>
-
-          <div class="insight-row">
-            <span>Efficacité de concentration</span>
-            <strong>
-              {{ data.summary.focusEfficiency }}%
-            </strong>
-          </div>
         </section>
       </div>
 
       <section class="panel daily-table-panel">
         <div class="panel-heading">
-          <h2>
-            Détail quotidien
-          </h2>
+          <div>
+            <h2>
+              Détail
+              {{ seriesGranularity }}
+            </h2>
+          </div>
         </div>
 
         <div class="daily-table">
           <div class="daily-row daily-head">
-            <span>Date</span>
+            <span>Période</span>
             <span>Sessions</span>
             <span>Concentration</span>
             <span>Tâches</span>
             <span>Notes</span>
-            <span>Temps d’utilisation</span>
+            <span>
+              Temps d’utilisation
+            </span>
           </div>
 
           <div
-            v-for="day in data.days"
-            :key="day.date"
+            v-for="point in series"
+            :key="point.key"
             class="daily-row"
           >
             <strong>
-              {{ day.date }}
+              {{ point.label }}
             </strong>
 
             <span>
-              {{ day.pomodoroSessions }}
+              {{
+                point
+                  .pomodoroSessions
+              }}
             </span>
 
             <span>
               {{
                 formatDuration(
-                  day.focusSeconds,
+                  point.focusSeconds,
                 )
               }}
             </span>
 
             <span>
-              {{ day.tasksCompleted }}
+              {{
+                point.tasksCompleted
+              }}
             </span>
 
             <span>
-              {{ day.notesCreated }}
+              {{
+                point.notesCreated
+              }}
             </span>
 
             <span>
               {{
                 formatDuration(
-                  day.activeAppSeconds,
+                  point.activeAppSeconds,
                 )
               }}
             </span>

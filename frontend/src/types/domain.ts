@@ -108,12 +108,21 @@ export interface StatisticSummary {
   activeAppSeconds: number
 }
 
+export interface StatisticRange {
+  start: string
+  end: string
+}
+
 export interface StatisticsResponse {
-  month: string
+  range: StatisticRange
+  comparisonRange: StatisticRange
   timezone: string
   summary: StatisticSummary
-  previous: StatisticSummary
+  comparison: StatisticSummary
   changes: Record<string, number | null>
   days: DailyStatistic[]
-  mostCompletedLabel: { labelName: string; count: number } | null
+  mostCompletedLabel: {
+    labelName: string
+    count: number
+  } | null
 }

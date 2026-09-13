@@ -1056,3 +1056,112 @@ select:focus {
     min-width: 680px;
   }
 }
+
+/* Statistiques par période */
+
+.stats-period-controls {
+  margin-bottom: 18px;
+  display: grid;
+  gap: 18px;
+}
+
+.stats-preset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.stats-preset-row > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.period-compare-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(0,1fr)
+    auto
+    minmax(0,1fr)
+    auto;
+  gap: 16px;
+  align-items: end;
+}
+
+.period-compare-grid fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  display: grid;
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0,1fr)
+    );
+  gap: 10px;
+  border: 1px solid var(--g-border);
+  border-radius: 16px;
+}
+
+.period-compare-grid legend {
+  padding: 0 8px;
+  color: var(--g-text);
+  font-weight: 600;
+}
+
+.period-compare-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--g-muted);
+  font-size: .82rem;
+}
+
+.period-versus {
+  align-self: center;
+  color: var(--g-muted);
+  font-size: .75rem;
+  font-weight: 800;
+}
+
+.period-load {
+  min-width: 110px;
+}
+
+.period-help {
+  margin: 0;
+}
+
+.period-chart {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.period-chart .day-column {
+  min-width: 26px;
+}
+
+@media (max-width: 900px) {
+  .period-compare-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .period-versus {
+    justify-self: center;
+  }
+
+  .period-load {
+    width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .stats-preset-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .period-compare-grid fieldset {
+    grid-template-columns: 1fr;
+  }
+}

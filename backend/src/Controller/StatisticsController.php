@@ -16,20 +16,92 @@ final readonly class StatisticsController
     public function __construct(
         private StatisticsRepository $statistics,
         private PomodoroRepository $pomodoro,
-        #[Autowire('%app.timezone%')] private string $timezone,
+        #[Autowire('%app.timezone%')]
+        private string $timezone,
     ) {
     }
 
-    #[Route('/api/statistics', name: 'api_statistics', methods: ['GET'])]
-    public function __invoke(Request $request): JsonResponse
-    {
-        // Refresh live Pomodoro metrics before aggregating the current month.
+    #[Route(
+        '/api/statistics',
+        name: 'api_statistics',
+        methods: ['GET'],
+    )]
+    public function __invoke(
+        Request $request,
+    ): JsonResponse {
+        /*
+         * Refresh live Pomodoro metrics before
+         * aggregating statistics.
+         */
         $this->pomodoro->active();
-        $month = $request->query->getString('month');
-        if ($month === '') {
-            $month = (new \DateTimeImmutable('now', new \DateTimeZone($this->timezone)))->format('Y-m');
+
+        $start =
+            $request->query
+                ->getString('start');
+
+        $end =
+            $request->query
+                ->getString('end');
+
+        if (
+            $start !== ''
+            || $end !== ''
+        ) {
+            if (
+                $start === ''
+                || $end === ''
+            ) {
+                throw new \InvalidArgumentException(
+                    'Both start and end dates are required.'
+                );
+            }
+
+            $compareStart =
+                $request->query
+                    ->getString(
+                        'compareStart'
+                    );
+
+            $compareEnd =
+                $request->query
+                    ->getString(
+                        'compareEnd'
+                    );
+
+            return new JsonResponse(
+                $this->statistics
+                    ->period(
+                        $start,
+                        $end,
+                        $compareStart !== ''
+                            ? $compareStart
+                            : null,
+                        $compareEnd !== ''
+                            ? $compareEnd
+                            : null,
+                    )
+            );
         }
 
-        return new JsonResponse($this->statistics->month($month));
+        $month =
+            $request->query
+                ->getString('month');
+
+        if ($month === '') {
+            $month =
+                (
+                    new \DateTimeImmutable(
+                        'now',
+                        new \DateTimeZone(
+                            $this->timezone
+                        ),
+                    )
+                )->format('Y-m');
+        }
+
+        return new JsonResponse(
+            $this->statistics
+                ->month($month)
+        );
     }
 }

@@ -75,6 +75,129 @@ final readonly class StatisticsRepository
         ];
     }
 
+    /** @return array<string, mixed> */
+    public function period(
+        string $startDate,
+        string $endDate,
+        ?string $compareStartDate = null,
+        ?string $compareEndDate = null,
+    ): array {
+        [
+            $start,
+            $end,
+        ] = $this->dateRange(
+            $startDate,
+            $endDate,
+        );
+
+        if (
+            ($compareStartDate === null)
+            !== ($compareEndDate === null)
+        ) {
+            throw new \InvalidArgumentException(
+                'Both comparison dates are required.'
+            );
+        }
+
+        if (
+            $compareStartDate !== null
+            && $compareEndDate !== null
+        ) {
+            [
+                $compareStart,
+                $compareEnd,
+            ] = $this->dateRange(
+                $compareStartDate,
+                $compareEndDate,
+            );
+        } else {
+            $days =
+                (int) $start
+                    ->diff($end)
+                    ->format('%a');
+
+            $compareEnd = $start;
+
+            $compareStart =
+                $start->modify(
+                    sprintf(
+                        '-%d days',
+                        $days,
+                    )
+                );
+        }
+
+        $current =
+            $this->summary(
+                $start,
+                $end,
+            );
+
+        $comparison =
+            $this->summary(
+                $compareStart,
+                $compareEnd,
+            );
+
+        return [
+            'range' => [
+                'start' =>
+                    $start->format(
+                        'Y-m-d'
+                    ),
+
+                'end' =>
+                    $end
+                        ->modify('-1 day')
+                        ->format(
+                            'Y-m-d'
+                        ),
+            ],
+
+            'comparisonRange' => [
+                'start' =>
+                    $compareStart
+                        ->format(
+                            'Y-m-d'
+                        ),
+
+                'end' =>
+                    $compareEnd
+                        ->modify('-1 day')
+                        ->format(
+                            'Y-m-d'
+                        ),
+            ],
+
+            'timezone' =>
+                $this->timezone,
+
+            'summary' =>
+                $current,
+
+            'comparison' =>
+                $comparison,
+
+            'changes' =>
+                $this->changes(
+                    $current,
+                    $comparison,
+                ),
+
+            'days' =>
+                $this->daily(
+                    $start,
+                    $end,
+                ),
+
+            'mostCompletedLabel' =>
+                $this->mostCompletedLabel(
+                    $start,
+                    $end,
+                ),
+        ];
+    }
+
     /** @return array<string, int|float> */
     private function summary(
         \DateTimeImmutable $start,
@@ -790,6 +913,77 @@ SQL,
         }
 
         return $changes;
+    }
+
+    /**
+     * @return array{
+     *     0:\DateTimeImmutable,
+     *     1:\DateTimeImmutable
+     * }
+     */
+    private function dateRange(
+        string $startDate,
+        string $endDate,
+    ): array {
+        if (
+            preg_match(
+                '/^\d{4}-\d{2}-\d{2}$/',
+                $startDate,
+            ) !== 1
+            || preg_match(
+                '/^\d{4}-\d{2}-\d{2}$/',
+                $endDate,
+            ) !== 1
+        ) {
+            throw new \InvalidArgumentException(
+                'Dates must use YYYY-MM-DD format.'
+            );
+        }
+
+        $timezone =
+            new \DateTimeZone(
+                $this->timezone
+            );
+
+        $start =
+            new \DateTimeImmutable(
+                $startDate
+                .' 00:00:00',
+                $timezone,
+            );
+
+        $inclusiveEnd =
+            new \DateTimeImmutable(
+                $endDate
+                .' 00:00:00',
+                $timezone,
+            );
+
+        if ($inclusiveEnd < $start) {
+            throw new \InvalidArgumentException(
+                'End date must not be before start date.'
+            );
+        }
+
+        $end =
+            $inclusiveEnd
+                ->modify('+1 day');
+
+        $days =
+            (int) $start
+                ->diff($end)
+                ->format('%a');
+
+        if ($days > 731) {
+            throw new \InvalidArgumentException(
+                'Statistics period cannot exceed 731 days.'
+            );
+        }
+
+        return [
+            $start,
+            $end,
+        ];
     }
 
     /**
