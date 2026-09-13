@@ -1,22 +1,27 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import {
+  computed,
+} from 'vue'
 
 interface Props {
-  [key: string]: unknown
   totalFocusMinutes?: number
-  focusedMinutes?: number
   currentSessionSeconds?: number
-  sessionSeconds?: number
-  activeSessionElapsedSeconds?: number
-  currentSessionMinutes?: number
-  sessionElapsedMinutes?: number
   maxGrowthMinutes?: number
-  idealSessionMinutes?: number | null
   recommendedSessionMinutes?: number | null
   feedbackCount?: number
 }
 
-const props = defineProps<Props>()
+const props =
+  withDefaults(
+    defineProps<Props>(),
+    {
+      totalFocusMinutes: 0,
+      currentSessionSeconds: 0,
+      maxGrowthMinutes: 25,
+      recommendedSessionMinutes: null,
+      feedbackCount: 0,
+    },
+  )
 
 const stageLabels = [
   'Pousse',
@@ -33,28 +38,196 @@ const stageLabels = [
   'Arbre complet',
 ] as const
 
-function asNumber(value: unknown): number | null {
-  return typeof value === 'number'
-    && Number.isFinite(value)
-    ? value
-    : null
-}
-
 function clamp(
   value: number,
-  min: number,
-  max: number,
+  minimum: number,
+  maximum: number,
 ): number {
   return Math.min(
-    max,
-    Math.max(min, value),
+    maximum,
+    Math.max(
+      minimum,
+      value,
+    ),
   )
 }
 
-function formatDuration(
+const durationMinutes =
+  computed(
+    () =>
+      Math.max(
+        5,
+        Math.round(
+          props.maxGrowthMinutes,
+        ),
+      ),
+  )
+
+const elapsedMinutes =
+  computed(
+    () =>
+      clamp(
+        Math.floor(
+          props.currentSessionSeconds
+          / 60,
+        ),
+        0,
+        durationMinutes.value,
+      ),
+  )
+
+const visualStage =
+  computed(() => {
+    const duration =
+      durationMinutes.value
+
+    /*
+     * La dernière minute est toujours
+     * passée au sprite maximum.
+     */
+    if (
+      elapsedMinutes.value
+      >= duration - 1
+    ) {
+      return 12
+    }
+
+    /*
+     * L'arbre ne change que toutes
+     * les cinq minutes.
+     */
+    const fiveMinuteStep =
+      Math.floor(
+        elapsedMinutes.value / 5,
+      )
+
+    const availableSteps =
+      Math.max(
+        1,
+        Math.ceil(
+          (duration - 1) / 5,
+        ),
+      )
+
+    /*
+     * On répartit les 11 étapes
+     * intermédiaires sur la durée
+     * réelle de la session.
+     *
+     * Exemple 25 min :
+     * 0  -> étape 1
+     * 5  -> étape 3/4
+     * 10 -> étape 6
+     * 15 -> étape 8/9
+     * 20 -> étape 11
+     * 24 -> étape 12
+     */
+    return clamp(
+      1
+      + Math.round(
+        (
+          fiveMinuteStep
+          / availableSteps
+        ) * 10,
+      ),
+      1,
+      11,
+    )
+  })
+
+const currentStageLabel =
+  computed(
+    () =>
+      stageLabels[
+        visualStage.value - 1
+      ],
+  )
+
+const spriteSource =
+  computed(
+    () =>
+      `/pomodoro-garden/stage-${
+        String(
+          visualStage.value,
+        ).padStart(
+          2,
+          '0',
+        )
+      }.svg`,
+  )
+
+const progressPercent =
+  computed(() => {
+    if (
+      elapsedMinutes.value
+      >= durationMinutes.value - 1
+    ) {
+      return 100
+    }
+
+    return clamp(
+      (
+        elapsedMinutes.value
+        / durationMinutes.value
+      ) * 100,
+      0,
+      100,
+    )
+  })
+
+const nextGrowth =
+  computed(() => {
+    if (
+      visualStage.value === 12
+    ) {
+      return null
+    }
+
+    const nextStep =
+      Math.min(
+        (
+          Math.floor(
+            elapsedMinutes.value / 5,
+          ) + 1
+        ) * 5,
+        durationMinutes.value - 1,
+      )
+
+    return Math.max(
+      1,
+      nextStep
+      - elapsedMinutes.value,
+    )
+  })
+
+const globalLevel =
+  computed(() => {
+    const minutes =
+      props.totalFocusMinutes
+
+    if (minutes >= 240) {
+      return 'Forêt'
+    }
+
+    if (minutes >= 180) {
+      return 'Grand arbre'
+    }
+
+    if (minutes >= 120) {
+      return 'Arbre'
+    }
+
+    if (minutes >= 60) {
+      return 'Arbuste'
+    }
+
+    return 'Jeune pousse'
+  })
+
+function formatMinutes(
   minutes: number,
 ): string {
-  const safeMinutes =
+  const rounded =
     Math.max(
       0,
       Math.round(minutes),
@@ -62,11 +235,11 @@ function formatDuration(
 
   const hours =
     Math.floor(
-      safeMinutes / 60,
+      rounded / 60,
     )
 
   const remainder =
-    safeMinutes % 60
+    rounded % 60
 
   if (
     hours > 0
@@ -81,309 +254,30 @@ function formatDuration(
 
   return `${remainder}m`
 }
-
-const maxGrowthMinutes = computed(
-  () =>
-    Math.max(
-      5,
-      Math.round(
-        asNumber(
-          props.maxGrowthMinutes,
-        ) ?? 60,
-      ),
-    ),
-)
-
-const totalFocusMinutes = computed(
-  () =>
-    Math.max(
-      0,
-      Math.round(
-        asNumber(
-          props.totalFocusMinutes,
-        )
-          ?? asNumber(
-            props.focusedMinutes,
-          )
-          ?? 0,
-      ),
-    ),
-)
-
-const elapsedMinutes = computed(() => {
-  const seconds =
-    asNumber(
-      props.currentSessionSeconds,
-    )
-    ?? asNumber(
-      props.sessionSeconds,
-    )
-    ?? asNumber(
-      props.activeSessionElapsedSeconds,
-    )
-
-  if (seconds !== null) {
-    return clamp(
-      Math.floor(
-        seconds / 60,
-      ),
-      0,
-      maxGrowthMinutes.value,
-    )
-  }
-
-  const minutes =
-    asNumber(
-      props.currentSessionMinutes,
-    )
-    ?? asNumber(
-      props.sessionElapsedMinutes,
-    )
-    ?? 0
-
-  return clamp(
-    Math.floor(minutes),
-    0,
-    maxGrowthMinutes.value,
-  )
-})
-
-/*
- * Une vraie progression par étapes :
- * - on part d'une petite pousse,
- * - toutes les 5 minutes ça grandit,
- * - la dernière minute reste au max.
- */
-const visualStage = computed(() => {
-  const maximum =
-    maxGrowthMinutes.value
-
-  if (
-    elapsedMinutes.value
-    >= maximum - 1
-  ) {
-    return 12
-  }
-
-  const preMaximumMinutes =
-    Math.max(
-      1,
-      maximum - 1,
-    )
-
-  const totalGrowthSteps =
-    Math.max(
-      1,
-      Math.ceil(
-        preMaximumMinutes / 5,
-      ),
-    )
-
-  const currentGrowthStep =
-    Math.floor(
-      elapsedMinutes.value / 5,
-    )
-
-  return clamp(
-    1
-    + Math.round(
-      (
-        currentGrowthStep
-        / totalGrowthSteps
-      ) * 10,
-    ),
-    1,
-    11,
-  )
-})
-
-const currentStageLabel = computed(
-  () =>
-    stageLabels[
-      visualStage.value - 1
-    ],
-)
-
-const sessionPercent = computed(
-  () => {
-    if (
-      elapsedMinutes.value
-      >= maxGrowthMinutes.value - 1
-    ) {
-      return 100
-    }
-
-    return clamp(
-      (
-        elapsedMinutes.value
-        / maxGrowthMinutes.value
-      ) * 100,
-      0,
-      100,
-    )
-  },
-)
-
-const nextStepLabel = computed(() => {
-  if (visualStage.value >= 12) {
-    return 'Taille maximale atteinte'
-  }
-
-  const nextFiveMinuteStep =
-    (
-      Math.floor(
-        elapsedMinutes.value / 5,
-      ) + 1
-    ) * 5
-
-  const maximumStep =
-    maxGrowthMinutes.value - 1
-
-  const nextStep =
-    Math.min(
-      nextFiveMinuteStep,
-      maximumStep,
-    )
-
-  const remaining =
-    Math.max(
-      1,
-      nextStep
-      - elapsedMinutes.value,
-    )
-
-  return `Prochaine pousse dans ${remaining} min`
-})
-
-const globalLevel = computed(() => {
-  const minutes =
-    totalFocusMinutes.value
-
-  if (minutes >= 240) {
-    return 'Forêt'
-  }
-
-  if (minutes >= 180) {
-    return 'Grand arbre'
-  }
-
-  if (minutes >= 120) {
-    return 'Arbre'
-  }
-
-  if (minutes >= 60) {
-    return 'Arbuste'
-  }
-
-  return 'Jeune pousse'
-})
-
-const idealSessionLabel = computed(() => {
-  const ideal =
-    asNumber(
-      props.idealSessionMinutes,
-    )
-    ?? asNumber(
-      props.recommendedSessionMinutes,
-    )
-
-  if (
-    ideal === null
-    || ideal <= 0
-  ) {
-    return 'En apprentissage'
-  }
-
-  return `${Math.round(ideal)} min`
-})
-
-const feedbackCount = computed(
-  () =>
-    Math.max(
-      0,
-      Math.round(
-        asNumber(
-          props.feedbackCount,
-        ) ?? 0,
-      ),
-    ),
-)
-
-const stemHeight = computed(
-  () =>
-    24 + (
-      sessionPercent.value
-      / 100
-    ) * 86,
-)
-
-const trunkHeight = computed(
-  () =>
-    14 + (
-      sessionPercent.value
-      / 100
-    ) * 94,
-)
-
-const canopyRadius = computed(
-  () =>
-    10 + (
-      sessionPercent.value
-      / 100
-    ) * 44,
-)
-
-const canopyCenterY = computed(
-  () =>
-    182
-    - trunkHeight.value
-    - canopyRadius.value
-    * 0.55,
-)
-
-function stageVisible(
-  stage: number,
-): number {
-  return visualStage.value >= stage
-    ? 1
-    : 0.08
-}
-
-function stageScale(
-  stage: number,
-  collapsed = 0.3,
-): string {
-  return `scale(${
-    visualStage.value >= stage
-      ? 1
-      : collapsed
-  })`
-}
 </script>
 
 <template>
-  <section class="garden-card">
-    <header class="garden-header">
+  <section class="pixel-garden">
+    <header class="pixel-garden-header">
       <div>
-        <p class="garden-eyebrow">
+        <span class="pixel-garden-kicker">
           Jardin Pomodoro
-        </p>
+        </span>
 
-        <h3 class="garden-title">
+        <h2>
           {{ currentStageLabel }}
-        </h3>
+        </h2>
 
-        <p class="garden-subtitle">
-          La pousse grandit toutes les
-          5 minutes pendant votre
-          session.
+        <p>
+          Votre arbre évolue toutes les
+          5 minutes de concentration.
         </p>
       </div>
 
-      <div class="garden-summary">
+      <div class="pixel-garden-total">
         <strong>
           {{
-            formatDuration(
+            formatMinutes(
               totalFocusMinutes,
             )
           }}
@@ -395,747 +289,466 @@ function stageScale(
       </div>
     </header>
 
-    <div class="garden-layout">
-      <div class="garden-scene">
-        <svg
-          viewBox="0 0 320 220"
-          aria-label="Croissance de la pousse Pomodoro"
-          role="img"
-        >
-          <defs>
-            <linearGradient
-              id="gardenSky"
-              x1="0%"
-              x2="0%"
-              y1="0%"
-              y2="100%"
-            >
-              <stop
-                offset="0%"
-                stop-color="#eef6ff"
-              />
+    <div class="pixel-garden-body">
+      <div class="pixel-scene">
+        <img
+          :key="spriteSource"
+          :src="spriteSource"
+          :alt="
+            `Étape ${visualStage} : ${currentStageLabel}`
+          "
+          class="pixel-tree"
+        />
 
-              <stop
-                offset="100%"
-                stop-color="#ffffff"
-              />
-            </linearGradient>
-
-            <linearGradient
-              id="gardenTrunk"
-              x1="0%"
-              x2="100%"
-              y1="0%"
-              y2="100%"
-            >
-              <stop
-                offset="0%"
-                stop-color="#8d5b32"
-              />
-
-              <stop
-                offset="100%"
-                stop-color="#5a3820"
-              />
-            </linearGradient>
-
-            <linearGradient
-              id="gardenLeaf"
-              x1="0%"
-              x2="100%"
-              y1="0%"
-              y2="100%"
-            >
-              <stop
-                offset="0%"
-                stop-color="#8bd56d"
-              />
-
-              <stop
-                offset="100%"
-                stop-color="#34a853"
-              />
-            </linearGradient>
-          </defs>
-
-          <rect
-            x="10"
-            y="10"
-            width="300"
-            height="200"
-            rx="28"
-            fill="url(#gardenSky)"
-          />
-
-          <circle
-            cx="262"
-            cy="52"
-            r="20"
-            fill="#fbbc04"
-            :style="{
-              opacity: String(
-                0.45
-                + sessionPercent / 180,
-              ),
-            }"
-          />
-
-          <ellipse
-            cx="160"
-            cy="182"
-            rx="112"
-            ry="21"
-            fill="#d8ebd7"
-          />
-
-          <ellipse
-            cx="160"
-            cy="188"
-            rx="86"
-            ry="13"
-            fill="#b6d8a4"
-          />
-
-          <g
-            :style="{
-              opacity: String(
-                stageVisible(1),
-              ),
-            }"
-          >
-            <path
-              d="M160 181 C154 185 149 191 145 198"
-              fill="none"
-              stroke="#8d5b32"
-              stroke-linecap="round"
-              stroke-width="4"
-            />
-
-            <path
-              d="M160 181 C166 186 171 192 175 198"
-              fill="none"
-              stroke="#8d5b32"
-              stroke-linecap="round"
-              stroke-width="4"
-            />
-          </g>
-
-          <rect
-            x="154"
-            :y="182 - stemHeight"
-            width="12"
-            :height="stemHeight"
-            rx="6"
-            fill="#34a853"
-          />
-
-          <g
-            :style="{
-              opacity: String(
-                stageVisible(1),
-              ),
-              transform: stageScale(1),
-              transformOrigin: '160px 170px',
-            }"
-          >
-            <ellipse
-              cx="146"
-              cy="166"
-              rx="14"
-              ry="8"
-              fill="#60c96c"
-              transform="rotate(-26 146 166)"
-            />
-
-            <ellipse
-              cx="174"
-              cy="166"
-              rx="14"
-              ry="8"
-              fill="#60c96c"
-              transform="rotate(26 174 166)"
-            />
-          </g>
-
-          <g
-            :style="{
-              opacity: String(
-                stageVisible(3),
-              ),
-              transform: stageScale(3),
-              transformOrigin: '160px 152px',
-            }"
-          >
-            <ellipse
-              cx="142"
-              cy="148"
-              rx="16"
-              ry="9"
-              fill="#55bd63"
-              transform="rotate(-32 142 148)"
-            />
-
-            <ellipse
-              cx="178"
-              cy="148"
-              rx="16"
-              ry="9"
-              fill="#55bd63"
-              transform="rotate(32 178 148)"
-            />
-          </g>
-
-          <g
-            :style="{
-              opacity: String(
-                stageVisible(5),
-              ),
-            }"
-          >
-            <rect
-              x="150"
-              :y="182 - trunkHeight"
-              width="20"
-              :height="trunkHeight"
-              rx="9"
-              fill="url(#gardenTrunk)"
-            />
-          </g>
-
-          <g
-            :style="{
-              opacity: String(
-                stageVisible(6),
-              ),
-            }"
-          >
-            <path
-              d="M160 120 C142 116 134 108 126 97"
-              fill="none"
-              stroke="#6b4424"
-              stroke-linecap="round"
-              stroke-width="6"
-            />
-
-            <path
-              d="M160 118 C178 114 186 106 194 95"
-              fill="none"
-              stroke="#6b4424"
-              stroke-linecap="round"
-              stroke-width="6"
-            />
-          </g>
-
-          <g
-            :style="{
-              opacity: String(
-                stageVisible(7),
-              ),
-              transform: `translateY(${
-                18
-                - sessionPercent / 8
-              }px)`,
-            }"
-          >
-            <circle
-              cx="160"
-              :cy="canopyCenterY"
-              :r="canopyRadius"
-              fill="url(#gardenLeaf)"
-            />
-
-            <circle
-              cx="132"
-              :cy="canopyCenterY + 8"
-              :r="canopyRadius * 0.72"
-              fill="#5cc26a"
-            />
-
-            <circle
-              cx="188"
-              :cy="canopyCenterY + 8"
-              :r="canopyRadius * 0.72"
-              fill="#5cc26a"
-            />
-          </g>
-
-          <g
-            :style="{
-              opacity: String(
-                stageVisible(9),
-              ),
-              transform: stageScale(9, 0.45),
-              transformOrigin: '160px 104px',
-            }"
-          >
-            <circle
-              cx="116"
-              cy="118"
-              r="22"
-              fill="#7fd665"
-            />
-
-            <circle
-              cx="204"
-              cy="118"
-              r="22"
-              fill="#7fd665"
-            />
-
-            <circle
-              cx="160"
-              cy="96"
-              r="26"
-              fill="#79cf5f"
-            />
-          </g>
-
-          <g
-            :style="{
-              opacity: String(
-                stageVisible(11),
-              ),
-              transform: stageScale(11, 0.5),
-              transformOrigin: '160px 98px',
-            }"
-          >
-            <circle
-              cx="98"
-              cy="132"
-              r="16"
-              fill="#8add6d"
-            />
-
-            <circle
-              cx="222"
-              cy="132"
-              r="16"
-              fill="#8add6d"
-            />
-
-            <circle
-              cx="136"
-              cy="84"
-              r="18"
-              fill="#8add6d"
-            />
-
-            <circle
-              cx="184"
-              cy="84"
-              r="18"
-              fill="#8add6d"
-            />
-          </g>
-
-          <g
-            :style="{
-              opacity: String(
-                stageVisible(12),
-              ),
-              transform: stageScale(12, 0.6),
-              transformOrigin: '160px 105px',
-            }"
-          >
-            <circle
-              cx="124"
-              cy="110"
-              r="4"
-              fill="#4285f4"
-            />
-
-            <circle
-              cx="198"
-              cy="104"
-              r="4"
-              fill="#ea4335"
-            />
-
-            <circle
-              cx="158"
-              cy="82"
-              r="4"
-              fill="#fbbc04"
-            />
-
-            <circle
-              cx="178"
-              cy="126"
-              r="4"
-              fill="#4285f4"
-            />
-
-            <circle
-              cx="142"
-              cy="126"
-              r="4"
-              fill="#34a853"
-            />
-          </g>
-        </svg>
+        <div class="pixel-stage-badge">
+          Étape
+          {{ visualStage }}/12
+        </div>
       </div>
 
-      <div class="garden-metrics">
-        <article class="garden-metric">
-          <span>Session en cours</span>
+      <div class="pixel-stats">
+        <article>
+          <span>
+            Session
+          </span>
 
           <strong>
             {{
-              formatDuration(
-                elapsedMinutes,
-              )
+              elapsedMinutes
             }}
+            /
+            {{
+              durationMinutes
+            }}
+            min
           </strong>
         </article>
 
-        <article class="garden-metric">
-          <span>Étape actuelle</span>
-
-          <strong>
-            {{
-              visualStage
-            }}/12 ·
-            {{
-              currentStageLabel
-            }}
-          </strong>
-        </article>
-
-        <article class="garden-metric">
-          <span>Niveau global</span>
+        <article>
+          <span>
+            Niveau global
+          </span>
 
           <strong>
             {{ globalLevel }}
           </strong>
         </article>
 
-        <article class="garden-metric">
-          <span>Durée idéale estimée</span>
+        <article>
+          <span>
+            Prochaine évolution
+          </span>
 
           <strong>
-            {{
-              idealSessionLabel
-            }}
+            <template
+              v-if="
+                nextGrowth !== null
+              "
+            >
+              {{ nextGrowth }} min
+            </template>
+
+            <template v-else>
+              Maximum
+            </template>
+          </strong>
+        </article>
+
+        <article>
+          <span>
+            Durée idéale
+          </span>
+
+          <strong>
+            <template
+              v-if="
+                recommendedSessionMinutes
+                !== null
+              "
+            >
+              {{
+                recommendedSessionMinutes
+              }}
+              min
+            </template>
+
+            <template v-else>
+              En apprentissage
+            </template>
           </strong>
 
           <small>
             {{
-              feedbackCount > 0
-                ? `${feedbackCount} retour${feedbackCount > 1 ? 's' : ''} enregistré${feedbackCount > 1 ? 's' : ''}`
-                : 'Ajoutez vos ressentis en fin de session'
+              feedbackCount
+            }}
+            retour{{
+              feedbackCount > 1
+                ? 's'
+                : ''
             }}
           </small>
         </article>
       </div>
     </div>
 
-    <div class="garden-progress-block">
-      <div class="garden-progress-bar">
+    <div class="pixel-progress">
+      <div class="pixel-progress-track">
         <span
           :style="{
-            width: `${sessionPercent}%`,
+            width:
+              `${progressPercent}%`,
           }"
         />
       </div>
 
-      <div class="garden-progress-meta">
+      <div class="pixel-progress-labels">
         <span>
-          {{ nextStepLabel }}
+          <template
+            v-if="
+              nextGrowth !== null
+            "
+          >
+            Prochaine pousse dans
+            {{ nextGrowth }} min
+          </template>
+
+          <template v-else>
+            Taille maximale atteinte
+          </template>
         </span>
 
         <span>
-          {{ elapsedMinutes }}/{{
-            maxGrowthMinutes
-          }} min
+          {{
+            Math.round(
+              progressPercent,
+            )
+          }}%
         </span>
       </div>
     </div>
 
-    <ol class="garden-stage-grid">
-      <li
-        v-for="(
-          label,
-          index
-        ) in stageLabels"
+    <div class="pixel-timeline">
+      <div
+        v-for="
+          (label, index)
+          in stageLabels
+        "
         :key="label"
+        class="pixel-timeline-step"
         :class="{
-          active:
+          done:
             index + 1
-            <= visualStage,
+            < visualStage,
+          current:
+            index + 1
+            === visualStage,
         }"
       >
         <span>
-          {{
-            index + 1
-          }}
+          {{ index + 1 }}
         </span>
 
         <small>
           {{ label }}
         </small>
-      </li>
-    </ol>
+      </div>
+    </div>
   </section>
 </template>
 
 <style scoped>
-.garden-card {
+.pixel-garden {
   display: grid;
-  gap: 1.5rem;
-  padding: 1.5rem;
-  border: 1px solid #d7e2f7;
-  border-radius: 28px;
-  background:
-    linear-gradient(
-      180deg,
-      #ffffff 0%,
-      #f7fbff 100%
-    );
-  box-shadow:
-    0 18px 40px rgba(66, 133, 244, 0.08);
+  gap: 22px;
+  width: 100%;
+  padding: clamp(18px, 3vw, 28px);
+  border: 1px solid #dfe3e7;
+  border-radius: 24px;
+  background: #fff;
 }
 
-.garden-header {
+.pixel-garden-header {
   display: flex;
-  justify-content: space-between;
-  gap: 1rem;
   align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
 }
 
-.garden-eyebrow {
-  margin: 0 0 0.35rem;
-  color: #137333;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+.pixel-garden-header h2 {
+  margin: 4px 0 6px;
+  font-size: clamp(1.7rem, 4vw, 2.2rem);
+}
+
+.pixel-garden-header p {
+  margin: 0;
+  color: #5f6368;
+}
+
+.pixel-garden-kicker {
+  color: #188038;
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .08em;
   text-transform: uppercase;
 }
 
-.garden-title {
-  margin: 0;
-  color: #1f1f1f;
-  font-size: 2rem;
-  line-height: 1.1;
-}
-
-.garden-subtitle {
-  margin: 0.45rem 0 0;
-  color: #5f6368;
-  line-height: 1.55;
-}
-
-.garden-summary {
+.pixel-garden-total {
+  flex: 0 0 auto;
+  min-width: 170px;
+  padding: 14px 18px;
   display: grid;
-  gap: 0.15rem;
-  min-width: 180px;
-  padding: 0.9rem 1rem;
-  border-radius: 20px;
-  background: #eef4ff;
+  gap: 3px;
+  border-radius: 18px;
+  background: #edf4ff;
   color: #174ea6;
   text-align: right;
 }
 
-.garden-summary strong {
-  font-size: 1.4rem;
-  line-height: 1;
+.pixel-garden-total strong {
+  font-size: 1.35rem;
 }
 
-.garden-summary span {
-  font-size: 0.92rem;
+.pixel-garden-total span {
+  font-size: .82rem;
 }
 
-.garden-layout {
+.pixel-garden-body {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
-  gap: 1.25rem;
-  align-items: stretch;
+  grid-template-columns:
+    minmax(280px, 1.35fr)
+    minmax(250px, .65fr);
+  gap: 20px;
 }
 
-.garden-scene {
-  padding: 0.75rem;
-  border-radius: 24px;
-  background:
-    linear-gradient(
-      180deg,
-      #f5faff 0%,
-      #ffffff 100%
-    );
-  border: 1px solid #dbe7f8;
-}
-
-.garden-scene svg {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.garden-scene svg * {
-  transition:
-    opacity 220ms ease,
-    transform 320ms ease,
-    height 320ms ease,
-    y 320ms ease,
-    cy 320ms ease,
-    r 320ms ease;
-}
-
-.garden-metrics {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
-
-.garden-metric {
-  display: grid;
-  gap: 0.35rem;
-  padding: 1rem;
-  border: 1px solid #dde6f6;
-  border-radius: 22px;
-  background: #ffffff;
-}
-
-.garden-metric span {
-  color: #5f6368;
-  font-size: 0.92rem;
-}
-
-.garden-metric strong {
-  color: #1f1f1f;
-  font-size: 1.2rem;
-  line-height: 1.2;
-}
-
-.garden-metric small {
-  color: #6f7680;
-  line-height: 1.45;
-}
-
-.garden-progress-block {
-  display: grid;
-  gap: 0.6rem;
-}
-
-.garden-progress-bar {
+.pixel-scene {
+  position: relative;
+  min-width: 0;
   overflow: hidden;
-  height: 14px;
-  border-radius: 999px;
-  background: #e6eefb;
+  border: 1px solid #d9e3f3;
+  border-radius: 20px;
+  background: #eef4fb;
 }
 
-.garden-progress-bar span {
+.pixel-tree {
   display: block;
+  width: 100%;
   height: 100%;
-  border-radius: inherit;
-  background:
-    linear-gradient(
-      90deg,
-      #34a853 0%,
-      #8ad76b 100%
-    );
-  transition: width 320ms ease;
+  min-height: 300px;
+  max-height: 440px;
+  object-fit: contain;
+
+  /*
+   * Important :
+   * aucun lissage des pixels.
+   */
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+
+  animation:
+    pixel-grow-in
+    360ms
+    steps(4, end);
 }
 
-.garden-progress-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  color: #5f6368;
-  font-size: 0.95rem;
+@keyframes pixel-grow-in {
+  from {
+    opacity: .35;
+    transform:
+      translateY(8px)
+      scale(.94);
+  }
+
+  to {
+    opacity: 1;
+    transform:
+      translateY(0)
+      scale(1);
+  }
 }
 
-.garden-stage-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.75rem;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-
-.garden-stage-grid li {
-  display: grid;
-  gap: 0.35rem;
-  justify-items: start;
-  padding: 0.9rem;
-  border: 1px solid #e3e9f5;
-  border-radius: 18px;
-  background: #ffffff;
-  color: #5f6368;
-}
-
-.garden-stage-grid li.active {
-  border-color: #c7dafc;
-  background: #eef5ff;
-  color: #174ea6;
-}
-
-.garden-stage-grid span {
-  display: inline-flex;
-  width: 1.9rem;
-  height: 1.9rem;
-  align-items: center;
-  justify-content: center;
+.pixel-stage-badge {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  padding: 7px 11px;
+  border: 1px solid
+    rgba(255,255,255,.65);
   border-radius: 999px;
-  background: #edf1f8;
-  color: inherit;
-  font-size: 0.85rem;
+  background:
+    rgba(31,31,31,.78);
+  color: #fff;
+  font-size: .78rem;
   font-weight: 700;
 }
 
-.garden-stage-grid li.active span {
-  background: #4285f4;
-  color: #ffffff;
+.pixel-stats {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0,1fr)
+    );
+  gap: 12px;
 }
 
-.garden-stage-grid small {
-  line-height: 1.35;
+.pixel-stats article {
+  min-width: 0;
+  padding: 16px;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  border: 1px solid #e0e3e7;
+  border-radius: 18px;
+  background: #fff;
 }
 
-@media (max-width: 980px) {
-  .garden-layout {
+.pixel-stats span {
+  color: #5f6368;
+  font-size: .82rem;
+}
+
+.pixel-stats strong {
+  font-size: 1.08rem;
+}
+
+.pixel-stats small {
+  color: #747775;
+}
+
+.pixel-progress {
+  display: grid;
+  gap: 8px;
+}
+
+.pixel-progress-track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e4ece6;
+}
+
+.pixel-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #34a853;
+  transition:
+    width 250ms ease;
+}
+
+.pixel-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #5f6368;
+  font-size: .85rem;
+}
+
+.pixel-timeline {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      6,
+      minmax(0,1fr)
+    );
+  gap: 8px;
+}
+
+.pixel-timeline-step {
+  min-width: 0;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+  border: 1px solid #e0e3e7;
+  border-radius: 14px;
+  color: #747775;
+}
+
+.pixel-timeline-step > span {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #eef1f5;
+  font-size: .76rem;
+  font-weight: 800;
+}
+
+.pixel-timeline-step small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pixel-timeline-step.done {
+  border-color: #c8e6cf;
+  background: #f2faf4;
+  color: #137333;
+}
+
+.pixel-timeline-step.done > span {
+  background: #ceead6;
+}
+
+.pixel-timeline-step.current {
+  border-color: #a8c7fa;
+  background: #edf4ff;
+  color: #174ea6;
+}
+
+.pixel-timeline-step.current > span {
+  background: #1a73e8;
+  color: #fff;
+}
+
+@media (max-width: 900px) {
+  .pixel-garden-body {
     grid-template-columns: 1fr;
   }
 
-  .garden-metrics {
-    grid-template-columns: 1fr 1fr;
+  .pixel-tree {
+    min-height: 260px;
   }
 
-  .garden-stage-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .pixel-timeline {
+    grid-template-columns:
+      repeat(
+        4,
+        minmax(0,1fr)
+      );
   }
 }
 
-@media (max-width: 720px) {
-  .garden-card {
-    padding: 1.1rem;
-    border-radius: 22px;
-  }
-
-  .garden-header {
+@media (max-width: 640px) {
+  .pixel-garden-header {
     flex-direction: column;
   }
 
-  .garden-summary {
-    min-width: 0;
+  .pixel-garden-total {
     width: 100%;
+    min-width: 0;
     text-align: left;
   }
 
-  .garden-title {
-    font-size: 1.65rem;
-  }
-
-  .garden-metrics {
+  .pixel-stats {
     grid-template-columns: 1fr;
   }
 
-  .garden-progress-meta {
-    flex-direction: column;
-    align-items: flex-start;
+  .pixel-timeline {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0,1fr)
+      );
   }
 
-  .garden-stage-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .pixel-progress-labels {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pixel-tree {
+    min-height: 220px;
   }
 }
 </style>

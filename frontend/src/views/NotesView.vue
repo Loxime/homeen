@@ -511,7 +511,7 @@ onMounted(
         </div>
 
         <button
-          class="secondary"
+          class="ui-button ui-button--secondary collection-toggle-button"
           type="button"
           @click="
             collectionFormOpen =
@@ -548,7 +548,7 @@ onMounted(
         />
 
         <button
-          class="primary"
+          class="ui-button ui-button--primary collection-create-submit"
           :disabled="
             creatingCollection
             || !collectionName
