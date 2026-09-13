@@ -233,11 +233,6 @@ onMounted(() => {
 
       <span class="keep-composer-actions">
         <AppIcon
-          name="check"
-          :size="19"
-        />
-
-        <AppIcon
           name="plus"
           :size="19"
         />
