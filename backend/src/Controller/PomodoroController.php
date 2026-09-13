@@ -53,6 +53,40 @@ final readonly class PomodoroController
         return new JsonResponse($this->pomodoro->stop($id));
     }
 
+    #[Route(
+        '/insights',
+        name: 'api_pomodoro_insights',
+        methods: ['GET'],
+    )]
+    public function insights(): JsonResponse
+    {
+        return new JsonResponse(
+            $this->pomodoro->insights()
+        );
+    }
+
+    #[Route(
+        '/sessions/{id<\d+>}/rating',
+        name: 'api_pomodoro_rating',
+        methods: ['POST'],
+    )]
+    public function rate(
+        int $id,
+        Request $request,
+    ): JsonResponse {
+        $data = $this->input->read($request);
+
+        return new JsonResponse(
+            $this->pomodoro->rate(
+                $id,
+                (int) (
+                    $data['rating']
+                    ?? 0
+                ),
+            ),
+        );
+    }
+
     #[Route('/history', name: 'api_pomodoro_history', methods: ['GET'])]
     public function history(Request $request): JsonResponse
     {

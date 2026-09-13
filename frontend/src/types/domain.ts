@@ -62,11 +62,29 @@ export interface PomodoroSession {
   stoppedAt: string | null
   focusSeconds: number
   breakSeconds: number
+  focusRating?: number | null
+  ratedAt?: string | null
   phase?: 'work' | 'break' | null
   remainingSeconds?: number
   completedWorkCycles?: number
   completedBreakCycles?: number
   isActive?: boolean
+}
+
+export interface PomodoroInsights {
+  totalFocusSeconds: number
+  totalFocusMinutes: number
+  stage:
+    | 'roots'
+    | 'sprout'
+    | 'sapling'
+    | 'tree'
+    | 'forest'
+  stageLabel: string
+  progressPercent: number
+  nextStageMinutes: number | null
+  recommendedMinutes: number | null
+  ratingCount: number
 }
 
 export interface DailyStatistic {

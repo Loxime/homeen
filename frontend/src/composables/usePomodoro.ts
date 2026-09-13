@@ -152,24 +152,29 @@ async function start(workMinutes: number): Promise<void> {
   tick()
 }
 
-async function quickStart(): Promise<void> {
-  enableAudio()
-  store.active = await api<PomodoroSession>('/api/pomodoro/quick-start', { method: 'POST' })
-  previousPhase = store.active.phase === 'break' ? 'break' : 'work'
-  playPomodoroSound('start')
-  channel?.postMessage({ type: 'started' })
-  await loadPresets()
-  tick()
-}
+async function stop(): Promise<PomodoroSession | null> {
+  if (!store.active) {
+    return null
+  }
 
-async function stop(): Promise<void> {
-  if (!store.active) return
-  await api(`/api/pomodoro/sessions/${store.active.id}/stop`, { method: 'POST' })
+  const completed =
+    await api<PomodoroSession>(
+      `/api/pomodoro/sessions/${store.active.id}/stop`,
+      {
+        method: 'POST',
+      },
+    )
+
   store.active = null
   store.live = null
   previousPhase = null
   document.title = 'Notes'
-  channel?.postMessage({ type: 'stopped' })
+
+  channel?.postMessage({
+    type: 'stopped',
+  })
+
+  return completed
 }
 
 function startGlobalTimer(): void {
@@ -202,7 +207,6 @@ export function usePomodoro() {
     loadActive,
     loadPresets,
     start,
-    quickStart,
     stop,
     startGlobalTimer,
     stopGlobalTimer,

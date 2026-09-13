@@ -12,10 +12,6 @@ import {
 import AppIcon from './AppIcon.vue'
 
 import {
-  ApiError,
-} from '../services/api'
-
-import {
   usePomodoro,
 } from '../composables/usePomodoro'
 
@@ -35,7 +31,7 @@ const router = useRouter()
 
 const {
   store,
-  quickStart,
+  start,
 } = usePomodoro()
 
 const {
@@ -92,22 +88,24 @@ async function quickFocus(): Promise<void> {
   quickLoading.value = true
 
   try {
-    await quickStart()
+    const latest =
+      store.presets[0]
+
+    if (!latest) {
+      await router.push(
+        '/pomodoro',
+      )
+
+      return
+    }
+
+    await start(
+      latest.workMinutes,
+    )
 
     await router.push(
       '/pomodoro',
     )
-  } catch (error) {
-    if (
-      error instanceof ApiError
-      && error.status === 404
-    ) {
-      await router.push(
-        '/pomodoro',
-      )
-    } else {
-      throw error
-    }
   } finally {
     quickLoading.value = false
   }

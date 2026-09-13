@@ -7,6 +7,7 @@ namespace App\Repository;
 use App\Service\ActivityLogger;
 use App\Service\CurrentUser;
 use App\Service\PomodoroCalculator;
+use App\Service\PomodoroInsightCalculator;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 
@@ -16,6 +17,7 @@ final readonly class PomodoroRepository
         private Connection $connection,
         private ActivityLogger $logger,
         private PomodoroCalculator $calculator,
+        private PomodoroInsightCalculator $insightCalculator,
         private CurrentUser $currentUser,
     ) {
     }
@@ -400,6 +402,140 @@ SQL,
         );
     }
 
+    /** @return array<string, mixed> */
+    public function insights(): array
+    {
+        $userId =
+            $this->currentUser->id();
+
+        $totalFocusSeconds =
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT COALESCE(
+    SUM(focus_seconds),
+    0
+)
+FROM pomodoro_session
+WHERE user_id = :userId
+SQL,
+                    [
+                        'userId' => $userId,
+                    ],
+                );
+
+        $rows = $this->connection
+            ->fetchAllAssociative(
+                <<<'SQL'
+SELECT
+    work_minutes_snapshot
+        AS "workMinutes",
+    focus_rating AS rating
+FROM pomodoro_session
+WHERE user_id = :userId
+  AND stopped_at IS NOT NULL
+  AND focus_rating IS NOT NULL
+ORDER BY
+    rated_at DESC,
+    id DESC
+LIMIT 20
+SQL,
+                [
+                    'userId' => $userId,
+                ],
+            );
+
+        $ratedSessions =
+            array_map(
+                static fn (
+                    array $row,
+                ): array => [
+                    'workMinutes' =>
+                        (int) $row[
+                            'workMinutes'
+                        ],
+
+                    'rating' =>
+                        (int) $row[
+                            'rating'
+                        ],
+                ],
+                $rows,
+            );
+
+        return $this
+            ->insightCalculator
+            ->calculate(
+                $totalFocusSeconds,
+                $ratedSessions,
+            );
+    }
+
+    /** @return array<string, mixed> */
+    public function rate(
+        int $id,
+        int $rating,
+    ): array {
+        if (
+            $rating < 1
+            || $rating > 3
+        ) {
+            throw new \InvalidArgumentException(
+                'Rating must be between 1 and 3.'
+            );
+        }
+
+        $userId =
+            $this->currentUser->id();
+
+        $row = $this->connection
+            ->fetchAssociative(
+                <<<'SQL'
+UPDATE pomodoro_session
+SET
+    focus_rating = :rating,
+    rated_at = NOW()
+WHERE id = :id
+  AND user_id = :userId
+  AND stopped_at IS NOT NULL
+RETURNING
+    id,
+    work_minutes_snapshot
+        AS "workMinutes",
+    started_at AS "startedAt",
+    stopped_at AS "stoppedAt",
+    focus_seconds AS "focusSeconds",
+    break_seconds AS "breakSeconds",
+    focus_rating AS "focusRating",
+    rated_at AS "ratedAt"
+SQL,
+                [
+                    'id' => $id,
+                    'userId' => $userId,
+                    'rating' => $rating,
+                ],
+            );
+
+        if ($row === false) {
+            throw new \OutOfBoundsException(
+                'Completed Pomodoro session not found.'
+            );
+        }
+
+        $this->logger->log(
+            'POMODORO_RATED',
+            'pomodoro_session',
+            $id,
+            [
+                'rating' => $rating,
+            ],
+        );
+
+        return $this->normalizeSession(
+            $row
+        );
+    }
+
     /** @return list<array<string, mixed>> */
     public function history(
         int $limit = 50,
@@ -418,7 +554,9 @@ SELECT
     started_at AS "startedAt",
     stopped_at AS "stoppedAt",
     focus_seconds AS "focusSeconds",
-    break_seconds AS "breakSeconds"
+    break_seconds AS "breakSeconds",
+    focus_rating AS "focusRating",
+    rated_at AS "ratedAt"
 FROM pomodoro_session
 WHERE user_id = :userId
 ORDER BY started_at DESC
@@ -466,6 +604,18 @@ SQL,
 
         $row['breakSeconds'] =
             (int) $row['breakSeconds'];
+
+        if (
+            array_key_exists(
+                'focusRating',
+                $row,
+            )
+        ) {
+            $row['focusRating'] =
+                $row['focusRating'] !== null
+                    ? (int) $row['focusRating']
+                    : null;
+        }
 
         return $row;
     }
