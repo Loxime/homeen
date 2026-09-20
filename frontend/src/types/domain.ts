@@ -7,6 +7,18 @@ export interface Label {
   noteCount: number
 }
 
+export interface ImageAsset {
+  id: number
+  originalName: string
+  mimeType: string
+  sizeBytes: number
+  width: number | null
+  height: number | null
+  createdAt: string
+  noteCount: number
+  contentUrl: string
+}
+
 export interface NoteCollection {
   id: number
   name: string

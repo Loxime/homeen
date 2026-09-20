@@ -3,6 +3,7 @@ defineProps<{
   name:
     | 'menu'
     | 'note'
+    | 'image'
     | 'tag'
     | 'timer'
     | 'chart'
@@ -44,6 +45,24 @@ defineProps<{
     <template v-else-if="name === 'note'">
       <path d="M6 3h9l3 3v15H6z" />
       <path d="M15 3v4h4M9 11h6M9 15h6" />
+    </template>
+
+    <template v-else-if="name === 'image'">
+      <rect
+        x="3"
+        y="4"
+        width="18"
+        height="16"
+        rx="2"
+      />
+      <circle
+        cx="8.5"
+        cy="9"
+        r="1.5"
+      />
+      <path
+        d="m4 17 5-5 4 4 2-2 5 5"
+      />
     </template>
 
     <template v-else-if="name === 'tag'">

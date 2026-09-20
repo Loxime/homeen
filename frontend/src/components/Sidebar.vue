@@ -189,6 +189,19 @@ async function quickFocus(): Promise<void> {
         </span>
       </RouterLink>
 
+      <RouterLink
+        class="sidebar-entry"
+        to="/library"
+      >
+        <span class="sidebar-icon-slot">
+          <AppIcon name="image" />
+        </span>
+
+        <span class="sidebar-label">
+          Bibliothèque
+        </span>
+      </RouterLink>
+
       <div class="sidebar-label-section">
         <button
           class="sidebar-entry sidebar-label-toggle"

@@ -37,8 +37,13 @@ export async function api<T>(
     'application/json',
   )
 
+  const isFormData =
+    typeof FormData !== 'undefined'
+    && init.body instanceof FormData
+
   if (
     init.body !== undefined
+    && !isFormData
     && !headers.has('Content-Type')
   ) {
     headers.set(

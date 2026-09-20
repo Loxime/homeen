@@ -9,6 +9,7 @@ import AppIcon from './AppIcon.vue'
 import { api } from '../services/api'
 
 import type {
+  ImageAsset,
   Label,
   Note,
   NoteCollection,
@@ -41,6 +42,26 @@ const taskText = ref('')
 const saving = ref(false)
 const error = ref('')
 const localNote = ref<Note | null>(null)
+
+const noteImages =
+  ref<ImageAsset[]>([])
+
+const libraryImages =
+  ref<ImageAsset[]>([])
+
+const imageUploading =
+  ref(false)
+
+const imageBusyId =
+  ref<number | null>(
+    null,
+  )
+
+const imageLibraryOpen =
+  ref(false)
+
+const imageLibraryLoading =
+  ref(false)
 
 const isNew = computed(
   () => localNote.value === null,
@@ -98,13 +119,25 @@ watch(
 
     taskText.value = ''
     error.value = ''
+
+    noteImages.value = []
+    libraryImages.value = []
+    imageLibraryOpen.value = false
+
+    if (value) {
+      void loadNoteImages(
+        value.id
+      )
+    }
   },
   {
     immediate: true,
   },
 )
 
-async function save():
+async function save(
+  notifyParent = true,
+):
 Promise<Note | null> {
   saving.value = true
   error.value = ''
@@ -138,10 +171,12 @@ Promise<Note | null> {
 
     localNote.value = note
 
-    emit(
-      'saved',
-      note,
-    )
+    if (notifyParent) {
+      emit(
+        'saved',
+        note,
+      )
+    }
 
     return note
   } catch (exception) {
@@ -163,6 +198,241 @@ async function done(): Promise<void> {
   if (note) {
     emit('closed')
   }
+}
+
+async function loadNoteImages(
+  noteId: number,
+): Promise<void> {
+  try {
+    const response =
+      await api<{
+        images: ImageAsset[]
+      }>(
+        `/api/images/note/${noteId}`,
+      )
+
+    noteImages.value =
+      response.images
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de charger les images.'
+  }
+}
+
+async function loadImageLibrary():
+Promise<void> {
+  imageLibraryLoading.value = true
+
+  try {
+    const response =
+      await api<{
+        images: ImageAsset[]
+      }>(
+        '/api/images',
+      )
+
+    libraryImages.value =
+      response.images
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de charger la bibliothèque.'
+  } finally {
+    imageLibraryLoading.value = false
+  }
+}
+
+async function toggleImageLibrary():
+Promise<void> {
+  imageLibraryOpen.value =
+    !imageLibraryOpen.value
+
+  if (
+    imageLibraryOpen.value
+    && libraryImages.value.length === 0
+  ) {
+    await loadImageLibrary()
+  }
+}
+
+async function ensureSavedNote():
+Promise<Note | null> {
+  if (localNote.value) {
+    return localNote.value
+  }
+
+  return await save(false)
+}
+
+async function attachImage(
+  image: ImageAsset,
+): Promise<void> {
+  if (
+    imageBusyId.value !== null
+  ) {
+    return
+  }
+
+  const note =
+    await ensureSavedNote()
+
+  if (!note) {
+    return
+  }
+
+  imageBusyId.value =
+    image.id
+
+  try {
+    await api(
+      `/api/images/${image.id}/notes/${note.id}`,
+      {
+        method: 'POST',
+      },
+    )
+
+    await loadNoteImages(
+      note.id
+    )
+
+    emit('changed')
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible d’ajouter l’image à la note.'
+  } finally {
+    imageBusyId.value = null
+  }
+}
+
+async function detachImage(
+  image: ImageAsset,
+): Promise<void> {
+  if (
+    !localNote.value
+    || imageBusyId.value !== null
+  ) {
+    return
+  }
+
+  imageBusyId.value =
+    image.id
+
+  try {
+    await api(
+      `/api/images/${image.id}/notes/${localNote.value.id}`,
+      {
+        method: 'DELETE',
+      },
+    )
+
+    noteImages.value =
+      noteImages.value.filter(
+        candidate =>
+          candidate.id
+          !== image.id,
+      )
+
+    emit('changed')
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de retirer l’image de la note.'
+  } finally {
+    imageBusyId.value = null
+  }
+}
+
+async function uploadImages(
+  event: Event,
+): Promise<void> {
+  const input =
+    event.target as HTMLInputElement
+
+  const files =
+    Array.from(
+      input.files ?? [],
+    )
+
+  input.value = ''
+
+  if (
+    files.length === 0
+    || imageUploading.value
+  ) {
+    return
+  }
+
+  const note =
+    await ensureSavedNote()
+
+  if (!note) {
+    return
+  }
+
+  imageUploading.value = true
+  error.value = ''
+
+  try {
+    for (
+      const file
+      of files
+    ) {
+      const form =
+        new FormData()
+
+      form.append(
+        'image',
+        file,
+      )
+
+      const image =
+        await api<ImageAsset>(
+          '/api/images',
+          {
+            method: 'POST',
+            body: form,
+          },
+        )
+
+      await api(
+        `/api/images/${image.id}/notes/${note.id}`,
+        {
+          method: 'POST',
+        },
+      )
+    }
+
+    await Promise.all([
+      loadNoteImages(
+        note.id
+      ),
+      loadImageLibrary(),
+    ])
+
+    emit('changed')
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible d’ajouter l’image.'
+  } finally {
+    imageUploading.value = false
+  }
+}
+
+function isImageAttached(
+  imageId: number,
+): boolean {
+  return noteImages.value.some(
+    image =>
+      image.id === imageId,
+  )
 }
 
 async function addTask(): Promise<void> {
@@ -358,6 +628,211 @@ async function restore(): Promise<void> {
           class="keep-content-input"
           placeholder="Écrivez votre note…"
         />
+
+        <section class="note-images-section">
+          <div class="note-images-heading">
+            <div>
+              <span class="keep-section-label">
+                Images
+              </span>
+
+              <small>
+                {{
+                  noteImages.length === 0
+                    ? 'Aucune image'
+                    : `${noteImages.length} image${noteImages.length > 1 ? 's' : ''}`
+                }}
+              </small>
+            </div>
+
+            <div class="note-image-actions">
+              <label
+                class="note-image-action"
+                :class="{
+                  disabled:
+                    imageUploading,
+                }"
+              >
+                <AppIcon
+                  name="plus"
+                  :size="16"
+                />
+
+                {{
+                  imageUploading
+                    ? 'Ajout…'
+                    : 'Importer'
+                }}
+
+                <input
+                  class="image-file-input"
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  :disabled="
+                    imageUploading
+                  "
+                  @change="
+                    uploadImages
+                  "
+                />
+              </label>
+
+              <button
+                type="button"
+                class="note-image-action"
+                @click="
+                  toggleImageLibrary
+                "
+              >
+                <AppIcon
+                  name="image"
+                  :size="16"
+                />
+
+                Bibliothèque
+              </button>
+            </div>
+          </div>
+
+          <div
+            v-if="
+              noteImages.length > 0
+            "
+            class="note-image-grid"
+          >
+            <figure
+              v-for="
+                image in noteImages
+              "
+              :key="image.id"
+              class="note-image-card"
+            >
+              <img
+                :src="
+                  image.contentUrl
+                "
+                :alt="
+                  image.originalName
+                "
+                loading="lazy"
+              />
+
+              <figcaption>
+                <span
+                  :title="
+                    image.originalName
+                  "
+                >
+                  {{
+                    image.originalName
+                  }}
+                </span>
+
+                <button
+                  type="button"
+                  :disabled="
+                    imageBusyId
+                    === image.id
+                  "
+                  title="Retirer de la note"
+                  aria-label="Retirer de la note"
+                  @click="
+                    detachImage(
+                      image,
+                    )
+                  "
+                >
+                  <AppIcon
+                    name="close"
+                    :size="15"
+                  />
+                </button>
+              </figcaption>
+            </figure>
+          </div>
+
+          <div
+            v-if="
+              imageLibraryOpen
+            "
+            class="note-library-picker"
+          >
+            <p
+              v-if="
+                imageLibraryLoading
+              "
+              class="muted"
+            >
+              Chargement de la bibliothèque…
+            </p>
+
+            <p
+              v-else-if="
+                libraryImages.length === 0
+              "
+              class="muted"
+            >
+              La bibliothèque est vide.
+            </p>
+
+            <div
+              v-else
+              class="note-library-grid"
+            >
+              <button
+                v-for="
+                  image in libraryImages
+                "
+                :key="image.id"
+                type="button"
+                class="note-library-image"
+                :class="{
+                  attached:
+                    isImageAttached(
+                      image.id,
+                    ),
+                }"
+                :disabled="
+                  isImageAttached(
+                    image.id,
+                  )
+                  || imageBusyId !== null
+                "
+                :title="
+                  isImageAttached(image.id)
+                    ? 'Déjà ajoutée'
+                    : `Ajouter ${image.originalName}`
+                "
+                @click="
+                  attachImage(
+                    image,
+                  )
+                "
+              >
+                <img
+                  :src="
+                    image.contentUrl
+                  "
+                  :alt="
+                    image.originalName
+                  "
+                  loading="lazy"
+                />
+
+                <span>
+                  {{
+                    isImageAttached(
+                      image.id,
+                    )
+                      ? 'Ajoutée'
+                      : 'Ajouter'
+                  }}
+                </span>
+              </button>
+            </div>
+          </div>
+        </section>
 
         <div class="note-organization-grid">
           <label>
