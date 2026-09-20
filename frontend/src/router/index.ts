@@ -4,7 +4,6 @@ import {
 } from 'vue-router'
 
 import NotesView from '../views/NotesView.vue'
-import LabelsView from '../views/LabelsView.vue'
 import PomodoroView from '../views/PomodoroView.vue'
 import StatisticsView from '../views/StatisticsView.vue'
 import ProfileView from '../views/ProfileView.vue'
@@ -46,7 +45,7 @@ export const router = createRouter({
 
     {
       path: '/labels',
-      component: LabelsView,
+      redirect: '/notes',
     },
 
     {

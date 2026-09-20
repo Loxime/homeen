@@ -170,6 +170,9 @@ onUnmounted(() => {
   >
     <Sidebar
       :collapsed="sidebarCollapsed"
+      @expand-sidebar="
+        sidebarCollapsed = false
+      "
     />
 
     <button

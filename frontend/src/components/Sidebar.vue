@@ -10,6 +10,7 @@ import {
 } from 'vue-router'
 
 import AppIcon from './AppIcon.vue'
+import SidebarLabels from './SidebarLabels.vue'
 
 import {
   usePomodoro,
@@ -23,9 +24,15 @@ import {
   useChannelUnreadMessages,
 } from '../composables/useChannelUnreadMessages'
 
-defineProps<{
-  collapsed: boolean
-}>()
+const props =
+  defineProps<{
+    collapsed: boolean
+  }>()
+
+const emit =
+  defineEmits<{
+    'expand-sidebar': []
+  }>()
 
 const router = useRouter()
 
@@ -62,6 +69,21 @@ onUnmounted(() => {
 })
 
 const quickLoading = ref(false)
+
+const labelsOpen =
+  ref(false)
+
+function toggleLabels(): void {
+  if (props.collapsed) {
+    emit('expand-sidebar')
+    labelsOpen.value = true
+
+    return
+  }
+
+  labelsOpen.value =
+    !labelsOpen.value
+}
 
 const quickLabel = computed(() => {
   if (store.active) {
@@ -167,18 +189,38 @@ async function quickFocus(): Promise<void> {
         </span>
       </RouterLink>
 
-      <RouterLink
-        class="sidebar-entry"
-        to="/labels"
-      >
-        <span class="sidebar-icon-slot">
-          <AppIcon name="tag" />
-        </span>
+      <div class="sidebar-label-section">
+        <button
+          class="sidebar-entry sidebar-label-toggle"
+          :class="{
+            active: labelsOpen,
+          }"
+          type="button"
+          :aria-expanded="
+            labelsOpen
+            && !collapsed
+          "
+          title="Gérer les libellés"
+          @click="
+            toggleLabels
+          "
+        >
+          <span class="sidebar-icon-slot">
+            <AppIcon name="tag" />
+          </span>
 
-        <span class="sidebar-label">
-          Libellés
-        </span>
-      </RouterLink>
+          <span class="sidebar-label">
+            Libellés
+          </span>
+        </button>
+
+        <SidebarLabels
+          v-show="
+            labelsOpen
+            && !collapsed
+          "
+        />
+      </div>
 
       <RouterLink
         class="sidebar-entry"

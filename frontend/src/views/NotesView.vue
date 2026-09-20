@@ -15,8 +15,11 @@ import NoteEditor from '../components/NoteEditor.vue'
 import { api } from '../services/api'
 import { formatDate } from '../services/format'
 
+import {
+  useLabels,
+} from '../composables/useLabels'
+
 import type {
-  Label,
   Note,
   NoteCollection,
   NoteSummary,
@@ -35,8 +38,10 @@ const route = useRoute()
 const notes =
   ref<NoteSummary[]>([])
 
-const labels =
-  ref<Label[]>([])
+const {
+  labels,
+  load: loadLabels,
+} = useLabels()
 
 const collections =
   ref<NoteCollection[]>([])
@@ -149,7 +154,6 @@ Promise<void> {
 
     const [
       noteResponse,
-      labelResponse,
       collectionResponse,
     ] = await Promise.all([
       api<{
@@ -159,24 +163,17 @@ Promise<void> {
       ),
 
       api<{
-        labels: Label[]
-      }>(
-        '/api/labels',
-      ),
-
-      api<{
         collections:
           NoteCollection[]
       }>(
         '/api/collections',
       ),
+
+      loadLabels(),
     ])
 
     notes.value =
       noteResponse.notes
-
-    labels.value =
-      labelResponse.labels
 
     collections.value =
       collectionResponse.collections
