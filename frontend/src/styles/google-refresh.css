@@ -1761,3 +1761,312 @@ select:focus {
 .sidebar-label-manager {
   display: none !important;
 }
+
+
+/* === Soft interaction system === */
+
+:root {
+  --interaction-fast: 140ms;
+  --interaction-normal: 190ms;
+  --interaction-slow: 240ms;
+  --interaction-ease:
+    cubic-bezier(.2, .8, .2, 1);
+}
+
+/*
+ * Les contrôles doivent répondre immédiatement,
+ * sans effet de saut brutal.
+ */
+
+button,
+a,
+input,
+textarea,
+select {
+  transition:
+    background-color
+      var(--interaction-fast)
+      var(--interaction-ease),
+    border-color
+      var(--interaction-fast)
+      var(--interaction-ease),
+    color
+      var(--interaction-fast)
+      var(--interaction-ease),
+    box-shadow
+      var(--interaction-fast)
+      var(--interaction-ease),
+    opacity
+      var(--interaction-fast)
+      var(--interaction-ease);
+}
+
+button {
+  transition:
+    background-color
+      var(--interaction-fast)
+      var(--interaction-ease),
+    border-color
+      var(--interaction-fast)
+      var(--interaction-ease),
+    color
+      var(--interaction-fast)
+      var(--interaction-ease),
+    box-shadow
+      var(--interaction-fast)
+      var(--interaction-ease),
+    opacity
+      var(--interaction-fast)
+      var(--interaction-ease),
+    transform
+      90ms
+      var(--interaction-ease);
+}
+
+button:not(:disabled):active {
+  transform:
+    translateY(1px)
+    scale(.985);
+}
+
+button:disabled {
+  transform: none;
+  filter: saturate(.7);
+}
+
+/*
+ * Focus visible cohérent pour clavier,
+ * sans cercle permanent à la souris.
+ */
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid
+    rgba(26,115,232,.22);
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-offset: 0;
+}
+
+/*
+ * Cartes et éléments interactifs.
+ */
+
+.note-card,
+.channel-card,
+.collection-chip,
+.preset-button,
+.session-feedback-options button,
+.metric-card,
+.sidebar-label-item,
+.sidebar-entry,
+.keep-note-composer,
+.board-note {
+  transition:
+    background-color
+      var(--interaction-normal)
+      var(--interaction-ease),
+    border-color
+      var(--interaction-normal)
+      var(--interaction-ease),
+    color
+      var(--interaction-normal)
+      var(--interaction-ease),
+    box-shadow
+      var(--interaction-normal)
+      var(--interaction-ease),
+    transform
+      var(--interaction-normal)
+      var(--interaction-ease);
+}
+
+.note-card:hover,
+.channel-card:hover {
+  transform:
+    translateY(-2px);
+}
+
+.collection-chip:not(:disabled):hover,
+.preset-button:not(:disabled):hover,
+.session-feedback-options
+button:not(:disabled):hover {
+  transform:
+    translateY(-1px);
+}
+
+/*
+ * Sidebar : survol plus progressif.
+ */
+
+.sidebar-entry,
+.sidebar .nav-list a,
+.sidebar .focus-quick {
+  transition:
+    background-color
+      var(--interaction-normal)
+      var(--interaction-ease),
+    color
+      var(--interaction-normal)
+      var(--interaction-ease),
+    opacity
+      var(--interaction-normal)
+      var(--interaction-ease);
+}
+
+.sidebar-label-manager {
+  animation:
+    soft-panel-in
+    var(--interaction-slow)
+    var(--interaction-ease)
+    both;
+}
+
+@keyframes soft-panel-in {
+  from {
+    opacity: 0;
+    transform:
+      translateY(-5px);
+  }
+
+  to {
+    opacity: 1;
+    transform:
+      translateY(0);
+  }
+}
+
+/*
+ * Modal :
+ * le backdrop apparaît doucement,
+ * la fenêtre monte légèrement au lieu
+ * d'apparaître instantanément.
+ */
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition:
+    opacity
+    var(--interaction-normal)
+    var(--interaction-ease);
+}
+
+.modal-fade-enter-active .modal,
+.modal-fade-leave-active .modal {
+  transition:
+    opacity
+      var(--interaction-normal)
+      var(--interaction-ease),
+    transform
+      var(--interaction-slow)
+      var(--interaction-ease);
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+
+.modal-fade-enter-from .modal {
+  opacity: 0;
+  transform:
+    translateY(12px)
+    scale(.985);
+}
+
+.modal-fade-leave-to .modal {
+  opacity: 0;
+  transform:
+    translateY(7px)
+    scale(.99);
+}
+
+/*
+ * Navigation principale.
+ */
+
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition:
+    opacity
+      var(--interaction-normal)
+      var(--interaction-ease),
+    transform
+      var(--interaction-normal)
+      var(--interaction-ease);
+}
+
+.page-fade-enter-from {
+  opacity: 0;
+  transform:
+    translateY(5px);
+}
+
+.page-fade-leave-to {
+  opacity: 0;
+  transform:
+    translateY(-3px);
+}
+
+/*
+ * Feedbacks d'interface.
+ */
+
+.form-error {
+  animation:
+    soft-feedback-in
+    var(--interaction-slow)
+    var(--interaction-ease)
+    both;
+}
+
+@keyframes soft-feedback-in {
+  from {
+    opacity: 0;
+    transform:
+      translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform:
+      translateY(0);
+  }
+}
+
+/*
+ * Evite les animations imposées aux
+ * utilisateurs qui les réduisent dans
+ * leur système.
+ */
+
+@media (
+  prefers-reduced-motion:
+  reduce
+) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration:
+      .01ms !important;
+    animation-iteration-count:
+      1 !important;
+    transition-duration:
+      .01ms !important;
+  }
+
+  button:not(:disabled):active,
+  .note-card:hover,
+  .channel-card:hover,
+  .collection-chip:hover,
+  .preset-button:hover {
+    transform: none;
+  }
+}
