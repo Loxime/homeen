@@ -6,6 +6,10 @@ import {
   useNotificationSound,
 } from '../composables/useNotificationSound'
 
+import {
+  useToast,
+} from '../composables/useToast'
+
 interface ProfileEmail {
   id: number
   email: string
@@ -20,6 +24,11 @@ interface Profile {
 }
 
 const { state } = useAccess()
+
+const {
+  success:
+    showSuccess,
+} = useToast()
 
 const {
   syncEnabled:
@@ -255,6 +264,12 @@ async function toggleSound(): Promise<void> {
   try {
     await setNotificationSoundEnabled(
       next,
+    )
+
+    showSuccess(
+      next
+        ? 'Sons de notification activés.'
+        : 'Sons de notification désactivés.',
     )
   } catch (exception) {
     profile.value

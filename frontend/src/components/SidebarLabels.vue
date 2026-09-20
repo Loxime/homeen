@@ -10,6 +10,10 @@ import {
   useLabels,
 } from '../composables/useLabels'
 
+import {
+  useToast,
+} from '../composables/useToast'
+
 import type {
   Label,
 } from '../types/domain'
@@ -23,6 +27,11 @@ const {
   update,
   remove,
 } = useLabels()
+
+const {
+  success:
+    showSuccess,
+} = useToast()
 
 const name =
   ref('')
@@ -87,6 +96,10 @@ Promise<void> {
     )
 
     name.value = ''
+
+    showSuccess(
+      'Libellé créé.',
+    )
   } catch {
     /*
      * Le store expose déjà
@@ -121,6 +134,10 @@ async function save(
     )
 
     editingId.value = null
+
+    showSuccess(
+      'Libellé modifié.',
+    )
   } catch {
     /*
      * L'erreur reste visible
@@ -152,6 +169,10 @@ async function deleteLabel(
   try {
     await remove(
       label.id,
+    )
+
+    showSuccess(
+      'Libellé supprimé.',
     )
   } catch {
     /*

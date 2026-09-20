@@ -13,6 +13,7 @@ import {
 } from 'vue-router'
 
 import BaseModal from './BaseModal.vue'
+import AppToast from './AppToast.vue'
 import Sidebar from './Sidebar.vue'
 import TopBar from './TopBar.vue'
 
@@ -216,6 +217,8 @@ onUnmounted(() => {
         </RouterView>
       </div>
     </section>
+
+    <AppToast />
 
     <BaseModal
       :open="

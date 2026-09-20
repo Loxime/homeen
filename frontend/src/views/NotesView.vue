@@ -19,6 +19,10 @@ import {
   useLabels,
 } from '../composables/useLabels'
 
+import {
+  useToast,
+} from '../composables/useToast'
+
 import type {
   Note,
   NoteCollection,
@@ -34,6 +38,11 @@ const props =
   }>()
 
 const route = useRoute()
+
+const {
+  success:
+    showSuccess,
+} = useToast()
 
 const notes =
   ref<NoteSummary[]>([])
@@ -256,6 +265,10 @@ Promise<void> {
       collection.id
 
     await load()
+
+    showSuccess(
+      'Collection créée.',
+    )
   } catch (exception) {
     error.value =
       exception instanceof Error
@@ -293,6 +306,10 @@ async function deleteCollection(
   }
 
   await load()
+
+  showSuccess(
+    'Collection supprimée.',
+  )
 }
 
 function selectCollection(

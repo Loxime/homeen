@@ -2070,3 +2070,128 @@ button:not(:disabled):hover {
     transform: none;
   }
 }
+
+
+/* === Action feedback === */
+
+.form-success {
+  margin: .7rem 0;
+  padding: .7rem .85rem;
+  border: 1px solid #b7dfc2;
+  border-radius: 12px;
+  background: #eef8f1;
+  color: #137333;
+  animation:
+    soft-feedback-in
+    var(--interaction-slow)
+    var(--interaction-ease)
+    both;
+}
+
+.app-toast {
+  position: fixed;
+  z-index: 1000;
+  right: 22px;
+  bottom: 22px;
+  width:
+    min(
+      390px,
+      calc(100vw - 32px)
+    );
+  min-height: 52px;
+  padding:
+    10px
+    10px
+    10px
+    14px;
+  display: grid;
+  grid-template-columns:
+    10px
+    minmax(0,1fr)
+    34px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--g-border);
+  border-radius: 16px;
+  background: #fff;
+  color: var(--g-text);
+  box-shadow:
+    0 10px 32px
+    rgba(60,64,67,.18);
+}
+
+.app-toast-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--g-blue);
+}
+
+.app-toast--success
+.app-toast-dot {
+  background: var(--g-green);
+}
+
+.app-toast--error
+.app-toast-dot {
+  background: var(--g-red);
+}
+
+.app-toast--info
+.app-toast-dot {
+  background: var(--g-blue);
+}
+
+.app-toast-message {
+  min-width: 0;
+  font-size: .9rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.app-toast-close {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--g-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.app-toast-close:hover {
+  background: var(--g-surface-alt);
+  color: var(--g-text);
+}
+
+.toast-enter-active,
+.toast-leave-active {
+  transition:
+    opacity
+      var(--interaction-normal)
+      var(--interaction-ease),
+    transform
+      var(--interaction-slow)
+      var(--interaction-ease);
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform:
+    translateY(12px)
+    scale(.98);
+}
+
+@media (max-width: 720px) {
+  .app-toast {
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    width: auto;
+  }
+}
