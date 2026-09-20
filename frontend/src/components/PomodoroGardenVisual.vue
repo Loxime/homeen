@@ -206,7 +206,7 @@ const globalLevel =
       props.totalFocusMinutes
 
     if (minutes >= 240) {
-      return 'Forêt'
+      return 'Arbre mature'
     }
 
     if (minutes >= 180) {

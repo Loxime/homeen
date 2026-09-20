@@ -79,7 +79,6 @@ export interface PomodoroInsights {
     | 'sprout'
     | 'sapling'
     | 'tree'
-    | 'forest'
   stageLabel: string
   progressPercent: number
   nextStageMinutes: number | null

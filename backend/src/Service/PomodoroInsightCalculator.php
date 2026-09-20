@@ -153,8 +153,8 @@ final readonly class PomodoroInsightCalculator
         }
 
         return [
-            'forest',
-            'Forêt',
+            'tree',
+            'Arbre mature',
             240,
             null,
         ];

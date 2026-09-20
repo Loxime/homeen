@@ -28,10 +28,10 @@ final readonly class TaskRepository
 
         if (
             $content === ''
-            || mb_strlen($content) > 255
+            || mb_strlen($content) > 4000
         ) {
             throw new \InvalidArgumentException(
-                'Task content must contain between 1 and 255 characters.'
+                'Task content must contain between 1 and 4000 characters.'
             );
         }
 

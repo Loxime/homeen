@@ -33,13 +33,21 @@ final class PomodoroInsightCalculatorTest
                 )['stage'],
         );
 
-        self::assertSame(
-            'forest',
+        $mature =
             $calculator
                 ->calculate(
                     4 * 60 * 60,
                     [],
-                )['stage'],
+                );
+
+        self::assertSame(
+            'tree',
+            $mature['stage'],
+        );
+
+        self::assertSame(
+            'Arbre mature',
+            $mature['stageLabel'],
         );
     }
 

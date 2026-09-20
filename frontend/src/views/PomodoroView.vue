@@ -339,8 +339,8 @@ onMounted(async () => {
         v-else
         class="focus-garden-complete"
       >
-        Votre forêt est installée.
-        Continuez à la faire grandir.
+        Votre arbre a atteint sa taille maximale.
+        Continuez à accumuler du temps de concentration.
       </div>
 
       <div class="ideal-duration">

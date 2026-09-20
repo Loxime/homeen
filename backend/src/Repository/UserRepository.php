@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 
 final readonly class UserRepository
 {
@@ -461,6 +462,10 @@ SQL,
         [
             'id' => $userId,
             'enabled' => $enabled,
+        ],
+        [
+            'enabled' =>
+                ParameterType::BOOLEAN,
         ],
     );
 

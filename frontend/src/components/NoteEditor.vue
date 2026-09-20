@@ -449,12 +449,12 @@ async function restore(): Promise<void> {
 
             <input
               v-model="taskText"
-              maxlength="255"
+              maxlength="4000"
               placeholder="Ajouter une tâche"
             />
 
             <span class="char-count">
-              {{ taskText.length }}/255
+              {{ taskText.length }}/4000
             </span>
           </form>
 

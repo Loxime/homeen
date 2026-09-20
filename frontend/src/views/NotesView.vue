@@ -738,7 +738,10 @@ onMounted(
             </span>
           </div>
 
-          <span class="task-ratio">
+          <span
+            v-if="note.taskCount > 0"
+            class="task-ratio"
+          >
             {{ note.completedTaskCount }}
             /
             {{ note.taskCount }}
@@ -811,7 +814,9 @@ onMounted(
           {{ note.collectionName }}
         </span>
 
-        <span>
+        <span
+          v-if="note.taskCount > 0"
+        >
           {{ note.completedTaskCount }}
           /
           {{ note.taskCount }}
@@ -896,7 +901,9 @@ onMounted(
             }}
           </span>
 
-          <small>
+          <small
+            v-if="note.taskCount > 0"
+          >
             {{ note.completedTaskCount }}
             /
             {{ note.taskCount }}

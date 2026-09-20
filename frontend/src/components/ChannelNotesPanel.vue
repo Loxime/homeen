@@ -285,7 +285,10 @@ onMounted(() => {
         @click="openNote(note)"
       >
         <div class="note-card-top">
-          <span class="task-ratio">
+          <span
+            v-if="note.taskCount > 0"
+            class="task-ratio"
+          >
             {{
               note.completedTaskCount
             }}
