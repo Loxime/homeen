@@ -11,8 +11,6 @@ import {
 
 import { api } from '../services/api'
 
-import PomodoroGardenVisual from '../components/PomodoroGardenVisual.vue'
-
 import {
   formatClock,
   formatDate,
@@ -252,9 +250,8 @@ onMounted(async () => {
         </h1>
 
         <p class="muted">
-          Votre temps de concentration
-          fait grandir votre espace,
-          session après session.
+          Suivez vos sessions de concentration
+          et adaptez progressivement leur durée.
         </p>
       </div>
     </header>
@@ -270,77 +267,25 @@ onMounted(async () => {
       v-if="insights"
       class="focus-garden panel"
     >
-      <div class="focus-garden-visual">
-        <PomodoroGardenVisual
-          :total-focus-minutes="
-            insights.totalFocusMinutes
-          "
-          :current-session-seconds="
-            store.live?.focusSeconds ?? 0
-          "
-          :max-growth-minutes="
-            store.active?.workMinutes
-            ?? workMinutes
-          "
-          :recommended-session-minutes="
-            insights.recommendedMinutes
-          "
-          :feedback-count="
-            insights.ratingCount
-          "
-        />
-
+      <div class="ideal-duration">
         <div>
           <span class="focus-garden-kicker">
-            Votre progression
+            Concentration cumulée
           </span>
 
-          <h2>
-            {{ insights.stageLabel }}
-          </h2>
-
-          <p class="muted">
+          <strong>
             {{
               formatDuration(
                 insights.totalFocusSeconds,
               )
             }}
-            de concentration cumulée
+          </strong>
+
+          <p class="muted">
+            Temps total enregistré dans
+            vos sessions Pomodoro.
           </p>
         </div>
-      </div>
-
-      <div
-        v-if="
-          insights.nextStageMinutes
-          !== null
-        "
-        class="focus-garden-progress"
-      >
-        <div class="focus-garden-track">
-          <span
-            :style="{
-              width:
-                `${insights.progressPercent}%`,
-            }"
-          />
-        </div>
-
-        <small>
-          Prochaine étape à
-          {{
-            insights.nextStageMinutes
-          }}
-          min de concentration cumulée
-        </small>
-      </div>
-
-      <div
-        v-else
-        class="focus-garden-complete"
-      >
-        Votre arbre a atteint sa taille maximale.
-        Continuez à accumuler du temps de concentration.
       </div>
 
       <div class="ideal-duration">
