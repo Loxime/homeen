@@ -20,11 +20,14 @@
 | Grid display | Notes grid |
 | List display | Notes list |
 | Random whiteboard | Randomized/jittered board with shuffle |
-| Create / delete task | Task API + note editor |
-| Task belongs to one note | Non-null `task.note_id`; cascade on purge |
-| Many tasks per note | One-to-many database relationship |
+| Create / delete task | Note task API + Project native task API |
+| Note-bound task scope | `task.note_id` set while `project_id` and `workflow_stage_id` remain null |
+| Project-native task scope | `task.project_id` + `workflow_stage_id` set while `note_id` remains null |
+| Many tasks per note | One-to-many note/task relationship |
+| Project task workflow | Configurable ordered workflow stages with persistent task positions |
+| Project task drag and drop | Atomic full-board reorder endpoint + native HTML5 drag and drop |
 | Task max 4000 characters | HTML maxlength, backend validation, database CHECK |
-| Task priority and status | Task metadata API + editor/fullscreen task view |
+| Task priority and status | Task metadata API + editor/fullscreen task view; Project status remains independent from workflow stage |
 | Task start / due dates | Optional PostgreSQL `DATE` fields + validation |
 | Pomodoro work time configurable | Integer input and saved preset |
 | Work minimum 5 minutes | Frontend, backend and database CHECK |
@@ -40,6 +43,11 @@
 | Trash purge every 30 days | Daily scheduler + `app:trash:purge` |
 | No reminder | No reminder/notification subsystem |
 | Global search | Top bar + `/api/search` note/task results + PostgreSQL ILIKE |
+| Projects | Member-based shared workspace with owner/admin/member roles |
+| Project invitations | Invite, accept, reject, role management, member removal and leave flows |
+| Shared Project notes | Project membership grants note access, lifecycle actions and shared image visibility |
+| Project workflow | Up to 20 ordered configurable stages per Project |
+| Legacy Channels | Frontend retired; backend/tables retained temporarily as migration compatibility |
 | Dockerized | PHP, PostgreSQL, Vite, Nginx, scheduler services |
 | `.env` variables | Root `.env`; `.env.example` committed |
 | Secrets excluded from Git | `.gitignore` ignores `.env*` except example |

@@ -58,9 +58,11 @@ If `origin` already exists, use `git remote set-url origin https://github.com/Lo
 - Reusable colored tags shared by notes and tasks; multiple tags can be attached to each note or task.
 - Keep-style note experience: pinned/other sections, quick card actions, first-image card previews, inline text composer, image-note shortcut and task-list shortcut.
 - Note views: grid, list and randomized whiteboard.
-- Private image library with reusable image assets attachable to notes.
-- Tasks belong to exactly one note; priority, status, position, optional start/due dates, reusable tags, completion state, and content up to 4000 characters.
-- Global search across note title/content, collections and tags, plus task content and tags.
+- Private image library with reusable image assets attachable to notes, including shared Project notes.
+- Projects with members, invitations, owner/admin/member roles, configurable workflow stages, shared notes and a persistent task board.
+- Tasks can belong either to a note or directly to a Project workflow stage; priority, status, position, optional start/due dates, reusable tags, completion state, and content up to 4000 characters.
+- Project task boards support persistent cross-column drag and drop plus explicit workflow stage management.
+- Global search across personal note title/content, collections and tags, plus personal task content and tags.
 - Infinite Pomodoro: configurable work duration (minimum 5 minutes, no maximum), fixed 5-minute break, saved presets, quick relaunch, tab countdown, audible phase transitions.
 - Statistics: Pomodoro sessions, start/stop times, focused time, task completions, most-completed tag, notes, active application time, daily evolution and period comparisons.
 - No reminders or notifications.

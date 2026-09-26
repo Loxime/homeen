@@ -7,11 +7,15 @@ Homeen is a private productivity application. It intentionally does not implemen
 ## Domain model
 
 - `tag`: user-owned reusable classification with a six-digit hexadecimal color.
-- `note`: text note with archive/trash timestamps, Keep-style pin state and color, optional collection, and zero or more tags through `note_tag`.
-- `note_collection`: lightweight user-owned single-assignment grouping for notes. It remains distinct from the richer project/workflow model planned separately.
-- `image_asset`: private reusable image owned by one user.
-- `note_image`: many-to-many attachment between notes and private image assets.
-- `task`: belongs to exactly one note; content up to 4000 characters, priority, status, position, optional start/due dates, and zero or more tags through `task_tag`.
+- `project`: shared workspace with metadata, archive state and optional provenance from a legacy collection or Channel.
+- `project_member`: Project membership with exactly the application roles `owner`, `admin` and `member`; active Projects created by the application have one owner.
+- `project_invitation`: pending invitation to join a Project.
+- `project_workflow_stage`: ordered configurable workflow column belonging to one Project.
+- `note`: text note with archive/trash timestamps, Keep-style pin state and color, optional Project assignment, legacy collection/Channel compatibility fields, and zero or more tags through `note_tag`.
+- `note_collection`: legacy lightweight grouping retained temporarily for migration and API compatibility; Projects are the current richer organization model.
+- `image_asset`: private reusable image owned by one user. Project membership may grant read access when the image is attached to a shared Project note, while asset ownership remains private.
+- `note_image`: many-to-many attachment between notes and reusable image assets.
+- `task`: has exactly one scope: either a note-bound task (`note_id`) or a native Project task (`project_id` + `workflow_stage_id`). It stores content up to 4000 characters, priority, status, position, optional start/due dates, completion state and zero or more tags through `task_tag`.
 - `pomodoro_preset`: unique work duration in minutes. Work duration is at least 5 minutes and has no application-defined upper bound.
 - `pomodoro_session`: one launch-to-stop interval. Only one session may run at once.
 - `activity_event`: immutable event log used for historical progress metrics.
@@ -19,6 +23,8 @@ Homeen is a private productivity application. It intentionally does not implemen
 - `app_usage_slice`: short active-time slices used for accurate daily/monthly aggregation.
 
 The legacy `label` table and `note.label_id` column are retained temporarily as a rollback compatibility layer. They are no longer exposed by the application API or frontend.
+
+Legacy Channel tables and backend endpoints are also retained temporarily as a migration compatibility layer. The Channel frontend has been retired in favor of Projects. Existing Channel notes, memberships and pending invitations are migrated into Projects by the Sprint 3 migrations before the legacy backend is removed in a later compatibility cleanup.
 
 ## Note lifecycle
 
