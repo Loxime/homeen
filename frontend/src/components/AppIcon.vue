@@ -19,6 +19,7 @@ defineProps<{
     | 'list'
     | 'whiteboard'
     | 'copy'
+    | 'pin'
     | 'check'
     | 'close'
   size?: number
@@ -141,6 +142,11 @@ defineProps<{
     <template v-else-if="name === 'copy'">
       <rect x="8" y="8" width="11" height="11" rx="2" />
       <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
+    </template>
+
+    <template v-else-if="name === 'pin'">
+      <path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z" />
+      <path d="M12 14v7" />
     </template>
 
     <template v-else-if="name === 'check'">

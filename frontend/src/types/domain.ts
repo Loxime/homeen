@@ -60,6 +60,8 @@ export interface NoteSummary {
   id: number
   title: string
   content: string
+  isPinned: boolean
+  color: string
   tags: Tag[]
   collectionId: number | null
   collectionName: string | null

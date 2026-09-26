@@ -584,6 +584,187 @@ SQL,
         );
     }
 
+    public function testNotesSupportKeepAppearanceAndPinnedOrdering(): void
+    {
+        $plain = $this->jsonRequest(
+            'POST',
+            '/api/notes',
+            [
+                'title' =>
+                    'Plain Keep note',
+
+                'content' =>
+                    'Not pinned',
+
+                'color' =>
+                    '#FFF3BF',
+            ],
+        );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertFalse(
+            $plain['isPinned'],
+        );
+
+        self::assertSame(
+            '#FFF3BF',
+            $plain['color'],
+        );
+
+        $pinned = $this->jsonRequest(
+            'POST',
+            '/api/notes',
+            [
+                'title' =>
+                    'Pinned Keep note',
+
+                'content' =>
+                    'Pinned first',
+
+                'isPinned' => true,
+
+                'color' =>
+                    '#D3F9D8',
+            ],
+        );
+
+        self::assertTrue(
+            $pinned['isPinned'],
+        );
+
+        self::assertSame(
+            '#D3F9D8',
+            $pinned['color'],
+        );
+
+        $list = $this->jsonRequest(
+            'GET',
+            '/api/notes',
+        );
+
+        self::assertSame(
+            $pinned['id'],
+            $list['notes'][0]['id'],
+        );
+
+        /*
+         * Existing clients may update a note
+         * without knowing about Keep appearance.
+         * Pin and color must be preserved.
+         */
+        $preserved = $this->jsonRequest(
+            'PUT',
+            sprintf(
+                '/api/notes/%d',
+                $pinned['id'],
+            ),
+            [
+                'title' =>
+                    'Pinned Keep note updated',
+
+                'content' =>
+                    'Still pinned',
+
+                'tagIds' => [],
+            ],
+        );
+
+        self::assertTrue(
+            $preserved['isPinned'],
+        );
+
+        self::assertSame(
+            '#D3F9D8',
+            $preserved['color'],
+        );
+
+        $updated = $this->jsonRequest(
+            'PUT',
+            sprintf(
+                '/api/notes/%d',
+                $plain['id'],
+            ),
+            [
+                'title' =>
+                    'Plain Keep note',
+
+                'content' =>
+                    'Now pinned',
+
+                'tagIds' => [],
+
+                'isPinned' => true,
+
+                'color' =>
+                    '#C5F6FA',
+            ],
+        );
+
+        self::assertTrue(
+            $updated['isPinned'],
+        );
+
+        self::assertSame(
+            '#C5F6FA',
+            $updated['color'],
+        );
+
+        $invalid = $this->jsonRequest(
+            'PUT',
+            sprintf(
+                '/api/notes/%d',
+                $plain['id'],
+            ),
+            [
+                'title' =>
+                    'Plain Keep note',
+
+                'content' =>
+                    'Invalid color',
+
+                'tagIds' => [],
+
+                'color' =>
+                    'yellow',
+            ],
+        );
+
+        self::assertSame(
+            422,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'Note color must be a six-digit hexadecimal color.',
+            $invalid['error'],
+        );
+
+        $duplicate = $this->jsonRequest(
+            'POST',
+            sprintf(
+                '/api/notes/%d/duplicate',
+                $pinned['id'],
+            ),
+        );
+
+        self::assertFalse(
+            $duplicate['isPinned'],
+        );
+
+        self::assertSame(
+            '#D3F9D8',
+            $duplicate['color'],
+        );
+    }
+
     public function testNotesSupportMultipleReusableTags(): void
     {
         $firstTag = $this->createTag(

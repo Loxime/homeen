@@ -446,7 +446,7 @@ onMounted(
           "
           class="muted"
         >
-          Projet :
+          Collection :
           {{ activeCollection.name }}
         </p>
       </div>
@@ -520,7 +520,7 @@ onMounted(
 
           <p class="muted">
             Regroupez vos notes
-            par projet ou par thème.
+            par thème ou par usage.
           </p>
         </div>
 
@@ -549,7 +549,7 @@ onMounted(
         <input
           v-model.trim="collectionName"
           maxlength="80"
-          placeholder="Nom du projet ou de la collection"
+          placeholder="Nom de la collection"
           autofocus
           required
         />
@@ -721,6 +721,14 @@ onMounted(
         v-for="note in notes"
         :key="note.id"
         class="note-card"
+        :class="{
+          pinned:
+            note.isPinned,
+        }"
+        :style="{
+          background:
+            note.color,
+        }"
         @click="openNote(note)"
       >
         <div class="note-card-top">
@@ -752,14 +760,22 @@ onMounted(
             </span>
           </div>
 
-          <span
-            v-if="note.taskCount > 0"
-            class="task-ratio"
-          >
+          <div class="note-card-status">
+            <AppIcon
+              v-if="note.isPinned"
+              name="pin"
+              :size="16"
+            />
+
+            <span
+              v-if="note.taskCount > 0"
+              class="task-ratio"
+            >
             {{ note.completedTaskCount }}
             /
             {{ note.taskCount }}
-          </span>
+            </span>
+          </div>
         </div>
 
         <h2>
@@ -801,10 +817,24 @@ onMounted(
         v-for="note in notes"
         :key="note.id"
         class="note-list-row"
+        :class="{
+          pinned:
+            note.isPinned,
+        }"
+        :style="{
+          background:
+            note.color,
+        }"
         @click="openNote(note)"
       >
         <div class="list-title">
           <strong>
+            <AppIcon
+              v-if="note.isPinned"
+              name="pin"
+              :size="14"
+            />
+
             {{
               note.title
               || 'Sans titre'
@@ -881,12 +911,14 @@ onMounted(
           v-for="(note, index) in notes"
           :key="note.id"
           class="board-note"
-          :style="
-            boardPosition(
+          :style="{
+            ...boardPosition(
               note,
               index,
-            )
-          "
+            ),
+            background:
+              note.color,
+          }"
           @click="openNote(note)"
         >
           <span
@@ -902,6 +934,12 @@ onMounted(
           </span>
 
           <strong>
+            <AppIcon
+              v-if="note.isPinned"
+              name="pin"
+              :size="14"
+            />
+
             {{
               note.title
               || 'Sans titre'

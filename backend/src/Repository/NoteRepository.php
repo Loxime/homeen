@@ -8,6 +8,7 @@ use App\Service\ActivityLogger;
 use App\Service\CurrentUser;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 
 final readonly class NoteRepository
 {
@@ -100,6 +101,8 @@ SELECT
     n.id,
     n.title,
     n.content,
+    n.is_pinned AS "isPinned",
+    n.color,
     n.collection_id AS "collectionId",
     collection.name AS "collectionName",
     collection.color AS "collectionColor",
@@ -119,7 +122,10 @@ LEFT JOIN task t
     ON t.note_id = n.id
 WHERE $where
 GROUP BY n.id, collection.id
-ORDER BY n.updated_at DESC, n.id DESC
+ORDER BY
+    n.is_pinned DESC,
+    n.updated_at DESC,
+    n.id DESC
 SQL;
 
         $rows = $this->connection
@@ -146,6 +152,8 @@ SELECT
     n.id,
     n.title,
     n.content,
+    n.is_pinned AS "isPinned",
+    n.color,
     n.collection_id AS "collectionId",
     collection.name AS "collectionName",
     collection.color AS "collectionColor",
@@ -180,6 +188,12 @@ SQL,
 
         $note['id'] = (int) $note['id'];
 
+        $note['isPinned'] =
+            filter_var(
+                $note['isPinned'],
+                FILTER_VALIDATE_BOOLEAN,
+            );
+
         $note['collectionId'] =
             $note['collectionId'] !== null
                 ? (int) $note['collectionId']
@@ -198,8 +212,15 @@ SQL,
         string $content,
         array $tagIds,
         ?int $collectionId,
+        bool $isPinned,
+        string $color,
     ): array {
         $this->validateTitle($title);
+
+        $color =
+            $this->validateColor(
+                $color
+            );
 
         $tagIds =
             $this->validateTags($tagIds);
@@ -217,6 +238,8 @@ SQL,
                     $content,
                     $tagIds,
                     $collectionId,
+                    $isPinned,
+                    $color,
                     $userId,
                 ): array {
                     $id = $this->connection
@@ -226,13 +249,17 @@ INSERT INTO note (
     user_id,
     title,
     content,
-    collection_id
+    collection_id,
+    is_pinned,
+    color
 )
 VALUES (
     :userId,
     :title,
     :content,
-    :collectionId
+    :collectionId,
+    :isPinned,
+    :color
 )
 RETURNING id
 SQL,
@@ -242,6 +269,16 @@ SQL,
                                 'content' => $content,
                                 'collectionId' =>
                                     $collectionId,
+
+                                'isPinned' =>
+                                    $isPinned,
+
+                                'color' =>
+                                    $color,
+                            ],
+                            [
+                                'isPinned' =>
+                                    ParameterType::BOOLEAN,
                             ],
                         );
 
@@ -266,6 +303,12 @@ SQL,
                             'tagIds' => $tagIds,
                             'collectionId' =>
                                 $collectionId,
+
+                            'isPinned' =>
+                                $isPinned,
+
+                            'color' =>
+                                $color,
                         ],
                     );
 
@@ -287,8 +330,22 @@ SQL,
         string $content,
         array $tagIds,
         ?int $collectionId,
+        ?bool $isPinned,
+        ?string $color,
     ): array {
         $this->validateTitle($title);
+
+        $current =
+            $this->get($id);
+
+        $isPinned ??=
+            (bool) $current['isPinned'];
+
+        $color =
+            $this->validateColor(
+                $color
+                ?? (string) $current['color']
+            );
 
         $tagIds =
             $this->validateTags($tagIds);
@@ -307,6 +364,8 @@ SQL,
                     $content,
                     $tagIds,
                     $collectionId,
+                    $isPinned,
+                    $color,
                     $userId,
                 ): array {
                     $affected =
@@ -317,6 +376,8 @@ UPDATE note
 SET title = :title,
     content = :content,
     collection_id = :collectionId,
+    is_pinned = :isPinned,
+    color = :color,
     updated_at = NOW()
 WHERE id = :id
   AND user_id = :userId
@@ -332,6 +393,16 @@ SQL,
                                         $content,
                                     'collectionId' =>
                                         $collectionId,
+
+                                    'isPinned' =>
+                                        $isPinned,
+
+                                    'color' =>
+                                        $color,
+                                ],
+                                [
+                                    'isPinned' =>
+                                        ParameterType::BOOLEAN,
                                 ],
                             );
 
@@ -354,6 +425,12 @@ SQL,
                             'tagIds' => $tagIds,
                             'collectionId' =>
                                 $collectionId,
+
+                            'isPinned' =>
+                                $isPinned,
+
+                            'color' =>
+                                $color,
                         ],
                     );
 
@@ -390,13 +467,15 @@ INSERT INTO note (
     user_id,
     title,
     content,
-    collection_id
+    collection_id,
+    color
 )
 VALUES (
     :userId,
     :title,
     :content,
-    :collectionId
+    :collectionId,
+    :color
 )
 RETURNING id
 SQL,
@@ -420,6 +499,9 @@ SQL,
                                         !== null
                                             ? (int) $original['collectionId']
                                             : null,
+
+                                'color' =>
+                                    (string) $original['color'],
                             ],
                         );
 
@@ -669,6 +751,12 @@ SQL,
         $row['id'] =
             (int) $row['id'];
 
+        $row['isPinned'] =
+            filter_var(
+                $row['isPinned'],
+                FILTER_VALIDATE_BOOLEAN,
+            );
+
         $row['tags'] =
             $this->tagsForNote(
                 $row['id']
@@ -701,6 +789,23 @@ SQL,
                 'Note title cannot exceed 255 characters.'
             );
         }
+    }
+
+    private function validateColor(
+        string $color,
+    ): string {
+        if (
+            preg_match(
+                '/^#[0-9A-Fa-f]{6}$/',
+                $color,
+            ) !== 1
+        ) {
+            throw new \InvalidArgumentException(
+                'Note color must be a six-digit hexadecimal color.'
+            );
+        }
+
+        return strtoupper($color);
     }
 
     private function validateCollection(

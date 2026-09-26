@@ -39,6 +39,47 @@ const emit = defineEmits<{
 const title = ref('')
 const content = ref('')
 
+const isPinned =
+  ref(false)
+
+const noteColor =
+  ref('#FFFFFF')
+
+const noteColors = [
+  {
+    label: 'Blanc',
+    value: '#FFFFFF',
+  },
+  {
+    label: 'Rouge doux',
+    value: '#FADBD8',
+  },
+  {
+    label: 'Orange doux',
+    value: '#FDEBD0',
+  },
+  {
+    label: 'Jaune doux',
+    value: '#FFF3BF',
+  },
+  {
+    label: 'Vert doux',
+    value: '#D3F9D8',
+  },
+  {
+    label: 'Turquoise doux',
+    value: '#C5F6FA',
+  },
+  {
+    label: 'Bleu doux',
+    value: '#D6E4FF',
+  },
+  {
+    label: 'Violet doux',
+    value: '#E5DBFF',
+  },
+] as const
+
 const selectedNoteTagIds =
   ref<number[]>([])
 
@@ -128,6 +169,12 @@ watch(
     content.value =
       value?.content ?? ''
 
+    isPinned.value =
+      value?.isPinned ?? false
+
+    noteColor.value =
+      value?.color ?? '#FFFFFF'
+
     selectedNoteTagIds.value =
       value?.tags.map(
         tag => tag.id,
@@ -168,6 +215,10 @@ Promise<Note | null> {
       JSON.stringify({
         title: title.value,
         content: content.value,
+        isPinned:
+          isPinned.value,
+        color:
+          noteColor.value,
         tagIds:
           selectedNoteTagIds.value,
         collectionId:
@@ -745,7 +796,13 @@ async function restore(): Promise<void> {
 </script>
 
 <template>
-  <div class="note-editor keep-note-editor">
+  <div
+    class="note-editor keep-note-editor"
+    :style="{
+      '--note-color':
+        noteColor,
+    }"
+  >
     <template v-if="isTrash">
       <div class="trash-message">
         <strong>
@@ -777,6 +834,96 @@ async function restore(): Promise<void> {
 
     <template v-else>
       <div class="keep-note-main">
+        <div class="keep-note-appearance">
+          <button
+            type="button"
+            class="keep-pin-button"
+            :class="{
+              active:
+                isPinned,
+            }"
+            :title="
+              isPinned
+                ? 'Désépingler'
+                : 'Épingler'
+            "
+            :aria-label="
+              isPinned
+                ? 'Désépingler la note'
+                : 'Épingler la note'
+            "
+            @click="
+              isPinned = !isPinned
+            "
+          >
+            <AppIcon
+              name="pin"
+              :size="18"
+            />
+
+            <span>
+              {{
+                isPinned
+                  ? 'Épinglée'
+                  : 'Épingler'
+              }}
+            </span>
+          </button>
+
+          <div
+            class="keep-color-palette"
+            aria-label="Couleur de la note"
+          >
+            <button
+              v-for="choice in noteColors"
+              :key="choice.value"
+              type="button"
+              class="keep-color-swatch"
+              :class="{
+                active:
+                  noteColor
+                  === choice.value,
+              }"
+              :style="{
+                background:
+                  choice.value,
+              }"
+              :title="choice.label"
+              :aria-label="
+                `Couleur ${choice.label}`
+              "
+              @click="
+                noteColor =
+                  choice.value
+              "
+            >
+              <AppIcon
+                v-if="
+                  noteColor
+                  === choice.value
+                "
+                name="check"
+                :size="14"
+              />
+            </button>
+          </div>
+
+          <label
+            class="keep-custom-color"
+            title="Couleur personnalisée"
+          >
+            <span>
+              Personnalisée
+            </span>
+
+            <input
+              v-model="noteColor"
+              type="color"
+              aria-label="Couleur personnalisée de la note"
+            />
+          </label>
+        </div>
+
         <input
           v-model="title"
           class="keep-title-input"
@@ -998,7 +1145,7 @@ async function restore(): Promise<void> {
         <div class="note-organization-grid">
           <label>
             <span class="keep-label-caption">
-              Collection / projet
+              Collection
             </span>
 
             <select

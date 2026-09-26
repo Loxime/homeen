@@ -65,6 +65,16 @@ final readonly class NoteController
                 isset($data['collectionId'])
                     ? (int) $data['collectionId']
                     : null,
+
+                $this->booleanValue(
+                    $data,
+                    'isPinned',
+                ) ?? false,
+
+                (string) (
+                    $data['color']
+                    ?? '#FFFFFF'
+                ),
             ),
             201,
         );
@@ -85,6 +95,15 @@ final readonly class NoteController
                 ),
                 isset($data['collectionId'])
                     ? (int) $data['collectionId']
+                    : null,
+
+                $this->booleanValue(
+                    $data,
+                    'isPinned',
+                ),
+
+                isset($data['color'])
+                    ? (string) $data['color']
                     : null,
             ),
         );
@@ -120,6 +139,31 @@ final readonly class NoteController
     {
         return new JsonResponse($this->notes->restore($id));
     }
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function booleanValue(
+        array $data,
+        string $field,
+    ): ?bool {
+        if (
+            !array_key_exists(
+                $field,
+                $data,
+            )
+        ) {
+            return null;
+        }
+
+        if (!is_bool($data[$field])) {
+            throw new \InvalidArgumentException(
+                $field.' must be a boolean.'
+            );
+        }
+
+        return $data[$field];
+    }
+
     /**
      * @return list<int>
      */
