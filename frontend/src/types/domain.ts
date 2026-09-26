@@ -29,6 +29,35 @@ export interface Project {
   archivedAt: string | null
 }
 
+export interface ProjectWorkflowStage {
+  id: number
+  projectId: number
+  name: string
+  position: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProjectTask {
+  id: number
+  noteId: null
+  projectId: number
+  workflowStageId: number
+  workflowStageName: string
+  workflowStagePosition: number
+  content: string
+  priority: TaskPriority
+  status: TaskStatus
+  position: number
+  startDate: string | null
+  dueDate: string | null
+  isCompleted: boolean
+  completedAt: string | null
+  createdAt: string
+  updatedAt: string
+  tags: Tag[]
+}
+
 export interface NoteCollection {
   id: number
   name: string

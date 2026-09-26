@@ -1038,13 +1038,9 @@ onMounted(
 
         <RouterLink
           class="ui-button ui-button--primary project-open"
-          :to="{
-            path: '/notes',
-            query: {
-              projectId:
-                String(project.id),
-            },
-          }"
+          :to="
+            `/projects/${project.id}`
+          "
         >
           Ouvrir le projet
         </RouterLink>
