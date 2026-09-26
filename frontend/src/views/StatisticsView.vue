@@ -755,13 +755,13 @@ onMounted(
 
           <div class="insight-row">
             <span>
-              Libellé le plus terminé
+              Tag le plus terminé
             </span>
 
             <strong>
               {{
-                data.mostCompletedLabel
-                  ? `${data.mostCompletedLabel.labelName} (${data.mostCompletedLabel.count})`
+                data.mostCompletedTag
+                  ? `${data.mostCompletedTag.tagName} (${data.mostCompletedTag.count})`
                   : '—'
               }}
             </strong>

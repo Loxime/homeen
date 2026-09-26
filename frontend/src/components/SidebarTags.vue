@@ -153,7 +153,7 @@ async function deleteTag(
 ): Promise<void> {
   const confirmed =
     window.confirm(
-      `Supprimer le tag « ${tag.name} » ? Il sera retiré des tâches associées.`,
+      `Supprimer le tag « ${tag.name} » ? Il sera retiré des notes et tâches associées.`,
     )
 
   if (
@@ -338,10 +338,13 @@ onMounted(
           <span
             class="sidebar-label-count"
             :title="
-              `${tag.taskCount ?? 0} tâche${(tag.taskCount ?? 0) > 1 ? 's' : ''}`
+              `${tag.noteCount ?? 0} note${(tag.noteCount ?? 0) > 1 ? 's' : ''} · ${tag.taskCount ?? 0} tâche${(tag.taskCount ?? 0) > 1 ? 's' : ''}`
             "
           >
-            {{ tag.taskCount ?? 0 }}
+            {{
+              (tag.noteCount ?? 0)
+              + (tag.taskCount ?? 0)
+            }}
           </span>
 
           <button

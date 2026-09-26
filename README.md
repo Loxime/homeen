@@ -1,6 +1,6 @@
 # Homeen
 
-Homeen is a private, single-user productivity application combining notes, labels, tasks, an infinite Pomodoro loop, and monthly/daily progression analytics.
+Homeen is a private productivity application combining notes, reusable tags, tasks, an infinite Pomodoro loop, and progression analytics.
 
 ## LOCAL environment
 
@@ -55,12 +55,12 @@ If `origin` already exists, use `git remote set-url origin https://github.com/Lo
 ## Functional scope
 
 - Notes: create, edit, duplicate, archive, trash, restore; automatic permanent deletion after 30 days.
-- One optional label per note; label CRUD and editable hex color.
+- Reusable colored tags shared by notes and tasks; multiple tags can be attached to each note or task.
 - Note views: grid, list, randomized whiteboard.
-- Tasks belong to exactly one note; create, complete/uncomplete, delete; 255-character maximum.
-- Global word search across note title/content, task content, and label name.
+- Tasks belong to exactly one note; priority, status, position, optional start/due dates, reusable tags, completion state, and content up to 4000 characters.
+- Global search across note title/content, collections and tags, plus task content and tags.
 - Infinite Pomodoro: configurable work duration (minimum 5 minutes, no maximum), fixed 5-minute break, saved presets, quick relaunch, tab countdown, audible phase transitions.
-- Statistics: Pomodoro sessions, start/stop times, focused time, task completions, most-completed label, notes, active application time, daily evolution and month-over-month comparisons.
+- Statistics: Pomodoro sessions, start/stop times, focused time, task completions, most-completed tag, notes, active application time, daily evolution and period comparisons.
 - No reminders or notifications.
 - Private access gate backed by `ACCESS_KEY`; the secret is never sent to the browser after authentication.
 

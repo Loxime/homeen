@@ -58,9 +58,10 @@ final readonly class NoteController
             $this->notes->create(
                 (string) ($data['title'] ?? ''),
                 (string) ($data['content'] ?? ''),
-                isset($data['labelId'])
-                    ? (int) $data['labelId']
-                    : null,
+                $this->tagIds(
+                    $data['tagIds']
+                    ?? [],
+                ),
                 isset($data['collectionId'])
                     ? (int) $data['collectionId']
                     : null,
@@ -78,9 +79,10 @@ final readonly class NoteController
                 $id,
                 (string) ($data['title'] ?? ''),
                 (string) ($data['content'] ?? ''),
-                isset($data['labelId'])
-                    ? (int) $data['labelId']
-                    : null,
+                $this->tagIds(
+                    $data['tagIds']
+                    ?? [],
+                ),
                 isset($data['collectionId'])
                     ? (int) $data['collectionId']
                     : null,
@@ -118,4 +120,39 @@ final readonly class NoteController
     {
         return new JsonResponse($this->notes->restore($id));
     }
+    /**
+     * @return list<int>
+     */
+    private function tagIds(
+        mixed $value,
+    ): array {
+        if (!is_array($value)) {
+            throw new \InvalidArgumentException(
+                'tagIds must be an array.'
+            );
+        }
+
+        $ids = [];
+
+        foreach ($value as $item) {
+            if (
+                !is_int($item)
+                && !(
+                    is_string($item)
+                    && ctype_digit($item)
+                )
+            ) {
+                throw new \InvalidArgumentException(
+                    'Tag identifiers must be integers.'
+                );
+            }
+
+            $ids[] = (int) $item;
+        }
+
+        return array_values(
+            array_unique($ids),
+        );
+    }
+
 }

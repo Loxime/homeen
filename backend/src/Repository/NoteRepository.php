@@ -6,6 +6,7 @@ namespace App\Repository;
 
 use App\Service\ActivityLogger;
 use App\Service\CurrentUser;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 final readonly class NoteRepository
@@ -71,7 +72,16 @@ final readonly class NoteRepository
  AND (
     n.title ILIKE :query
     OR n.content ILIKE :query
-    OR l.name ILIKE :query
+    OR EXISTS (
+        SELECT 1
+        FROM note_tag search_note_tag
+        INNER JOIN tag search_note_tag_value
+            ON search_note_tag_value.id =
+                search_note_tag.tag_id
+        WHERE search_note_tag.note_id = n.id
+          AND search_note_tag_value.user_id = :userId
+          AND search_note_tag_value.name ILIKE :query
+    )
     OR EXISTS (
         SELECT 1
         FROM task search_task
@@ -90,9 +100,6 @@ SELECT
     n.id,
     n.title,
     n.content,
-    n.label_id AS "labelId",
-    l.name AS "labelName",
-    l.color AS "labelColor",
     n.collection_id AS "collectionId",
     collection.name AS "collectionName",
     collection.color AS "collectionColor",
@@ -105,16 +112,13 @@ SELECT
         FILTER (WHERE t.is_completed = TRUE)
         AS "completedTaskCount"
 FROM note n
-LEFT JOIN label l
-    ON l.id = n.label_id
-   AND l.user_id = :userId
 LEFT JOIN note_collection collection
     ON collection.id = n.collection_id
    AND collection.user_id = :userId
 LEFT JOIN task t
     ON t.note_id = n.id
 WHERE $where
-GROUP BY n.id, l.id, collection.id
+GROUP BY n.id, collection.id
 ORDER BY n.updated_at DESC, n.id DESC
 SQL;
 
@@ -142,9 +146,6 @@ SELECT
     n.id,
     n.title,
     n.content,
-    n.label_id AS "labelId",
-    l.name AS "labelName",
-    l.color AS "labelColor",
     n.collection_id AS "collectionId",
     collection.name AS "collectionName",
     collection.color AS "collectionColor",
@@ -153,9 +154,6 @@ SELECT
     n.archived_at AS "archivedAt",
     n.deleted_at AS "deletedAt"
 FROM note n
-LEFT JOIN label l
-    ON l.id = n.label_id
-   AND l.user_id = :userId
 LEFT JOIN note_collection collection
     ON collection.id = n.collection_id
    AND collection.user_id = :userId
@@ -177,12 +175,10 @@ SQL,
         $note['tasks'] =
             $this->tasks->forNote($id);
 
-        $note['id'] = (int) $note['id'];
+        $note['tags'] =
+            $this->tagsForNote($id);
 
-        $note['labelId'] =
-            $note['labelId'] !== null
-                ? (int) $note['labelId']
-                : null;
+        $note['id'] = (int) $note['id'];
 
         $note['collectionId'] =
             $note['collectionId'] !== null
@@ -192,129 +188,178 @@ SQL,
         return $note;
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param list<int> $tagIds
+     *
+     * @return array<string, mixed>
+     */
     public function create(
         string $title,
         string $content,
-        ?int $labelId,
+        array $tagIds,
         ?int $collectionId,
     ): array {
         $this->validateTitle($title);
-        $this->validateLabel($labelId);
+
+        $tagIds =
+            $this->validateTags($tagIds);
+
         $this->validateCollection(
             $collectionId
         );
 
         $userId = $this->currentUser->id();
 
-        $id = $this->connection->fetchOne(
-            <<<'SQL'
+        return $this->connection
+            ->transactional(
+                function () use (
+                    $title,
+                    $content,
+                    $tagIds,
+                    $collectionId,
+                    $userId,
+                ): array {
+                    $id = $this->connection
+                        ->fetchOne(
+                            <<<'SQL'
 INSERT INTO note (
     user_id,
     title,
     content,
-    label_id,
     collection_id
 )
 VALUES (
     :userId,
     :title,
     :content,
-    :labelId,
     :collectionId
 )
 RETURNING id
 SQL,
-            [
-                'userId' => $userId,
-                'title' => trim($title),
-                'content' => $content,
-                'labelId' => $labelId,
-                'collectionId' =>
-                    $collectionId,
-            ],
-        );
+                            [
+                                'userId' => $userId,
+                                'title' => trim($title),
+                                'content' => $content,
+                                'collectionId' =>
+                                    $collectionId,
+                            ],
+                        );
 
-        if ($id === false) {
-            throw new \RuntimeException(
-                'Unable to create note.'
+                    if ($id === false) {
+                        throw new \RuntimeException(
+                            'Unable to create note.'
+                        );
+                    }
+
+                    $noteId = (int) $id;
+
+                    $this->syncTags(
+                        $noteId,
+                        $tagIds,
+                    );
+
+                    $this->logger->log(
+                        'NOTE_CREATED',
+                        'note',
+                        $noteId,
+                        [
+                            'tagIds' => $tagIds,
+                            'collectionId' =>
+                                $collectionId,
+                        ],
+                    );
+
+                    return $this->get(
+                        $noteId
+                    );
+                },
             );
-        }
-
-        $noteId = (int) $id;
-
-        $this->logger->log(
-            'NOTE_CREATED',
-            'note',
-            $noteId,
-            [
-                'labelId' => $labelId,
-                'collectionId' =>
-                    $collectionId,
-            ],
-        );
-
-        return $this->get($noteId);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param list<int> $tagIds
+     *
+     * @return array<string, mixed>
+     */
     public function update(
         int $id,
         string $title,
         string $content,
-        ?int $labelId,
+        array $tagIds,
         ?int $collectionId,
     ): array {
         $this->validateTitle($title);
-        $this->validateLabel($labelId);
+
+        $tagIds =
+            $this->validateTags($tagIds);
+
         $this->validateCollection(
             $collectionId
         );
 
         $userId = $this->currentUser->id();
 
-        $affected = $this->connection
-            ->executeStatement(
-                <<<'SQL'
+        return $this->connection
+            ->transactional(
+                function () use (
+                    $id,
+                    $title,
+                    $content,
+                    $tagIds,
+                    $collectionId,
+                    $userId,
+                ): array {
+                    $affected =
+                        $this->connection
+                            ->executeStatement(
+                                <<<'SQL'
 UPDATE note
 SET title = :title,
     content = :content,
-    label_id = :labelId,
     collection_id = :collectionId,
     updated_at = NOW()
 WHERE id = :id
   AND user_id = :userId
   AND deleted_at IS NULL
 SQL,
-                [
-                    'id' => $id,
-                    'userId' => $userId,
-                    'title' => trim($title),
-                    'content' => $content,
-                    'labelId' => $labelId,
-                    'collectionId' =>
-                        $collectionId,
-                ],
+                                [
+                                    'id' => $id,
+                                    'userId' =>
+                                        $userId,
+                                    'title' =>
+                                        trim($title),
+                                    'content' =>
+                                        $content,
+                                    'collectionId' =>
+                                        $collectionId,
+                                ],
+                            );
+
+                    if ($affected !== 1) {
+                        throw new \OutOfBoundsException(
+                            'Note not found or is in trash.'
+                        );
+                    }
+
+                    $this->syncTags(
+                        $id,
+                        $tagIds,
+                    );
+
+                    $this->logger->log(
+                        'NOTE_UPDATED',
+                        'note',
+                        $id,
+                        [
+                            'tagIds' => $tagIds,
+                            'collectionId' =>
+                                $collectionId,
+                        ],
+                    );
+
+                    return $this->get($id);
+                },
             );
-
-        if ($affected !== 1) {
-            throw new \OutOfBoundsException(
-                'Note not found or is in trash.'
-            );
-        }
-
-        $this->logger->log(
-            'NOTE_UPDATED',
-            'note',
-            $id,
-            [
-                'labelId' => $labelId,
-                'collectionId' =>
-                    $collectionId,
-            ],
-        );
-
-        return $this->get($id);
     }
 
     /** @return array<string, mixed> */
@@ -345,14 +390,12 @@ INSERT INTO note (
     user_id,
     title,
     content,
-    label_id,
     collection_id
 )
 VALUES (
     :userId,
     :title,
     :content,
-    :labelId,
     :collectionId
 )
 RETURNING id
@@ -372,12 +415,6 @@ SQL,
                                 'content' =>
                                     (string) $original['content'],
 
-                                'labelId' =>
-                                    $original['labelId']
-                                        !== null
-                                            ? (int) $original['labelId']
-                                            : null,
-
                                 'collectionId' =>
                                     $original['collectionId']
                                         !== null
@@ -393,6 +430,23 @@ SQL,
                     }
 
                     $newNoteId = (int) $newId;
+
+                    foreach (
+                        $original['tags']
+                        as $tag
+                    ) {
+                        $this->connection
+                            ->insert(
+                                'note_tag',
+                                [
+                                    'note_id' =>
+                                        $newNoteId,
+
+                                    'tag_id' =>
+                                        (int) $tag['id'],
+                                ],
+                            );
+                    }
 
                     foreach (
                         $original['tasks']
@@ -615,10 +669,10 @@ SQL,
         $row['id'] =
             (int) $row['id'];
 
-        $row['labelId'] =
-            $row['labelId'] !== null
-                ? (int) $row['labelId']
-                : null;
+        $row['tags'] =
+            $this->tagsForNote(
+                $row['id']
+            );
 
         $row['collectionId'] =
             $row['collectionId'] !== null
@@ -678,32 +732,128 @@ SQL,
         }
     }
 
-    private function validateLabel(
-        ?int $labelId,
-    ): void {
-        if ($labelId === null) {
-            return;
+    /**
+     * @param list<int> $tagIds
+     *
+     * @return list<int>
+     */
+    private function validateTags(
+        array $tagIds,
+    ): array {
+        $tagIds = array_values(
+            array_unique(
+                array_map(
+                    static fn (
+                        mixed $id,
+                    ): int => (int) $id,
+                    $tagIds,
+                ),
+            ),
+        );
+
+        if ($tagIds === []) {
+            return [];
         }
 
-        $exists = $this->connection
+        foreach ($tagIds as $tagId) {
+            if ($tagId <= 0) {
+                throw new \InvalidArgumentException(
+                    'Tag identifiers must be positive integers.'
+                );
+            }
+        }
+
+        $count = (int) $this->connection
             ->fetchOne(
                 <<<'SQL'
-SELECT 1
-FROM label
-WHERE id = :id
-  AND user_id = :userId
+SELECT COUNT(*)
+FROM tag
+WHERE user_id = :userId
+  AND id IN (:tagIds)
 SQL,
                 [
-                    'id' => $labelId,
+                    'userId' =>
+                        $this->currentUser->id(),
+
+                    'tagIds' =>
+                        $tagIds,
+                ],
+                [
+                    'tagIds' =>
+                        ArrayParameterType::INTEGER,
+                ],
+            );
+
+        if ($count !== count($tagIds)) {
+            throw new \InvalidArgumentException(
+                'One or more selected tags do not exist.'
+            );
+        }
+
+        return $tagIds;
+    }
+
+    /**
+     * @param list<int> $tagIds
+     */
+    private function syncTags(
+        int $noteId,
+        array $tagIds,
+    ): void {
+        $this->connection->delete(
+            'note_tag',
+            [
+                'note_id' => $noteId,
+            ],
+        );
+
+        foreach ($tagIds as $tagId) {
+            $this->connection->insert(
+                'note_tag',
+                [
+                    'note_id' => $noteId,
+                    'tag_id' => $tagId,
+                ],
+            );
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function tagsForNote(
+        int $noteId,
+    ): array {
+        $rows = $this->connection
+            ->fetchAllAssociative(
+                <<<'SQL'
+SELECT
+    tag.id,
+    tag.name,
+    tag.color
+FROM tag
+INNER JOIN note_tag
+    ON note_tag.tag_id = tag.id
+WHERE note_tag.note_id = :noteId
+  AND tag.user_id = :userId
+ORDER BY lower(tag.name), tag.id
+SQL,
+                [
+                    'noteId' => $noteId,
+
                     'userId' =>
                         $this->currentUser->id(),
                 ],
             );
 
-        if ($exists === false) {
-            throw new \InvalidArgumentException(
-                'Selected label does not exist.'
-            );
+        foreach ($rows as &$tag) {
+            $tag['id'] =
+                (int) $tag['id'];
         }
+
+        unset($tag);
+
+        return $rows;
     }
+
 }

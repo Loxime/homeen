@@ -16,10 +16,6 @@ import { api } from '../services/api'
 import { formatDate } from '../services/format'
 
 import {
-  useLabels,
-} from '../composables/useLabels'
-
-import {
   useTags,
 } from '../composables/useTags'
 
@@ -50,11 +46,6 @@ const {
 
 const notes =
   ref<NoteSummary[]>([])
-
-const {
-  labels,
-  load: loadLabels,
-} = useLabels()
 
 const {
   tags,
@@ -187,7 +178,6 @@ Promise<void> {
         '/api/collections',
       ),
 
-      loadLabels(),
       loadTags(),
     ])
 
@@ -750,15 +740,15 @@ onMounted(
             </span>
 
             <span
-              v-if="note.labelName"
+              v-for="tag in note.tags"
+              :key="tag.id"
               class="label-chip"
               :style="{
                 '--label':
-                  note.labelColor
-                  ?? '#64748B',
+                  tag.color,
               }"
             >
-              {{ note.labelName }}
+              {{ tag.name }}
             </span>
           </div>
 
@@ -957,7 +947,6 @@ onMounted(
           ?? `new-note-${collectionFilter ?? 'all'}`
         "
         :note="selected"
-        :labels="labels"
         :tags="tags"
         :collections="collections"
         :default-collection-id="

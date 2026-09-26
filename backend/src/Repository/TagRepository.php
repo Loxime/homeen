@@ -30,10 +30,17 @@ SELECT
     tag.color,
     tag.created_at AS "createdAt",
     tag.updated_at AS "updatedAt",
-    COUNT(task_tag.task_id) AS "taskCount"
+    COUNT(
+        DISTINCT task_tag.task_id
+    ) AS "taskCount",
+    COUNT(
+        DISTINCT note_tag.note_id
+    ) AS "noteCount"
 FROM tag
 LEFT JOIN task_tag
     ON task_tag.tag_id = tag.id
+LEFT JOIN note_tag
+    ON note_tag.tag_id = tag.id
 WHERE tag.user_id = :userId
 GROUP BY tag.id
 ORDER BY lower(tag.name), tag.id
@@ -102,6 +109,7 @@ SQL,
         }
 
         $row['taskCount'] = 0;
+        $row['noteCount'] = 0;
 
         $this->logger->log(
             'TAG_CREATED',
@@ -179,6 +187,19 @@ SQL,
                     ],
                 );
 
+        $row['noteCount'] =
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT COUNT(*)
+FROM note_tag
+WHERE tag_id = :id
+SQL,
+                    [
+                        'id' => $id,
+                    ],
+                );
+
         $this->logger->log(
             'TAG_UPDATED',
             'tag',
@@ -247,6 +268,9 @@ SQL,
 
         $row['taskCount'] =
             (int) ($row['taskCount'] ?? 0);
+
+        $row['noteCount'] =
+            (int) ($row['noteCount'] ?? 0);
 
         return $row;
     }

@@ -52,14 +52,10 @@ SELECT
     n.id,
     n.title,
     n.content,
-    l.name AS "labelName",
     collection.name AS "collectionName",
     n.archived_at AS "archivedAt",
     n.updated_at AS "updatedAt"
 FROM note n
-LEFT JOIN label l
-    ON l.id = n.label_id
-   AND l.user_id = :userId
 LEFT JOIN note_collection collection
     ON collection.id = n.collection_id
    AND collection.user_id = :userId
@@ -69,8 +65,17 @@ WHERE n.user_id = :userId
   AND (
       n.title ILIKE :query
       OR n.content ILIKE :query
-      OR l.name ILIKE :query
       OR collection.name ILIKE :query
+      OR EXISTS (
+          SELECT 1
+          FROM note_tag search_note_tag
+          INNER JOIN tag search_note_tag_value
+              ON search_note_tag_value.id =
+                  search_note_tag.tag_id
+          WHERE search_note_tag.note_id = n.id
+            AND search_note_tag_value.user_id = :userId
+            AND search_note_tag_value.name ILIKE :query
+      )
   )
 ORDER BY
     n.updated_at DESC,

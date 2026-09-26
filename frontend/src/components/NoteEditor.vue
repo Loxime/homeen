@@ -10,7 +10,6 @@ import { api } from '../services/api'
 
 import type {
   ImageAsset,
-  Label,
   Note,
   NoteCollection,
   Tag,
@@ -22,7 +21,6 @@ import type {
 const props = withDefaults(
   defineProps<{
     note: Note | null
-    labels: Label[]
     tags: Tag[]
     collections: NoteCollection[]
     defaultCollectionId?: number | null
@@ -40,8 +38,12 @@ const emit = defineEmits<{
 
 const title = ref('')
 const content = ref('')
-const labelId = ref<number | null>(null)
-const collectionId = ref<number | null>(null)
+
+const selectedNoteTagIds =
+  ref<number[]>([])
+
+const collectionId =
+  ref<number | null>(null)
 const taskText = ref('')
 const saving = ref(false)
 const error = ref('')
@@ -88,6 +90,13 @@ function cloneNote(
 ): Note {
   return {
     ...note,
+
+    tags: note.tags.map(
+      tag => ({
+        ...tag,
+      }),
+    ),
+
     tasks: note.tasks.map(
       task => ({
         ...task,
@@ -119,8 +128,10 @@ watch(
     content.value =
       value?.content ?? ''
 
-    labelId.value =
-      value?.labelId ?? null
+    selectedNoteTagIds.value =
+      value?.tags.map(
+        tag => tag.id,
+      ) ?? []
 
     collectionId.value =
       value?.collectionId
@@ -157,7 +168,8 @@ Promise<Note | null> {
       JSON.stringify({
         title: title.value,
         content: content.value,
-        labelId: labelId.value,
+        tagIds:
+          selectedNoteTagIds.value,
         collectionId:
           collectionId.value,
       })
@@ -443,6 +455,33 @@ function isImageAttached(
     image =>
       image.id === imageId,
   )
+}
+
+function isNoteTagged(
+  tagId: number,
+): boolean {
+  return selectedNoteTagIds.value
+    .includes(tagId)
+}
+
+function toggleNoteTag(
+  tagId: number,
+  event: Event,
+): void {
+  const input =
+    event.target as HTMLInputElement
+
+  selectedNoteTagIds.value =
+    input.checked
+      ? Array.from(
+          new Set([
+            ...selectedNoteTagIds.value,
+            tagId,
+          ]),
+        )
+      : selectedNoteTagIds.value.filter(
+          id => id !== tagId,
+        )
 }
 
 async function addTask(): Promise<void> {
@@ -980,28 +1019,60 @@ async function restore(): Promise<void> {
             </select>
           </label>
 
-          <label>
+          <div class="note-tag-field">
             <span class="keep-label-caption">
-              Libellé
+              Tags
             </span>
 
-            <select
-              v-model="labelId"
-              class="keep-label-select"
+            <div
+              v-if="tags.length > 0"
+              class="note-tag-picker"
             >
-              <option :value="null">
-                Aucun libellé
-              </option>
-
-              <option
-                v-for="label in labels"
-                :key="label.id"
-                :value="label.id"
+              <label
+                v-for="tag in tags"
+                :key="tag.id"
+                class="task-tag-option"
+                :class="{
+                  active:
+                    isNoteTagged(tag.id),
+                }"
               >
-                {{ label.name }}
-              </option>
-            </select>
-          </label>
+                <input
+                  type="checkbox"
+                  :checked="
+                    isNoteTagged(
+                      tag.id,
+                    )
+                  "
+                  @change="
+                    toggleNoteTag(
+                      tag.id,
+                      $event,
+                    )
+                  "
+                />
+
+                <span
+                  class="task-tag-dot"
+                  :style="{
+                    background:
+                      tag.color,
+                  }"
+                />
+
+                <span>
+                  {{ tag.name }}
+                </span>
+              </label>
+            </div>
+
+            <span
+              v-else
+              class="muted"
+            >
+              Aucun tag disponible.
+            </span>
+          </div>
         </div>
 
         <p

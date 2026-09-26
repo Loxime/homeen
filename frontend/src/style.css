@@ -2648,3 +2648,14 @@ h3 { margin-bottom: .35rem; }
   color: #8a94a5;
   font-size: .8rem;
 }
+
+.note-tag-field {
+  display: grid;
+  gap: .45rem;
+}
+
+.note-tag-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+}

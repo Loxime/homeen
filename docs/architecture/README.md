@@ -2,24 +2,26 @@
 
 ## Product boundaries
 
-Homeen is a single-user private productivity application. It intentionally does not implement accounts, reminders, deadlines, push notifications, or calendar integration.
+Homeen is a private productivity application. It intentionally does not implement reminders, push notifications, or calendar integration.
 
 ## Domain model
 
-- `label`: reusable classification with a six-digit hexadecimal color.
-- `note`: text note with zero or one label, archive timestamp and trash timestamp.
-- `task`: belongs to exactly one note; maximum 255 characters.
+- `tag`: user-owned reusable classification with a six-digit hexadecimal color.
+- `note`: text note with archive/trash timestamps, optional collection, and zero or more tags through `note_tag`.
+- `task`: belongs to exactly one note; content up to 4000 characters, priority, status, position, optional start/due dates, and zero or more tags through `task_tag`.
 - `pomodoro_preset`: unique work duration in minutes. Work duration is at least 5 minutes and has no application-defined upper bound.
 - `pomodoro_session`: one launch-to-stop interval. Only one session may run at once.
 - `activity_event`: immutable event log used for historical progress metrics.
 - `app_usage_session`: browser-visible usage session start/stop log.
 - `app_usage_slice`: short active-time slices used for accurate daily/monthly aggregation.
 
+The legacy `label` table and `note.label_id` column are retained temporarily as a rollback compatibility layer. They are no longer exposed by the application API or frontend.
+
 ## Note lifecycle
 
-`active -> archived -> active` and `active|archived -> trash -> active`. A daily scheduler permanently deletes notes that have remained in trash for at least 30 days. Tasks cascade-delete only when the note is permanently purged. Deleting a label sets the note label to null.
+`active -> archived -> active` and `active|archived -> trash -> active`. A daily scheduler permanently deletes notes that have remained in trash for at least 30 days. Tasks and `note_tag` associations cascade-delete only when the note is permanently purged. Deleting a tag removes its note/task associations without deleting either object.
 
-Duplicating a note copies title, content, label and task texts. Duplicated tasks are deliberately reset to incomplete so the copy represents a new actionable note.
+Duplicating a note copies title, content, collection, note tags, task metadata, task dates and task tags. Duplicated tasks are deliberately reset to `todo` and incomplete so the copy represents a new actionable note.
 
 ## Pomodoro semantics
 
@@ -36,7 +38,7 @@ Saved presets are unique by `work_minutes`. Starting an already-known duration u
 - **Pomodoro sessions**: sessions whose `started_at` is inside the selected month.
 - **Focus time**: focused seconds that overlap the selected period, even when a session crosses midnight or a month boundary.
 - **Tasks checked**: `TASK_COMPLETED` activity events in the selected period.
-- **Most resolved label**: label snapshot associated with the largest number of task-completion events in the selected period. The name is copied into event metadata so later label renames/deletions do not rewrite history.
+- **Most resolved tag**: tag snapshot associated with the largest number of task-completion events in the selected period. Completion events snapshot the tags linked to the task or its note so later tag renames/deletions do not rewrite history. Legacy `labelName` event metadata remains readable for historical compatibility.
 - **Notes created**: `NOTE_CREATED` events in the selected period.
 - **Current notes**: notes currently not in trash.
 - **Application time**: active seconds recorded by the browser usage tracker while the app is visible and the user has interacted within the last two minutes. A cross-tab leader lock prevents multiple open tabs from double-counting time.
@@ -51,4 +53,4 @@ Daily statistics use the timezone configured by `APP_TIMEZONE`.
 
 ## Search
 
-The classic search endpoint is integrated into `GET /api/notes?q=...`. PostgreSQL `ILIKE` matches note title/content, task content and label name. The note state (`active`, `archived`, `trash`) remains an explicit scope.
+Scoped note search remains available through `GET /api/notes?q=...`, matching note title/content, note tags and task content. Global search uses `GET /api/search?q=...` and returns separate note/task results; it also matches collection names and reusable tags. Trashed notes are excluded from global search.

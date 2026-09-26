@@ -67,8 +67,8 @@ final readonly class StatisticsRepository
                     $end,
                 ),
 
-            'mostCompletedLabel' =>
-                $this->mostCompletedLabel(
+            'mostCompletedTag' =>
+                $this->mostCompletedTag(
                     $start,
                     $end,
                 ),
@@ -190,8 +190,8 @@ final readonly class StatisticsRepository
                     $end,
                 ),
 
-            'mostCompletedLabel' =>
-                $this->mostCompletedLabel(
+            'mostCompletedTag' =>
+                $this->mostCompletedTag(
                     $start,
                     $end,
                 ),
@@ -806,36 +806,70 @@ SQL,
 
     /**
      * @return array{
-     *     labelName:string,
+     *     tagName:string,
      *     count:int
      * }|null
      */
-    private function mostCompletedLabel(
+    private function mostCompletedTag(
         \DateTimeImmutable $start,
         \DateTimeImmutable $end,
     ): ?array {
         $row = $this->connection
             ->fetchAssociative(
                 <<<'SQL'
+WITH completed_events AS (
+    SELECT metadata
+    FROM activity_event
+    WHERE user_id = :userId
+      AND event_type = 'TASK_COMPLETED'
+      AND occurred_at >= :start
+      AND occurred_at < :end
+),
+tag_occurrences AS (
+    SELECT
+        tag_value->>'name'
+            AS "tagName"
+    FROM completed_events
+    CROSS JOIN LATERAL
+        jsonb_array_elements(
+            CASE
+                WHEN jsonb_typeof(
+                    metadata->'tags'
+                ) = 'array'
+                    THEN metadata->'tags'
+                ELSE '[]'::jsonb
+            END
+        ) AS expanded(tag_value)
+
+    UNION ALL
+
+    /*
+     * Compatibility with completion events
+     * created before reusable tags replaced
+     * note labels.
+     */
+    SELECT
+        metadata->>'labelName'
+            AS "tagName"
+    FROM completed_events
+    WHERE NOT (metadata ? 'tags')
+      AND NULLIF(
+          metadata->>'labelName',
+          ''
+      ) IS NOT NULL
+)
 SELECT
-    metadata->>'labelName'
-        AS "labelName",
+    "tagName",
     COUNT(*) AS count
-FROM activity_event
-WHERE user_id = :userId
-  AND event_type =
-      'TASK_COMPLETED'
-  AND occurred_at >= :start
-  AND occurred_at < :end
-  AND NULLIF(
-      metadata->>'labelName',
-      ''
-  ) IS NOT NULL
-GROUP BY
-    metadata->>'labelName'
+FROM tag_occurrences
+WHERE NULLIF(
+    "tagName",
+    ''
+) IS NOT NULL
+GROUP BY "tagName"
 ORDER BY
     count DESC,
-    "labelName" ASC
+    "tagName" ASC
 LIMIT 1
 SQL,
                 [
@@ -853,9 +887,9 @@ SQL,
         return $row === false
             ? null
             : [
-                'labelName' =>
+                'tagName' =>
                     (string) $row[
-                        'labelName'
+                        'tagName'
                     ],
 
                 'count' =>

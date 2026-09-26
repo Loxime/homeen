@@ -316,11 +316,7 @@ SQL,
                     'noteId' =>
                         $noteId,
 
-                    'labelId' =>
-                        null,
-
-                    'labelName' =>
-                        null,
+                    'tags' => [],
                 ],
             );
         }

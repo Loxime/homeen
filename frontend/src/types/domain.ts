@@ -1,12 +1,3 @@
-export interface Label {
-  id: number
-  name: string
-  color: string
-  createdAt: string
-  updatedAt: string
-  noteCount: number
-}
-
 export interface ImageAsset {
   id: number
   originalName: string
@@ -46,6 +37,7 @@ export interface Tag {
   createdAt?: string
   updatedAt?: string
   taskCount?: number
+  noteCount?: number
 }
 
 export interface Task {
@@ -68,9 +60,7 @@ export interface NoteSummary {
   id: number
   title: string
   content: string
-  labelId: number | null
-  labelName: string | null
-  labelColor: string | null
+  tags: Tag[]
   collectionId: number | null
   collectionName: string | null
   collectionColor: string | null
@@ -159,8 +149,8 @@ export interface StatisticsResponse {
   comparison: StatisticSummary
   changes: Record<string, number | null>
   days: DailyStatistic[]
-  mostCompletedLabel: {
-    labelName: string
+  mostCompletedTag: {
+    tagName: string
     count: number
   } | null
 }

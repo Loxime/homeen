@@ -687,25 +687,42 @@ SQL,
             return;
         }
 
-        $label = $this->connection
-            ->fetchAssociative(
+        $tags = $this->connection
+            ->fetchAllAssociative(
                 <<<'SQL'
 SELECT
-    n.label_id AS "labelId",
-    l.name AS "labelName"
-FROM note n
-LEFT JOIN label l
-    ON l.id = n.label_id
-WHERE n.id = :noteId
-  AND n.user_id = :userId
-LIMIT 1
+    tag.id,
+    tag.name
+FROM tag
+INNER JOIN (
+    SELECT note_tag.tag_id
+    FROM note_tag
+    WHERE note_tag.note_id = :noteId
+
+    UNION
+
+    SELECT task_tag.tag_id
+    FROM task_tag
+    WHERE task_tag.task_id = :taskId
+) linked_tag
+    ON linked_tag.tag_id = tag.id
+WHERE tag.user_id = :userId
+ORDER BY lower(tag.name), tag.id
 SQL,
                 [
+                    'taskId' => $taskId,
                     'noteId' => $noteId,
                     'userId' =>
                         $this->currentUser->id(),
                 ],
             );
+
+        foreach ($tags as &$tag) {
+            $tag['id'] =
+                (int) $tag['id'];
+        }
+
+        unset($tag);
 
         $this->logger->log(
             $completed
@@ -715,15 +732,7 @@ SQL,
             $taskId,
             [
                 'noteId' => $noteId,
-                'labelId' =>
-                    $label !== false
-                    && $label['labelId'] !== null
-                        ? (int) $label['labelId']
-                        : null,
-                'labelName' =>
-                    $label !== false
-                        ? $label['labelName']
-                        : null,
+                'tags' => $tags,
             ],
         );
     }

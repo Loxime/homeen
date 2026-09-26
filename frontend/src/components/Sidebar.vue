@@ -10,7 +10,6 @@ import {
 } from 'vue-router'
 
 import AppIcon from './AppIcon.vue'
-import SidebarLabels from './SidebarLabels.vue'
 import SidebarTags from './SidebarTags.vue'
 
 import {
@@ -71,23 +70,8 @@ onUnmounted(() => {
 
 const quickLoading = ref(false)
 
-const labelsOpen =
-  ref(false)
-
 const tagsOpen =
   ref(false)
-
-function toggleLabels(): void {
-  if (props.collapsed) {
-    emit('expand-sidebar')
-    labelsOpen.value = true
-
-    return
-  }
-
-  labelsOpen.value =
-    !labelsOpen.value
-}
 
 function toggleTags(): void {
   if (props.collapsed) {
@@ -222,39 +206,6 @@ async function quickFocus(): Promise<void> {
         <button
           class="sidebar-entry sidebar-label-toggle"
           :class="{
-            active: labelsOpen,
-          }"
-          type="button"
-          :aria-expanded="
-            labelsOpen
-            && !collapsed
-          "
-          title="Gérer les libellés"
-          @click="
-            toggleLabels
-          "
-        >
-          <span class="sidebar-icon-slot">
-            <AppIcon name="tag" />
-          </span>
-
-          <span class="sidebar-label">
-            Libellés
-          </span>
-        </button>
-
-        <SidebarLabels
-          v-show="
-            labelsOpen
-            && !collapsed
-          "
-        />
-      </div>
-
-      <div class="sidebar-label-section">
-        <button
-          class="sidebar-entry sidebar-label-toggle"
-          :class="{
             active: tagsOpen,
           }"
           type="button"
@@ -262,7 +213,7 @@ async function quickFocus(): Promise<void> {
             tagsOpen
             && !collapsed
           "
-          title="Gérer les tags de tâches"
+          title="Gérer les tags"
           @click="
             toggleTags
           "

@@ -584,6 +584,171 @@ SQL,
         );
     }
 
+    public function testNotesSupportMultipleReusableTags(): void
+    {
+        $firstTag = $this->createTag(
+            'NoteBackend',
+            '#3344AA',
+        );
+
+        $secondTag = $this->createTag(
+            'NoteImportant',
+            '#AA4433',
+        );
+
+        $created = $this->jsonRequest(
+            'POST',
+            '/api/notes',
+            [
+                'title' =>
+                    'Tagged functional note',
+
+                'content' =>
+                    'Note with reusable tags',
+
+                'tagIds' => [
+                    $firstTag['id'],
+                    $secondTag['id'],
+                ],
+            ],
+        );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertCount(
+            2,
+            $created['tags'],
+        );
+
+        $tagIds = array_column(
+            $created['tags'],
+            'id',
+        );
+
+        sort($tagIds);
+
+        $expected = [
+            $firstTag['id'],
+            $secondTag['id'],
+        ];
+
+        sort($expected);
+
+        self::assertSame(
+            $expected,
+            $tagIds,
+        );
+
+        $updated = $this->jsonRequest(
+            'PUT',
+            sprintf(
+                '/api/notes/%d',
+                $created['id'],
+            ),
+            [
+                'title' =>
+                    'Tagged functional note',
+
+                'content' =>
+                    'Note with reusable tags',
+
+                'tagIds' => [
+                    $secondTag['id'],
+                ],
+            ],
+        );
+
+        self::assertCount(
+            1,
+            $updated['tags'],
+        );
+
+        self::assertSame(
+            $secondTag['id'],
+            $updated['tags'][0]['id'],
+        );
+
+        $search = $this->jsonRequest(
+            'GET',
+            '/api/search?q=NoteImportant',
+        );
+
+        $noteIds = array_column(
+            $search['notes'],
+            'id',
+        );
+
+        self::assertContains(
+            $created['id'],
+            $noteIds,
+        );
+
+        $otherUserId =
+            $this->createOtherUser();
+
+        $foreignTagId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO tag (
+    user_id,
+    name,
+    color
+)
+VALUES (
+    :userId,
+    'Foreign note tag',
+    '#123456'
+)
+RETURNING id
+SQL,
+                    [
+                        'userId' =>
+                            $otherUserId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $foreignTagId,
+        );
+
+        $invalid = $this->jsonRequest(
+            'PUT',
+            sprintf(
+                '/api/notes/%d',
+                $created['id'],
+            ),
+            [
+                'title' =>
+                    'Tagged functional note',
+
+                'content' =>
+                    'Note with reusable tags',
+
+                'tagIds' => [
+                    (int) $foreignTagId,
+                ],
+            ],
+        );
+
+        self::assertSame(
+            422,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'One or more selected tags do not exist.',
+            $invalid['error'],
+        );
+    }
+
     public function testGlobalSearchFindsNotesTasksAndTags(): void
     {
         $tag = $this->createTag(
@@ -758,6 +923,24 @@ SQL,
             '#8844CC',
         );
 
+        $this->jsonRequest(
+            'PUT',
+            sprintf(
+                '/api/notes/%d',
+                $this->noteId,
+            ),
+            [
+                'title' =>
+                    'Functional task test',
+
+                'content' => '',
+
+                'tagIds' => [
+                    $tag['id'],
+                ],
+            ],
+        );
+
         $task = $this->jsonRequest(
             'POST',
             sprintf(
@@ -807,6 +990,16 @@ SQL,
             $this->client
                 ->getResponse()
                 ->getStatusCode(),
+        );
+
+        self::assertCount(
+            1,
+            $duplicate['tags'],
+        );
+
+        self::assertSame(
+            $tag['id'],
+            $duplicate['tags'][0]['id'],
         );
 
         self::assertCount(

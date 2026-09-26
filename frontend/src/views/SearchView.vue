@@ -18,10 +18,6 @@ import {
 } from '../services/api'
 
 import {
-  useLabels,
-} from '../composables/useLabels'
-
-import {
   useTags,
 } from '../composables/useTags'
 
@@ -34,7 +30,6 @@ interface SearchNoteResult {
   id: number
   title: string
   content: string
-  labelName: string | null
   collectionName: string | null
   archivedAt: string | null
   updatedAt: string
@@ -66,11 +61,6 @@ interface SearchResponse {
 }
 
 const route = useRoute()
-
-const {
-  labels,
-  load: loadLabels,
-} = useLabels()
 
 const {
   tags,
@@ -153,7 +143,6 @@ Promise<void> {
     }>(
       '/api/collections',
     ),
-    loadLabels(),
     loadTags(),
   ])
 
@@ -360,14 +349,6 @@ watch(
                 </span>
 
                 <span
-                  v-if="note.labelName"
-                >
-                  {{
-                    note.labelName
-                  }}
-                </span>
-
-                <span
                   v-if="note.archivedAt"
                   class="search-archived-badge"
                 >
@@ -483,7 +464,6 @@ watch(
         v-if="selectedNote"
         :key="selectedNote.id"
         :note="selectedNote"
-        :labels="labels"
         :tags="tags"
         :collections="collections"
         @saved="
