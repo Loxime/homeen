@@ -2896,3 +2896,91 @@ h3 { margin-bottom: .35rem; }
   opacity: .45;
   cursor: default;
 }
+
+/* Sprint 2 — quick note card actions */
+
+.note-card {
+  position: relative;
+}
+
+.note-card-quick-actions {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  right: 8px;
+  padding: 3px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.88);
+  box-shadow:
+    0 1px 4px rgba(60,64,67,.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition:
+    opacity .14s ease,
+    transform .14s ease;
+  backdrop-filter: blur(5px);
+}
+
+.note-card:hover
+.note-card-quick-actions,
+.note-card:focus-within
+.note-card-quick-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.note-card-action {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #5f6368;
+}
+
+.note-card-action:hover,
+.note-card-action.active {
+  background: rgba(60,64,67,.1);
+  color: #202124;
+}
+
+.note-card-action:disabled {
+  opacity: .45;
+}
+
+.note-card-color-action {
+  cursor: pointer;
+}
+
+.note-card-color-dot {
+  width: 17px;
+  height: 17px;
+  border: 1px solid rgba(60,64,67,.28);
+  border-radius: 50%;
+}
+
+.note-card-color-action input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+@media (hover: none) {
+  .note-card-quick-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+}

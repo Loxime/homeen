@@ -74,6 +74,9 @@ const quickContent =
 const quickSaving =
   ref(false)
 
+const quickActionBusyId =
+  ref<number | null>(null)
+
 const quickContentInput =
   ref<HTMLTextAreaElement | null>(
     null,
@@ -374,6 +377,170 @@ Promise<void> {
         : 'Impossible de créer la note.'
   } finally {
     quickSaving.value = false
+  }
+}
+
+async function updateQuickAppearance(
+  note: NoteSummary,
+  changes: {
+    isPinned?: boolean
+    color?: string
+  },
+): Promise<void> {
+  if (
+    quickActionBusyId.value
+    !== null
+  ) {
+    return
+  }
+
+  quickActionBusyId.value =
+    note.id
+
+  error.value = ''
+
+  try {
+    const updated =
+      await api<Note>(
+        `/api/notes/${note.id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            title:
+              note.title,
+            content:
+              note.content,
+            tagIds:
+              note.tags.map(
+                tag => tag.id,
+              ),
+            collectionId:
+              note.collectionId,
+            isPinned:
+              changes.isPinned
+              ?? note.isPinned,
+            color:
+              changes.color
+              ?? note.color,
+          }),
+        },
+      )
+
+    notes.value =
+      notes.value
+        .map(
+          candidate =>
+            candidate.id
+            === note.id
+              ? {
+                  ...candidate,
+                  isPinned:
+                    updated.isPinned,
+                  color:
+                    updated.color,
+                  updatedAt:
+                    updated.updatedAt,
+                }
+              : candidate,
+        )
+        .sort(
+          (first, second) => {
+            if (
+              first.isPinned
+              !== second.isPinned
+            ) {
+              return first.isPinned
+                ? -1
+                : 1
+            }
+
+            return (
+              Date.parse(
+                second.updatedAt,
+              )
+              - Date.parse(
+                first.updatedAt,
+              )
+            )
+            || second.id
+              - first.id
+          },
+        )
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de modifier la note.'
+  } finally {
+    quickActionBusyId.value =
+      null
+  }
+}
+
+async function toggleQuickPin(
+  note: NoteSummary,
+): Promise<void> {
+  await updateQuickAppearance(
+    note,
+    {
+      isPinned:
+        !note.isPinned,
+    },
+  )
+}
+
+async function changeQuickColor(
+  note: NoteSummary,
+  event: Event,
+): Promise<void> {
+  const input =
+    event.target as HTMLInputElement
+
+  await updateQuickAppearance(
+    note,
+    {
+      color:
+        input.value,
+    },
+  )
+}
+
+async function quickArchive(
+  note: NoteSummary,
+): Promise<void> {
+  if (
+    quickActionBusyId.value
+    !== null
+  ) {
+    return
+  }
+
+  quickActionBusyId.value =
+    note.id
+
+  error.value = ''
+
+  try {
+    await api<Note>(
+      `/api/notes/${note.id}/archive`,
+      {
+        method: 'POST',
+      },
+    )
+
+    await load()
+
+    showSuccess(
+      'Note archivée.',
+    )
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible d’archiver la note.'
+  } finally {
+    quickActionBusyId.value =
+      null
   }
 }
 
@@ -979,6 +1146,98 @@ onMounted(
               alt=""
               loading="lazy"
             />
+
+            <div
+              v-if="
+                scope === 'active'
+              "
+              class="note-card-quick-actions"
+              @click.stop
+            >
+              <button
+                type="button"
+                class="note-card-action"
+                :class="{
+                  active:
+                    note.isPinned,
+                }"
+                :disabled="
+                  quickActionBusyId
+                  !== null
+                "
+                :title="
+                  note.isPinned
+                    ? 'Désépingler'
+                    : 'Épingler'
+                "
+                :aria-label="
+                  note.isPinned
+                    ? 'Désépingler la note'
+                    : 'Épingler la note'
+                "
+                @click.stop="
+                  toggleQuickPin(note)
+                "
+              >
+                <AppIcon
+                  name="pin"
+                  :size="17"
+                />
+              </button>
+
+              <label
+                class="
+                  note-card-action
+                  note-card-color-action
+                "
+                title="Changer la couleur"
+              >
+                <span
+                  class="note-card-color-dot"
+                  :style="{
+                    background:
+                      note.color,
+                  }"
+                />
+
+                <input
+                  type="color"
+                  :value="note.color"
+                  :disabled="
+                    quickActionBusyId
+                    !== null
+                  "
+                  :aria-label="
+                    `Changer la couleur de ${note.title || 'la note'}`
+                  "
+                  @change="
+                    changeQuickColor(
+                      note,
+                      $event,
+                    )
+                  "
+                />
+              </label>
+
+              <button
+                type="button"
+                class="note-card-action"
+                :disabled="
+                  quickActionBusyId
+                  !== null
+                "
+                title="Archiver"
+                aria-label="Archiver la note"
+                @click.stop="
+                  quickArchive(note)
+                "
+              >
+                <AppIcon
+                  name="archive"
+                  :size="17"
+                />
+              </button>
+            </div>
 
             <div class="note-card-top">
               <div class="note-card-tags">
