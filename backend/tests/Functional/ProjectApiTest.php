@@ -3368,6 +3368,236 @@ SQL,
         );
     }
 
+    public function testProjectMembersCanArchiveTrashAndRestoreSharedNotes():
+    void {
+        $ownerUserId =
+            $this->createOtherUser();
+
+        $projectId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO project (
+    name,
+    description,
+    color
+)
+VALUES (
+    'Lifecycle project',
+    '',
+    '#15AABF'
+)
+RETURNING id
+SQL,
+                );
+
+        self::assertNotFalse(
+            $projectId,
+        );
+
+        $projectId =
+            (int) $projectId;
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $projectId,
+                'user_id' =>
+                    $ownerUserId,
+                'role' =>
+                    'owner',
+            ],
+        );
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $projectId,
+                'user_id' =>
+                    $this->userId,
+                'role' =>
+                    'member',
+            ],
+        );
+
+        $noteId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO note (
+    user_id,
+    project_id,
+    title,
+    content
+)
+VALUES (
+    NULL,
+    :projectId,
+    'Shared lifecycle note',
+    'Lifecycle test'
+)
+RETURNING id
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $noteId,
+        );
+
+        $noteId =
+            (int) $noteId;
+
+        $archived =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/notes/%d/archive',
+                    $noteId,
+                ),
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertNotNull(
+            $archived['archivedAt'],
+        );
+
+        $archivedList =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/notes?scope=archived&projectId=%d',
+                    $projectId,
+                ),
+            );
+
+        self::assertSame(
+            [$noteId],
+            array_column(
+                $archivedList['notes'],
+                'id',
+            ),
+        );
+
+        $unarchived =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/notes/%d/unarchive',
+                    $noteId,
+                ),
+            );
+
+        self::assertNull(
+            $unarchived['archivedAt'],
+        );
+
+        $this->jsonRequest(
+            'DELETE',
+            sprintf(
+                '/api/notes/%d',
+                $noteId,
+            ),
+        );
+
+        self::assertSame(
+            204,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        $trashList =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/notes?scope=trash&projectId=%d',
+                    $projectId,
+                ),
+            );
+
+        self::assertSame(
+            [$noteId],
+            array_column(
+                $trashList['notes'],
+                'id',
+            ),
+        );
+
+        $restored =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/notes/%d/restore',
+                    $noteId,
+                ),
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertNull(
+            $restored['deletedAt'],
+        );
+
+        $activeList =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/notes?projectId=%d',
+                    $projectId,
+                ),
+            );
+
+        self::assertSame(
+            [$noteId],
+            array_column(
+                $activeList['notes'],
+                'id',
+            ),
+        );
+
+        $this->connection->delete(
+            'project_member',
+            [
+                'project_id' =>
+                    $projectId,
+                'user_id' =>
+                    $this->userId,
+            ],
+        );
+
+        $this->jsonRequest(
+            'POST',
+            sprintf(
+                '/api/notes/%d/archive',
+                $noteId,
+            ),
+        );
+
+        self::assertSame(
+            404,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+    }
+
     private function authenticate(): void
     {
         $this->client->request(

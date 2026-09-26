@@ -852,7 +852,17 @@ UPDATE note
 SET archived_at = :archivedAt,
     updated_at = NOW()
 WHERE id = :id
-  AND user_id = :userId
+  AND (
+      user_id = :userId
+      OR EXISTS (
+          SELECT 1
+          FROM project_member member
+          WHERE member.project_id =
+                    note.project_id
+            AND member.user_id =
+                    :userId
+      )
+  )
   AND deleted_at IS NULL
 SQL,
                 [
@@ -898,7 +908,17 @@ SET deleted_at = NOW(),
     archived_at = NULL,
     updated_at = NOW()
 WHERE id = :id
-  AND user_id = :userId
+  AND (
+      user_id = :userId
+      OR EXISTS (
+          SELECT 1
+          FROM project_member member
+          WHERE member.project_id =
+                    note.project_id
+            AND member.user_id =
+                    :userId
+      )
+  )
   AND deleted_at IS NULL
 SQL,
                 [
@@ -931,7 +951,17 @@ UPDATE note
 SET deleted_at = NULL,
     updated_at = NOW()
 WHERE id = :id
-  AND user_id = :userId
+  AND (
+      user_id = :userId
+      OR EXISTS (
+          SELECT 1
+          FROM project_member member
+          WHERE member.project_id =
+                    note.project_id
+            AND member.user_id =
+                    :userId
+      )
+  )
   AND deleted_at IS NOT NULL
 SQL,
                 [
