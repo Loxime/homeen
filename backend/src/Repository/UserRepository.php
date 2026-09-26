@@ -485,19 +485,27 @@ public function deleteAccount(int $userId): void
             $userId,
         ): void {
             /*
-             * Lock owned OPEN channels so ownership
-             * cannot change underneath this deletion.
+             * An open legacy Channel still blocks
+             * deletion if it has not been migrated
+             * to a Project.
              *
-             * An active channel must always retain
-             * a valid creator.
+             * Successfully migrated Channels no
+             * longer represent the active domain.
              */
             $ownedOpenChannels =
                 $connection->fetchFirstColumn(
                     <<<'SQL'
-SELECT id
+SELECT channel.id
 FROM channel
-WHERE creator_user_id = :userId
-  AND closed_at IS NULL
+WHERE channel.creator_user_id =
+        :userId
+  AND channel.closed_at IS NULL
+  AND NOT EXISTS (
+      SELECT 1
+      FROM project
+      WHERE project.legacy_channel_id =
+            channel.id
+  )
 FOR UPDATE
 SQL,
                     [
@@ -511,6 +519,70 @@ SQL,
                     'CHANNEL_OWNERSHIP_BLOCKS_ACCOUNT_DELETION',
                 );
             }
+
+            /*
+             * A deleted owner must never leave an
+             * active Project without an owner.
+             *
+             * Preserve shared data by archiving
+             * owned active Projects. The owner's
+             * membership will then disappear via
+             * ON DELETE CASCADE while collaborator
+             * memberships remain available on the
+             * archived Project.
+             */
+            $connection->executeStatement(
+                <<<'SQL'
+UPDATE project
+SET
+    archived_at = NOW(),
+    updated_at = NOW()
+WHERE archived_at IS NULL
+  AND EXISTS (
+      SELECT 1
+      FROM project_member member
+      WHERE member.project_id =
+                project.id
+        AND member.user_id =
+                :userId
+        AND member.role =
+                'owner'
+  )
+SQL,
+                [
+                    'userId' =>
+                        $userId,
+                ],
+            );
+
+            /*
+             * Migrated legacy Channels are retained
+             * only for compatibility/history.
+             *
+             * Closing them allows the existing
+             * creator cleanup below to null the
+             * legacy creator safely.
+             */
+            $connection->executeStatement(
+                <<<'SQL'
+UPDATE channel
+SET
+    closed_at = NOW(),
+    updated_at = NOW()
+WHERE creator_user_id = :userId
+  AND closed_at IS NULL
+  AND EXISTS (
+      SELECT 1
+      FROM project
+      WHERE project.legacy_channel_id =
+            channel.id
+  )
+SQL,
+                [
+                    'userId' =>
+                        $userId,
+                ],
+            );
 
             /*
              * A pending invitation should not outlive
@@ -619,6 +691,12 @@ SELECT COUNT(*)
 FROM channel
 WHERE creator_user_id = :userId
   AND closed_at IS NULL
+  AND NOT EXISTS (
+      SELECT 1
+      FROM project
+      WHERE project.legacy_channel_id =
+            channel.id
+  )
 SQL,
         [
             'userId' => $userId,

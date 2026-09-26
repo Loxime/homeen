@@ -3598,6 +3598,262 @@ SQL,
         );
     }
 
+    public function testDeletingAccountRetiresMigratedLegacyChannel():
+    void {
+        $collaboratorUserId =
+            $this->createOtherUser();
+
+        $project =
+            $this->jsonRequest(
+                'POST',
+                '/api/projects',
+                [
+                    'name' =>
+                        'Account deletion project',
+
+                    'description' =>
+                        'Compatibility project',
+
+                    'color' =>
+                        '#339AF0',
+                ],
+            );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        $projectId =
+            (int) $project['id'];
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $projectId,
+
+                'user_id' =>
+                    $collaboratorUserId,
+
+                'role' =>
+                    'member',
+            ],
+        );
+
+        $channelId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO channel (
+    code,
+    name,
+    description,
+    creator_user_id
+)
+VALUES (
+    '987654321',
+    'Legacy project channel',
+    '',
+    :userId
+)
+RETURNING id
+SQL,
+                    [
+                        'userId' =>
+                            $this->userId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $channelId,
+        );
+
+        $channelId =
+            (int) $channelId;
+
+        $this->connection->insert(
+            'channel_member',
+            [
+                'channel_id' =>
+                    $channelId,
+
+                'user_id' =>
+                    $this->userId,
+            ],
+        );
+
+        /*
+         * An unmigrated legacy Channel remains
+         * a hard safety blocker.
+         */
+        $blocked =
+            $this->jsonRequest(
+                'DELETE',
+                '/api/profile',
+                [
+                    'password' =>
+                        $this->password,
+                ],
+            );
+
+        self::assertSame(
+            409,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'CHANNEL_OWNERSHIP_BLOCKS_ACCOUNT_DELETION',
+            $blocked['code'],
+        );
+
+        self::assertSame(
+            1,
+            $blocked['channelCount'],
+        );
+
+        self::assertSame(
+            1,
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT COUNT(*)
+FROM app_user
+WHERE id = :userId
+SQL,
+                    [
+                        'userId' =>
+                            $this->userId,
+                    ],
+                ),
+        );
+
+        /*
+         * Represent the legacy Channel through
+         * its migrated Project.
+         */
+        $this->connection->update(
+            'project',
+            [
+                'legacy_channel_id' =>
+                    $channelId,
+            ],
+            [
+                'id' =>
+                    $projectId,
+            ],
+        );
+
+        $this->jsonRequest(
+            'DELETE',
+            '/api/profile',
+            [
+                'password' =>
+                    $this->password,
+            ],
+        );
+
+        self::assertSame(
+            204,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            0,
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT COUNT(*)
+FROM app_user
+WHERE id = :userId
+SQL,
+                    [
+                        'userId' =>
+                            $this->userId,
+                    ],
+                ),
+        );
+
+        self::assertSame(
+            1,
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT COUNT(*)
+FROM project
+WHERE id = :projectId
+  AND archived_at IS NOT NULL
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+                    ],
+                ),
+        );
+
+        self::assertSame(
+            0,
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT COUNT(*)
+FROM project_member
+WHERE project_id = :projectId
+  AND role = 'owner'
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+                    ],
+                ),
+        );
+
+        self::assertSame(
+            1,
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT COUNT(*)
+FROM project_member
+WHERE project_id = :projectId
+  AND user_id = :userId
+  AND role = 'member'
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+
+                        'userId' =>
+                            $collaboratorUserId,
+                    ],
+                ),
+        );
+
+        self::assertSame(
+            1,
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT COUNT(*)
+FROM channel
+WHERE id = :channelId
+  AND closed_at IS NOT NULL
+  AND creator_user_id IS NULL
+SQL,
+                    [
+                        'channelId' =>
+                            $channelId,
+                    ],
+                ),
+        );
+    }
+
     private function authenticate(): void
     {
         $this->client->request(
