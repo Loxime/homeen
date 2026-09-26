@@ -2699,6 +2699,515 @@ SQL,
         );
     }
 
+    public function testNativeProjectTasksLifecycle():
+    void {
+        $project =
+            $this->jsonRequest(
+                'POST',
+                '/api/projects',
+                [
+                    'name' =>
+                        'Native tasks',
+
+                    'description' =>
+                        '',
+
+                    'color' =>
+                        '#845EF7',
+                ],
+            );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        $projectId =
+            (int) $project['id'];
+
+        $workflow =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/projects/%d/workflow',
+                    $projectId,
+                ),
+            );
+
+        self::assertCount(
+            3,
+            $workflow['stages'],
+        );
+
+        $firstStageId =
+            (int) $workflow[
+                'stages'
+            ][0]['id'];
+
+        $secondStageId =
+            (int) $workflow[
+                'stages'
+            ][1]['id'];
+
+        $tagId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO tag (
+    user_id,
+    name,
+    color
+)
+VALUES (
+    :userId,
+    'Project tag',
+    '#12B886'
+)
+RETURNING id
+SQL,
+                    [
+                        'userId' =>
+                            $this->userId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $tagId,
+        );
+
+        $tagId = (int) $tagId;
+
+        /*
+         * Omitting workflowStageId places the
+         * task in the first workflow stage.
+         */
+        $created =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/tasks',
+                    $projectId,
+                ),
+                [
+                    'content' =>
+                        'Native project task',
+
+                    'priority' =>
+                        'urgent',
+
+                    'tagIds' => [
+                        $tagId,
+                    ],
+
+                    'startDate' =>
+                        '2026-09-26',
+
+                    'dueDate' =>
+                        '2026-09-30',
+                ],
+            );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        $taskId =
+            (int) $created['id'];
+
+        self::assertNull(
+            $created['noteId'],
+        );
+
+        self::assertSame(
+            $projectId,
+            $created['projectId'],
+        );
+
+        self::assertSame(
+            $firstStageId,
+            $created['workflowStageId'],
+        );
+
+        self::assertSame(
+            'Backlog',
+            $created[
+                'workflowStageName'
+            ],
+        );
+
+        self::assertSame(
+            'urgent',
+            $created['priority'],
+        );
+
+        self::assertSame(
+            'todo',
+            $created['status'],
+        );
+
+        self::assertFalse(
+            $created['isCompleted'],
+        );
+
+        self::assertSame(
+            $tagId,
+            $created['tags'][0]['id'],
+        );
+
+        self::assertSame(
+            [
+                null,
+                $projectId,
+                $firstStageId,
+            ],
+            $this->connection
+                ->fetchNumeric(
+                    <<<'SQL'
+SELECT
+    note_id,
+    project_id,
+    workflow_stage_id
+FROM task
+WHERE id = :taskId
+SQL,
+                    [
+                        'taskId' =>
+                            $taskId,
+                    ],
+                ),
+        );
+
+        $listed =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/projects/%d/tasks',
+                    $projectId,
+                ),
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertCount(
+            1,
+            $listed['tasks'],
+        );
+
+        /*
+         * Shared project tasks keep tags
+         * personal. Updating my tags must not
+         * remove another user's tag.
+         */
+        $otherUserId =
+            $this->createOtherUser();
+
+        $foreignTagId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO tag (
+    user_id,
+    name,
+    color
+)
+VALUES (
+    :userId,
+    'Foreign project tag',
+    '#FA5252'
+)
+RETURNING id
+SQL,
+                    [
+                        'userId' =>
+                            $otherUserId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $foreignTagId,
+        );
+
+        $foreignTagId =
+            (int) $foreignTagId;
+
+        $this->connection->insert(
+            'task_tag',
+            [
+                'task_id' =>
+                    $taskId,
+
+                'tag_id' =>
+                    $foreignTagId,
+            ],
+        );
+
+        /*
+         * A regular Project member may edit
+         * the task; management privileges are
+         * not required.
+         */
+        $this->connection->update(
+            'project_member',
+            [
+                'role' =>
+                    'member',
+            ],
+            [
+                'project_id' =>
+                    $projectId,
+
+                'user_id' =>
+                    $this->userId,
+            ],
+        );
+
+        $updated =
+            $this->jsonRequest(
+                'PUT',
+                sprintf(
+                    '/api/projects/%d/tasks/%d',
+                    $projectId,
+                    $taskId,
+                ),
+                [
+                    'content' =>
+                        'Moved project task',
+
+                    'priority' =>
+                        'high',
+
+                    'status' =>
+                        'in_progress',
+
+                    'workflowStageId' =>
+                        $secondStageId,
+
+                    'tagIds' => [],
+                ],
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'Moved project task',
+            $updated['content'],
+        );
+
+        self::assertSame(
+            $secondStageId,
+            $updated[
+                'workflowStageId'
+            ],
+        );
+
+        self::assertSame(
+            'En cours',
+            $updated[
+                'workflowStageName'
+            ],
+        );
+
+        self::assertSame(
+            'in_progress',
+            $updated['status'],
+        );
+
+        self::assertSame(
+            [],
+            $updated['tags'],
+        );
+
+        self::assertFalse(
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT 1
+FROM task_tag
+WHERE task_id = :taskId
+  AND tag_id = :tagId
+LIMIT 1
+SQL,
+                    [
+                        'taskId' =>
+                            $taskId,
+
+                        'tagId' =>
+                            $tagId,
+                    ],
+                ),
+        );
+
+        self::assertSame(
+            1,
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT COUNT(*)
+FROM task_tag
+WHERE task_id = :taskId
+  AND tag_id = :tagId
+SQL,
+                    [
+                        'taskId' =>
+                            $taskId,
+
+                        'tagId' =>
+                            $foreignTagId,
+                    ],
+                ),
+        );
+
+        /*
+         * Workflow administration still
+         * requires owner/admin.
+         */
+        $this->connection->update(
+            'project_member',
+            [
+                'role' =>
+                    'owner',
+            ],
+            [
+                'project_id' =>
+                    $projectId,
+
+                'user_id' =>
+                    $this->userId,
+            ],
+        );
+
+        $occupied =
+            $this->jsonRequest(
+                'DELETE',
+                sprintf(
+                    '/api/projects/%d/workflow/stages/%d',
+                    $projectId,
+                    $secondStageId,
+                ),
+            );
+
+        self::assertSame(
+            409,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'PROJECT_WORKFLOW_STAGE_NOT_EMPTY',
+            $occupied['code'],
+        );
+
+        $completed =
+            $this->jsonRequest(
+                'PUT',
+                sprintf(
+                    '/api/projects/%d/tasks/%d/completed',
+                    $projectId,
+                    $taskId,
+                ),
+                [
+                    'completed' =>
+                        true,
+                ],
+            );
+
+        self::assertTrue(
+            $completed['isCompleted'],
+        );
+
+        self::assertSame(
+            'done',
+            $completed['status'],
+        );
+
+        $reopened =
+            $this->jsonRequest(
+                'PUT',
+                sprintf(
+                    '/api/projects/%d/tasks/%d/completed',
+                    $projectId,
+                    $taskId,
+                ),
+                [
+                    'completed' =>
+                        false,
+                ],
+            );
+
+        self::assertFalse(
+            $reopened['isCompleted'],
+        );
+
+        self::assertSame(
+            'todo',
+            $reopened['status'],
+        );
+
+        $this->jsonRequest(
+            'DELETE',
+            sprintf(
+                '/api/projects/%d/tasks/%d',
+                $projectId,
+                $taskId,
+            ),
+        );
+
+        self::assertSame(
+            204,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertFalse(
+            $this->connection
+                ->fetchOne(
+                    'SELECT 1 FROM task '
+                    .'WHERE id = :taskId',
+                    [
+                        'taskId' =>
+                            $taskId,
+                    ],
+                ),
+        );
+
+        /*
+         * Once empty, the workflow stage can
+         * be removed normally.
+         */
+        $this->jsonRequest(
+            'DELETE',
+            sprintf(
+                '/api/projects/%d/workflow/stages/%d',
+                $projectId,
+                $secondStageId,
+            ),
+        );
+
+        self::assertSame(
+            204,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+    }
+
     private function authenticate(): void
     {
         $this->client->request(

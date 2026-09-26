@@ -360,6 +360,31 @@ SQL,
                 $stageId,
             );
 
+        $taskCount =
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT COUNT(*)
+FROM task
+WHERE project_id = :projectId
+  AND workflow_stage_id = :stageId
+  AND note_id IS NULL
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+
+                        'stageId' =>
+                            $stageId,
+                    ],
+                );
+
+        if ($taskCount > 0) {
+            throw new \DomainException(
+                'PROJECT_WORKFLOW_STAGE_NOT_EMPTY',
+            );
+        }
+
         $count =
             (int) $this->connection
                 ->fetchOne(
