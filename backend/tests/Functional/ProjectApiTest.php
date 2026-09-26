@@ -1502,6 +1502,404 @@ SQL,
         );
     }
 
+    public function testProjectMembersCanManageSharedTasksWithoutRemovingForeignTags():
+    void {
+        $ownerUserId =
+            $this->createOtherUser();
+
+        $projectId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO project (
+    name,
+    description,
+    color
+)
+VALUES (
+    'Collaborative tasks',
+    '',
+    '#74C0FC'
+)
+RETURNING id
+SQL,
+                );
+
+        self::assertNotFalse(
+            $projectId,
+        );
+
+        $projectId =
+            (int) $projectId;
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $projectId,
+
+                'user_id' =>
+                    $ownerUserId,
+
+                'role' =>
+                    'owner',
+            ],
+        );
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $projectId,
+
+                'user_id' =>
+                    $this->userId,
+
+                'role' =>
+                    'member',
+            ],
+        );
+
+        $noteId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO note (
+    user_id,
+    project_id,
+    title,
+    content
+)
+VALUES (
+    NULL,
+    :projectId,
+    'Shared task note',
+    ''
+)
+RETURNING id
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $noteId,
+        );
+
+        $noteId =
+            (int) $noteId;
+
+        $currentTagId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO tag (
+    user_id,
+    name,
+    color
+)
+VALUES (
+    :userId,
+    'My shared tag',
+    '#12B886'
+)
+RETURNING id
+SQL,
+                    [
+                        'userId' =>
+                            $this->userId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $currentTagId,
+        );
+
+        $currentTagId =
+            (int) $currentTagId;
+
+        $foreignTagId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO tag (
+    user_id,
+    name,
+    color
+)
+VALUES (
+    :userId,
+    'Owner tag',
+    '#FA5252'
+)
+RETURNING id
+SQL,
+                    [
+                        'userId' =>
+                            $ownerUserId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $foreignTagId,
+        );
+
+        $foreignTagId =
+            (int) $foreignTagId;
+
+        $task =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/notes/%d/tasks',
+                    $noteId,
+                ),
+                [
+                    'content' =>
+                        'Shared Project task',
+
+                    'priority' =>
+                        'high',
+
+                    'status' =>
+                        'in_progress',
+
+                    'tagIds' => [
+                        $currentTagId,
+                    ],
+                ],
+            );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            $noteId,
+            $task['noteId'],
+        );
+
+        self::assertSame(
+            'high',
+            $task['priority'],
+        );
+
+        self::assertSame(
+            'in_progress',
+            $task['status'],
+        );
+
+        self::assertCount(
+            1,
+            $task['tags'],
+        );
+
+        $taskId =
+            (int) $task['id'];
+
+        /*
+         * Simulate a tag attached by another
+         * Project member.
+         */
+        $this->connection->insert(
+            'task_tag',
+            [
+                'task_id' =>
+                    $taskId,
+
+                'tag_id' =>
+                    $foreignTagId,
+            ],
+        );
+
+        /*
+         * Updating with no local tags must
+         * remove only this user's tag.
+         */
+        $updated =
+            $this->jsonRequest(
+                'PUT',
+                sprintf(
+                    '/api/tasks/%d',
+                    $taskId,
+                ),
+                [
+                    'content' =>
+                        'Updated shared task',
+
+                    'priority' =>
+                        'urgent',
+
+                    'status' =>
+                        'todo',
+
+                    'position' =>
+                        0,
+
+                    'tagIds' => [],
+
+                    'startDate' =>
+                        null,
+
+                    'dueDate' =>
+                        null,
+                ],
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'Updated shared task',
+            $updated['content'],
+        );
+
+        self::assertSame(
+            'urgent',
+            $updated['priority'],
+        );
+
+        /*
+         * API exposes only the current user's
+         * personal tags.
+         */
+        self::assertSame(
+            [],
+            $updated['tags'],
+        );
+
+        self::assertFalse(
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT 1
+FROM task_tag
+WHERE task_id = :taskId
+  AND tag_id = :tagId
+LIMIT 1
+SQL,
+                    [
+                        'taskId' =>
+                            $taskId,
+
+                        'tagId' =>
+                            $currentTagId,
+                    ],
+                ),
+        );
+
+        self::assertSame(
+            1,
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT COUNT(*)
+FROM task_tag
+WHERE task_id = :taskId
+  AND tag_id = :tagId
+SQL,
+                    [
+                        'taskId' =>
+                            $taskId,
+
+                        'tagId' =>
+                            $foreignTagId,
+                    ],
+                ),
+        );
+
+        $completed =
+            $this->jsonRequest(
+                'PUT',
+                sprintf(
+                    '/api/tasks/%d/completed',
+                    $taskId,
+                ),
+                [
+                    'completed' =>
+                        true,
+                ],
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertTrue(
+            $completed[
+                'isCompleted'
+            ],
+        );
+
+        self::assertSame(
+            'done',
+            $completed['status'],
+        );
+
+        $detail =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/notes/%d',
+                    $noteId,
+                ),
+            );
+
+        self::assertCount(
+            1,
+            $detail['tasks'],
+        );
+
+        self::assertTrue(
+            $detail[
+                'tasks'
+            ][0]['isCompleted'],
+        );
+
+        $this->jsonRequest(
+            'DELETE',
+            sprintf(
+                '/api/tasks/%d',
+                $taskId,
+            ),
+        );
+
+        self::assertSame(
+            204,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertFalse(
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT 1
+FROM task
+WHERE id = :id
+LIMIT 1
+SQL,
+                    [
+                        'id' =>
+                            $taskId,
+                    ],
+                ),
+        );
+    }
+
     private function authenticate(): void
     {
         $this->client->request(

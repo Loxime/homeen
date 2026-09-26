@@ -154,8 +154,20 @@ SQL,
 SELECT 1
 FROM note
 WHERE id = :noteId
-  AND user_id = :userId
-  AND channel_id IS NULL
+  AND (
+      (
+          user_id = :userId
+          AND channel_id IS NULL
+      )
+      OR EXISTS (
+          SELECT 1
+          FROM project_member member
+          WHERE member.project_id =
+                    note.project_id
+            AND member.user_id =
+                    :userId
+      )
+  )
   AND deleted_at IS NULL
 LIMIT 1
 SQL,
@@ -569,8 +581,20 @@ FROM task t
 INNER JOIN note n
     ON n.id = t.note_id
 WHERE t.id = :id
-  AND n.user_id = :userId
-  AND n.channel_id IS NULL
+  AND (
+      (
+          n.user_id = :userId
+          AND n.channel_id IS NULL
+      )
+      OR EXISTS (
+          SELECT 1
+          FROM project_member member
+          WHERE member.project_id =
+                    n.project_id
+            AND member.user_id =
+                    :userId
+      )
+  )
   AND n.deleted_at IS NULL
 LIMIT 1
 SQL,
@@ -589,12 +613,24 @@ SQL,
         int $taskId,
         array $tagIds,
     ): void {
-        $this->connection->delete(
-            'task_tag',
-            [
-                'task_id' => $taskId,
-            ],
-        );
+        $this->connection
+            ->executeStatement(
+                <<<'SQL'
+DELETE FROM task_tag
+USING tag
+WHERE task_tag.task_id = :taskId
+  AND tag.id = task_tag.tag_id
+  AND tag.user_id = :userId
+SQL,
+                [
+                    'taskId' =>
+                        $taskId,
+
+                    'userId' =>
+                        $this->currentUser
+                            ->id(),
+                ],
+            );
 
         foreach ($tagIds as $tagId) {
             $this->connection->insert(
@@ -677,8 +713,20 @@ SQL,
 UPDATE note
 SET updated_at = NOW()
 WHERE id = :noteId
-  AND user_id = :userId
-  AND channel_id IS NULL
+  AND (
+      (
+          user_id = :userId
+          AND channel_id IS NULL
+      )
+      OR EXISTS (
+          SELECT 1
+          FROM project_member member
+          WHERE member.project_id =
+                    note.project_id
+            AND member.user_id =
+                    :userId
+      )
+  )
 SQL,
             [
                 'noteId' => $noteId,
