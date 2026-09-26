@@ -9,6 +9,7 @@ import { api } from '../services/api'
 
 import type {
   Project,
+  ProjectRole,
 } from '../types/domain'
 
 interface ProjectInvitation {
@@ -21,11 +22,39 @@ interface ProjectInvitation {
   createdAt: string
 }
 
+interface ProjectMember {
+  userId: number
+  email: string
+  role: ProjectRole
+  joinedAt: string
+}
+
+interface AccessStatus {
+  email: string | null
+}
+
 const projects =
   ref<Project[]>([])
 
 const invitations =
   ref<ProjectInvitation[]>([])
+
+const currentEmail =
+  ref('')
+
+const projectMembers =
+  ref<
+    Record<number, ProjectMember[]>
+  >({})
+
+const expandedProjectIds =
+  ref<number[]>([])
+
+const membersLoadingProjectId =
+  ref<number | null>(null)
+
+const memberActionBusy =
+  ref<string | null>(null)
 
 const loading = ref(true)
 const error = ref('')
@@ -52,6 +81,7 @@ async function load(): Promise<void> {
     const [
       projectResponse,
       invitationResponse,
+      accessResponse,
     ] = await Promise.all([
       api<{
         projects: Project[]
@@ -63,7 +93,15 @@ async function load(): Promise<void> {
       }>(
         '/api/project-invitations',
       ),
+
+      api<AccessStatus>(
+        '/api/access/status',
+      ),
     ])
+
+    currentEmail.value =
+      accessResponse.email?.trim()
+      ?? ''
 
     projects.value =
       projectResponse.projects
@@ -235,6 +273,322 @@ async function rejectInvitation(
         : 'Impossible de refuser l’invitation.'
   } finally {
     busyInvitationId.value = null
+  }
+}
+
+function membersExpanded(
+  projectId: number,
+): boolean {
+  return expandedProjectIds.value
+    .includes(projectId)
+}
+
+function membersFor(
+  projectId: number,
+): ProjectMember[] {
+  return projectMembers.value[
+    projectId
+  ] ?? []
+}
+
+function sameEmail(
+  first: string,
+  second: string,
+): boolean {
+  return (
+    first.trim().toLocaleLowerCase()
+    === second.trim().toLocaleLowerCase()
+  )
+}
+
+function isCurrentMember(
+  member: ProjectMember,
+): boolean {
+  return (
+    currentEmail.value !== ''
+    && sameEmail(
+      member.email,
+      currentEmail.value,
+    )
+  )
+}
+
+function memberBusyKey(
+  project: Project,
+  member: ProjectMember,
+): string {
+  return `${project.id}:${member.userId}`
+}
+
+function canChangeRole(
+  project: Project,
+  member: ProjectMember,
+): boolean {
+  return (
+    project.role === 'owner'
+    && member.role !== 'owner'
+    && !isCurrentMember(member)
+  )
+}
+
+function canRemoveMember(
+  project: Project,
+  member: ProjectMember,
+): boolean {
+  if (
+    member.role === 'owner'
+    || isCurrentMember(member)
+  ) {
+    return false
+  }
+
+  if (project.role === 'owner') {
+    return true
+  }
+
+  return (
+    project.role === 'admin'
+    && member.role === 'member'
+  )
+}
+
+async function loadMembers(
+  projectId: number,
+): Promise<void> {
+  membersLoadingProjectId.value =
+    projectId
+
+  error.value = ''
+
+  try {
+    const response =
+      await api<{
+        members: ProjectMember[]
+      }>(
+        `/api/projects/${projectId}/members`,
+      )
+
+    projectMembers.value = {
+      ...projectMembers.value,
+
+      [projectId]:
+        response.members,
+    }
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de charger les membres.'
+  } finally {
+    membersLoadingProjectId.value =
+      null
+  }
+}
+
+async function toggleMembers(
+  project: Project,
+): Promise<void> {
+  if (
+    membersExpanded(project.id)
+  ) {
+    expandedProjectIds.value =
+      expandedProjectIds.value.filter(
+        id => id !== project.id,
+      )
+
+    return
+  }
+
+  expandedProjectIds.value = [
+    ...expandedProjectIds.value,
+    project.id,
+  ]
+
+  if (
+    !Object.prototype.hasOwnProperty.call(
+      projectMembers.value,
+      project.id,
+    )
+  ) {
+    await loadMembers(project.id)
+  }
+}
+
+async function changeMemberRole(
+  project: Project,
+  member: ProjectMember,
+  event: Event,
+): Promise<void> {
+  if (
+    !canChangeRole(
+      project,
+      member,
+    )
+  ) {
+    return
+  }
+
+  const select =
+    event.target as HTMLSelectElement
+
+  const role =
+    select.value as
+      | 'admin'
+      | 'member'
+
+  const key =
+    memberBusyKey(
+      project,
+      member,
+    )
+
+  memberActionBusy.value = key
+  error.value = ''
+
+  try {
+    await api(
+      `/api/projects/${project.id}/members/${member.userId}/role`,
+      {
+        method: 'PUT',
+
+        body: JSON.stringify({
+          role,
+        }),
+      },
+    )
+
+    await loadMembers(
+      project.id,
+    )
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de modifier le rôle.'
+
+    await loadMembers(
+      project.id,
+    )
+  } finally {
+    memberActionBusy.value = null
+  }
+}
+
+async function removeMember(
+  project: Project,
+  member: ProjectMember,
+): Promise<void> {
+  if (
+    !canRemoveMember(
+      project,
+      member,
+    )
+  ) {
+    return
+  }
+
+  const confirmed =
+    window.confirm(
+      `Retirer ${member.email} du projet « ${project.name} » ?`,
+    )
+
+  if (!confirmed) {
+    return
+  }
+
+  const key =
+    memberBusyKey(
+      project,
+      member,
+    )
+
+  memberActionBusy.value = key
+  error.value = ''
+
+  try {
+    await api(
+      `/api/projects/${project.id}/members/${member.userId}`,
+      {
+        method: 'DELETE',
+      },
+    )
+
+    project.memberCount =
+      Math.max(
+        0,
+        project.memberCount - 1,
+      )
+
+    await loadMembers(
+      project.id,
+    )
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de retirer le membre.'
+  } finally {
+    memberActionBusy.value = null
+  }
+}
+
+async function leaveProject(
+  project: Project,
+): Promise<void> {
+  if (
+    project.role === 'owner'
+    || busyProjectId.value !== null
+  ) {
+    return
+  }
+
+  const confirmed =
+    window.confirm(
+      `Quitter le projet « ${project.name} » ?`,
+    )
+
+  if (!confirmed) {
+    return
+  }
+
+  busyProjectId.value =
+    project.id
+
+  error.value = ''
+
+  try {
+    await api(
+      `/api/projects/${project.id}/leave`,
+      {
+        method: 'POST',
+      },
+    )
+
+    projects.value =
+      projects.value.filter(
+        candidate =>
+          candidate.id !== project.id,
+      )
+
+    expandedProjectIds.value =
+      expandedProjectIds.value.filter(
+        id => id !== project.id,
+      )
+
+    const {
+      [project.id]: _removed,
+      ...remainingMembers
+    } = projectMembers.value
+
+    projectMembers.value =
+      remainingMembers
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de quitter le projet.'
+  } finally {
+    busyProjectId.value = null
   }
 }
 
@@ -494,6 +848,164 @@ onMounted(
             }}
           </span>
         </div>
+
+        <button
+          class="ui-button ui-button--secondary project-members-toggle"
+          type="button"
+          @click="
+            toggleMembers(project)
+          "
+        >
+          <AppIcon
+            name="users"
+            :size="17"
+          />
+
+          {{
+            membersExpanded(project.id)
+              ? 'Masquer les membres'
+              : 'Voir les membres'
+          }}
+        </button>
+
+        <section
+          v-if="
+            membersExpanded(project.id)
+          "
+          class="project-members-panel"
+        >
+          <div class="project-members-heading">
+            <strong>
+              Membres
+            </strong>
+
+            <small class="muted">
+              {{ project.memberCount }}
+              au total
+            </small>
+          </div>
+
+          <p
+            v-if="
+              membersLoadingProjectId
+              === project.id
+            "
+            class="muted"
+          >
+            Chargement des membres…
+          </p>
+
+          <div
+            v-else
+            class="project-member-list"
+          >
+            <div
+              v-for="
+                member
+                in membersFor(project.id)
+              "
+              :key="member.userId"
+              class="project-member-row"
+            >
+              <div class="project-member-identity">
+                <strong>
+                  {{ member.email }}
+                </strong>
+
+                <small
+                  v-if="
+                    isCurrentMember(member)
+                  "
+                  class="muted"
+                >
+                  Vous
+                </small>
+              </div>
+
+              <select
+                v-if="
+                  canChangeRole(
+                    project,
+                    member,
+                  )
+                "
+                class="project-member-role"
+                :value="member.role"
+                :disabled="
+                  memberActionBusy
+                  === memberBusyKey(
+                    project,
+                    member,
+                  )
+                "
+                @change="
+                  changeMemberRole(
+                    project,
+                    member,
+                    $event,
+                  )
+                "
+              >
+                <option value="admin">
+                  Administrateur
+                </option>
+
+                <option value="member">
+                  Membre
+                </option>
+              </select>
+
+              <span
+                v-else
+                class="project-member-role-label"
+              >
+                {{ roleLabel(member.role) }}
+              </span>
+
+              <button
+                v-if="
+                  canRemoveMember(
+                    project,
+                    member,
+                  )
+                "
+                class="project-member-remove"
+                type="button"
+                :disabled="
+                  memberActionBusy
+                  === memberBusyKey(
+                    project,
+                    member,
+                  )
+                "
+                @click="
+                  removeMember(
+                    project,
+                    member,
+                  )
+                "
+              >
+                Retirer
+              </button>
+            </div>
+          </div>
+
+          <button
+            v-if="
+              project.role !== 'owner'
+            "
+            class="project-leave"
+            type="button"
+            :disabled="
+              busyProjectId !== null
+            "
+            @click="
+              leaveProject(project)
+            "
+          >
+            Quitter ce projet
+          </button>
+        </section>
 
         <form
           v-if="
