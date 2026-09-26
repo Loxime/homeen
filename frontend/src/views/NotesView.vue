@@ -131,6 +131,64 @@ const activeCollection =
       ) ?? null,
   )
 
+const gridSections =
+  computed(
+    () => {
+      if (
+        props.scope
+        !== 'active'
+      ) {
+        return [
+          {
+            key: 'all',
+            title: '',
+            notes:
+              notes.value,
+          },
+        ]
+      }
+
+      const pinned =
+        notes.value.filter(
+          note =>
+            note.isPinned,
+        )
+
+      const other =
+        notes.value.filter(
+          note =>
+            !note.isPinned,
+        )
+
+      const sections: Array<{
+        key: string
+        title: string
+        notes: NoteSummary[]
+      }> = []
+
+      if (pinned.length > 0) {
+        sections.push({
+          key: 'pinned',
+          title: 'Épinglées',
+          notes: pinned,
+        })
+      }
+
+      if (other.length > 0) {
+        sections.push({
+          key: 'other',
+          title:
+            pinned.length > 0
+              ? 'Autres'
+              : '',
+          notes: other,
+        })
+      }
+
+      return sections
+    },
+  )
+
 async function load():
 Promise<void> {
   loading.value = true
@@ -715,96 +773,131 @@ onMounted(
         display === 'grid'
         || scope === 'trash'
       "
-      class="notes-grid"
+      class="keep-note-sections"
     >
-      <article
-        v-for="note in notes"
-        :key="note.id"
-        class="note-card"
-        :class="{
-          pinned:
-            note.isPinned,
-        }"
-        :style="{
-          background:
-            note.color,
-        }"
-        @click="openNote(note)"
+      <section
+        v-for="section in gridSections"
+        :key="section.key"
+        class="keep-note-section"
       >
-        <div class="note-card-top">
-          <div class="note-card-tags">
-            <span
-              v-if="note.collectionName"
-              class="collection-label"
-              :style="{
-                '--collection':
-                  note.collectionColor
-                  ?? '#1A73E8',
-              }"
-            >
-              {{
-                note.collectionName
-              }}
-            </span>
-
-            <span
-              v-for="tag in note.tags"
-              :key="tag.id"
-              class="label-chip"
-              :style="{
-                '--label':
-                  tag.color,
-              }"
-            >
-              {{ tag.name }}
-            </span>
-          </div>
-
-          <div class="note-card-status">
-            <AppIcon
-              v-if="note.isPinned"
-              name="pin"
-              :size="16"
-            />
-
-            <span
-              v-if="note.taskCount > 0"
-              class="task-ratio"
-            >
-            {{ note.completedTaskCount }}
-            /
-            {{ note.taskCount }}
-            </span>
-          </div>
-        </div>
-
-        <h2>
-          {{
-            note.title
-            || 'Sans titre'
-          }}
+        <h2
+          v-if="section.title"
+          class="keep-note-section-title"
+        >
+          {{ section.title }}
         </h2>
 
-        <p class="note-excerpt">
-          {{ noteExcerpt(note) }}
-        </p>
+        <div class="notes-grid">
+          <article
+            v-for="note in section.notes"
+            :key="note.id"
+            class="note-card"
+            :class="{
+              pinned:
+                note.isPinned,
+            }"
+            :style="{
+              background:
+                note.color,
+            }"
+            @click="openNote(note)"
+          >
+            <img
+              v-if="
+                note.previewImageUrl
+              "
+              class="note-card-preview"
+              :src="
+                note.previewImageUrl
+              "
+              alt=""
+              loading="lazy"
+            />
 
-        <footer>
-          <span>
-            {{
-              scope === 'trash'
-                ? 'Supprimée'
-                : 'Modifiée'
-            }}
-          </span>
+            <div class="note-card-top">
+              <div class="note-card-tags">
+                <span
+                  v-if="
+                    note.collectionName
+                  "
+                  class="collection-label"
+                  :style="{
+                    '--collection':
+                      note.collectionColor
+                      ?? '#1A73E8',
+                  }"
+                >
+                  {{
+                    note.collectionName
+                  }}
+                </span>
 
-          {{
-            formatDate(
-              noteCardDate(note),
-            )
-          }}
-        </footer>
-      </article>
+                <span
+                  v-for="tag in note.tags"
+                  :key="tag.id"
+                  class="label-chip"
+                  :style="{
+                    '--label':
+                      tag.color,
+                  }"
+                >
+                  {{ tag.name }}
+                </span>
+              </div>
+
+              <div class="note-card-status">
+                <AppIcon
+                  v-if="
+                    note.isPinned
+                  "
+                  name="pin"
+                  :size="16"
+                />
+
+                <span
+                  v-if="
+                    note.taskCount > 0
+                  "
+                  class="task-ratio"
+                >
+                  {{
+                    note.completedTaskCount
+                  }}
+                  /
+                  {{ note.taskCount }}
+                </span>
+              </div>
+            </div>
+
+            <h2>
+              {{
+                note.title
+                || 'Sans titre'
+              }}
+            </h2>
+
+            <p class="note-excerpt">
+              {{ noteExcerpt(note) }}
+            </p>
+
+            <footer>
+              <span>
+                {{
+                  scope === 'trash'
+                    ? 'Supprimée'
+                    : 'Modifiée'
+                }}
+              </span>
+
+              {{
+                formatDate(
+                  noteCardDate(note),
+                )
+              }}
+            </footer>
+          </article>
+        </div>
+      </section>
     </div>
 
     <div

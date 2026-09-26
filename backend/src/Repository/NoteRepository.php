@@ -103,6 +103,22 @@ SELECT
     n.content,
     n.is_pinned AS "isPinned",
     n.color,
+    (
+        SELECT
+            '/api/images/'
+            || preview_image.id::text
+            || '/content'
+        FROM note_image preview_link
+        INNER JOIN image_asset preview_image
+            ON preview_image.id =
+                preview_link.image_id
+        WHERE preview_link.note_id = n.id
+          AND preview_image.user_id = :userId
+        ORDER BY
+            preview_link.created_at ASC,
+            preview_image.id ASC
+        LIMIT 1
+    ) AS "previewImageUrl",
     n.collection_id AS "collectionId",
     collection.name AS "collectionName",
     collection.color AS "collectionColor",
@@ -154,6 +170,22 @@ SELECT
     n.content,
     n.is_pinned AS "isPinned",
     n.color,
+    (
+        SELECT
+            '/api/images/'
+            || preview_image.id::text
+            || '/content'
+        FROM note_image preview_link
+        INNER JOIN image_asset preview_image
+            ON preview_image.id =
+                preview_link.image_id
+        WHERE preview_link.note_id = n.id
+          AND preview_image.user_id = :userId
+        ORDER BY
+            preview_link.created_at ASC,
+            preview_image.id ASC
+        LIMIT 1
+    ) AS "previewImageUrl",
     n.collection_id AS "collectionId",
     collection.name AS "collectionName",
     collection.color AS "collectionColor",

@@ -62,6 +62,7 @@ export interface NoteSummary {
   content: string
   isPinned: boolean
   color: string
+  previewImageUrl: string | null
   tags: Tag[]
   collectionId: number | null
   collectionName: string | null

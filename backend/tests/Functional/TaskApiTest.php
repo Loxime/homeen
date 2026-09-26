@@ -643,6 +643,57 @@ SQL,
             $pinned['color'],
         );
 
+        $imageId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO image_asset (
+    user_id,
+    stored_name,
+    original_name,
+    mime_type,
+    size_bytes,
+    width,
+    height
+)
+VALUES (
+    :userId,
+    :storedName,
+    'keep-preview.png',
+    'image/png',
+    128,
+    320,
+    180
+)
+RETURNING id
+SQL,
+                    [
+                        'userId' =>
+                            $this->userId,
+
+                        'storedName' =>
+                            sprintf(
+                                'keep-preview-%d.png',
+                                $plain['id'],
+                            ),
+                    ],
+                );
+
+        self::assertNotFalse(
+            $imageId,
+        );
+
+        $this->connection->insert(
+            'note_image',
+            [
+                'note_id' =>
+                    $plain['id'],
+
+                'image_id' =>
+                    (int) $imageId,
+            ],
+        );
+
         $list = $this->jsonRequest(
             'GET',
             '/api/notes',
@@ -651,6 +702,56 @@ SQL,
         self::assertSame(
             $pinned['id'],
             $list['notes'][0]['id'],
+        );
+
+        $plainSummary = null;
+
+        foreach (
+            $list['notes']
+            as $summary
+        ) {
+            if (
+                $summary['id']
+                === $plain['id']
+            ) {
+                $plainSummary =
+                    $summary;
+
+                break;
+            }
+        }
+
+        self::assertNotNull(
+            $plainSummary,
+        );
+
+        self::assertSame(
+            sprintf(
+                '/api/images/%d/content',
+                $imageId,
+            ),
+            $plainSummary[
+                'previewImageUrl'
+            ],
+        );
+
+        $plainDetail =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/notes/%d',
+                    $plain['id'],
+                ),
+            );
+
+        self::assertSame(
+            sprintf(
+                '/api/images/%d/content',
+                $imageId,
+            ),
+            $plainDetail[
+                'previewImageUrl'
+            ],
         );
 
         /*
