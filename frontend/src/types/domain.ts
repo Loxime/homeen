@@ -10,6 +10,25 @@ export interface ImageAsset {
   contentUrl: string
 }
 
+export type ProjectRole =
+  | 'owner'
+  | 'admin'
+  | 'member'
+
+export interface Project {
+  id: number
+  name: string
+  description: string
+  color: string
+  imageUrl: string | null
+  role: ProjectRole
+  memberCount: number
+  noteCount: number
+  createdAt: string
+  updatedAt: string
+  archivedAt: string | null
+}
+
 export interface NoteCollection {
   id: number
   name: string
@@ -67,6 +86,9 @@ export interface NoteSummary {
   collectionId: number | null
   collectionName: string | null
   collectionColor: string | null
+  projectId: number | null
+  projectName: string | null
+  projectColor: string | null
   createdAt: string
   updatedAt: string
   archivedAt: string | null

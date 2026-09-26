@@ -25,23 +25,45 @@ final readonly class NoteRepository
         string $scope = 'active',
         ?string $query = null,
         ?int $collectionId = null,
+        ?int $projectId = null,
     ): array {
         $userId = $this->currentUser->id();
 
+        if (
+            $collectionId !== null
+            && $projectId !== null
+        ) {
+            throw new \InvalidArgumentException(
+                'Use either collectionId or projectId when filtering notes.'
+            );
+        }
+
+        if ($projectId !== null) {
+            $this->validateProject(
+                $projectId
+            );
+
+            $ownerWhere =
+                'n.project_id = :projectId';
+        } else {
+            $ownerWhere =
+                'n.user_id = :userId';
+        }
+
         $where = match ($scope) {
             'active' =>
-                'n.user_id = :userId
-                 AND n.deleted_at IS NULL
-                 AND n.archived_at IS NULL',
+                $ownerWhere
+                .' AND n.deleted_at IS NULL'
+                .' AND n.archived_at IS NULL',
 
             'archived' =>
-                'n.user_id = :userId
-                 AND n.deleted_at IS NULL
-                 AND n.archived_at IS NOT NULL',
+                $ownerWhere
+                .' AND n.deleted_at IS NULL'
+                .' AND n.archived_at IS NOT NULL',
 
             'trash' =>
-                'n.user_id = :userId
-                 AND n.deleted_at IS NOT NULL',
+                $ownerWhere
+                .' AND n.deleted_at IS NOT NULL',
 
             default =>
                 throw new \InvalidArgumentException(
@@ -52,6 +74,11 @@ final readonly class NoteRepository
         $params = [
             'userId' => $userId,
         ];
+
+        if ($projectId !== null) {
+            $params['projectId'] =
+                $projectId;
+        }
 
         if ($collectionId !== null) {
             $this->validateCollection(
@@ -122,6 +149,9 @@ SELECT
     n.collection_id AS "collectionId",
     collection.name AS "collectionName",
     collection.color AS "collectionColor",
+    n.project_id AS "projectId",
+    project.name AS "projectName",
+    project.color AS "projectColor",
     n.created_at AS "createdAt",
     n.updated_at AS "updatedAt",
     n.archived_at AS "archivedAt",
@@ -134,10 +164,15 @@ FROM note n
 LEFT JOIN note_collection collection
     ON collection.id = n.collection_id
    AND collection.user_id = :userId
+LEFT JOIN project
+    ON project.id = n.project_id
 LEFT JOIN task t
     ON t.note_id = n.id
 WHERE $where
-GROUP BY n.id, collection.id
+GROUP BY
+    n.id,
+    collection.id,
+    project.id
 ORDER BY
     n.is_pinned DESC,
     n.updated_at DESC,
@@ -159,11 +194,13 @@ SQL;
     /** @return array<string, mixed> */
     public function get(int $id): array
     {
-        $userId = $this->currentUser->id();
+        $userId =
+            $this->currentUser->id();
 
-        $note = $this->connection
-            ->fetchAssociative(
-                <<<'SQL'
+        $note =
+            $this->connection
+                ->fetchAssociative(
+                    <<<'SQL'
 SELECT
     n.id,
     n.title,
@@ -189,6 +226,9 @@ SELECT
     n.collection_id AS "collectionId",
     collection.name AS "collectionName",
     collection.color AS "collectionColor",
+    n.project_id AS "projectId",
+    project.name AS "projectName",
+    project.color AS "projectColor",
     n.created_at AS "createdAt",
     n.updated_at AS "updatedAt",
     n.archived_at AS "archivedAt",
@@ -197,14 +237,26 @@ FROM note n
 LEFT JOIN note_collection collection
     ON collection.id = n.collection_id
    AND collection.user_id = :userId
+LEFT JOIN project
+    ON project.id = n.project_id
 WHERE n.id = :id
-  AND n.user_id = :userId
+  AND (
+      n.user_id = :userId
+      OR EXISTS (
+          SELECT 1
+          FROM project_member member
+          WHERE member.project_id =
+                    n.project_id
+            AND member.user_id =
+                    :userId
+      )
+  )
 SQL,
-                [
-                    'id' => $id,
-                    'userId' => $userId,
-                ],
-            );
+                    [
+                        'id' => $id,
+                        'userId' => $userId,
+                    ],
+                );
 
         if ($note === false) {
             throw new \OutOfBoundsException(
@@ -218,7 +270,8 @@ SQL,
         $note['tags'] =
             $this->tagsForNote($id);
 
-        $note['id'] = (int) $note['id'];
+        $note['id'] =
+            (int) $note['id'];
 
         $note['isPinned'] =
             filter_var(
@@ -229,6 +282,11 @@ SQL,
         $note['collectionId'] =
             $note['collectionId'] !== null
                 ? (int) $note['collectionId']
+                : null;
+
+        $note['projectId'] =
+            $note['projectId'] !== null
+                ? (int) $note['projectId']
                 : null;
 
         return $note;
@@ -244,6 +302,7 @@ SQL,
         string $content,
         array $tagIds,
         ?int $collectionId,
+        ?int $projectId,
         bool $isPinned,
         string $color,
     ): array {
@@ -261,7 +320,12 @@ SQL,
             $collectionId
         );
 
-        $userId = $this->currentUser->id();
+        $this->validateProject(
+            $projectId
+        );
+
+        $userId =
+            $this->currentUser->id();
 
         return $this->connection
             ->transactional(
@@ -270,18 +334,21 @@ SQL,
                     $content,
                     $tagIds,
                     $collectionId,
+                    $projectId,
                     $isPinned,
                     $color,
                     $userId,
                 ): array {
-                    $id = $this->connection
-                        ->fetchOne(
-                            <<<'SQL'
+                    $id =
+                        $this->connection
+                            ->fetchOne(
+                                <<<'SQL'
 INSERT INTO note (
     user_id,
     title,
     content,
     collection_id,
+    project_id,
     is_pinned,
     color
 )
@@ -290,29 +357,39 @@ VALUES (
     :title,
     :content,
     :collectionId,
+    :projectId,
     :isPinned,
     :color
 )
 RETURNING id
 SQL,
-                            [
-                                'userId' => $userId,
-                                'title' => trim($title),
-                                'content' => $content,
-                                'collectionId' =>
-                                    $collectionId,
+                                [
+                                    'userId' =>
+                                        $userId,
 
-                                'isPinned' =>
-                                    $isPinned,
+                                    'title' =>
+                                        trim($title),
 
-                                'color' =>
-                                    $color,
-                            ],
-                            [
-                                'isPinned' =>
-                                    ParameterType::BOOLEAN,
-                            ],
-                        );
+                                    'content' =>
+                                        $content,
+
+                                    'collectionId' =>
+                                        $collectionId,
+
+                                    'projectId' =>
+                                        $projectId,
+
+                                    'isPinned' =>
+                                        $isPinned,
+
+                                    'color' =>
+                                        $color,
+                                ],
+                                [
+                                    'isPinned' =>
+                                        ParameterType::BOOLEAN,
+                                ],
+                            );
 
                     if ($id === false) {
                         throw new \RuntimeException(
@@ -320,7 +397,8 @@ SQL,
                         );
                     }
 
-                    $noteId = (int) $id;
+                    $noteId =
+                        (int) $id;
 
                     $this->syncTags(
                         $noteId,
@@ -332,9 +410,14 @@ SQL,
                         'note',
                         $noteId,
                         [
-                            'tagIds' => $tagIds,
+                            'tagIds' =>
+                                $tagIds,
+
                             'collectionId' =>
                                 $collectionId,
+
+                            'projectId' =>
+                                $projectId,
 
                             'isPinned' =>
                                 $isPinned,
@@ -356,12 +439,19 @@ SQL,
      *
      * @return array<string, mixed>
      */
+    /**
+     * @param list<int> $tagIds
+     *
+     * @return array<string, mixed>
+     */
     public function update(
         int $id,
         string $title,
         string $content,
         array $tagIds,
         ?int $collectionId,
+        ?int $projectId,
+        bool $projectProvided,
         ?bool $isPinned,
         ?string $color,
     ): array {
@@ -369,6 +459,29 @@ SQL,
 
         $current =
             $this->get($id);
+
+        if (!$projectProvided) {
+            $projectId =
+                $current['projectId'] !== null
+                    ? (int) $current['projectId']
+                    : null;
+        }
+
+        if (
+            $projectProvided
+            && $projectId === null
+            && !$this->hasPersonalOwner(
+                $id
+            )
+        ) {
+            throw new \InvalidArgumentException(
+                'A shared note must belong to a project.'
+            );
+        }
+
+        $this->validateProject(
+            $projectId
+        );
 
         $isPinned ??=
             (bool) $current['isPinned'];
@@ -386,7 +499,8 @@ SQL,
             $collectionId
         );
 
-        $userId = $this->currentUser->id();
+        $userId =
+            $this->currentUser->id();
 
         return $this->connection
             ->transactional(
@@ -396,6 +510,7 @@ SQL,
                     $content,
                     $tagIds,
                     $collectionId,
+                    $projectId,
                     $isPinned,
                     $color,
                     $userId,
@@ -408,23 +523,42 @@ UPDATE note
 SET title = :title,
     content = :content,
     collection_id = :collectionId,
+    project_id = :projectId,
     is_pinned = :isPinned,
     color = :color,
     updated_at = NOW()
 WHERE id = :id
-  AND user_id = :userId
+  AND (
+      user_id = :userId
+      OR EXISTS (
+          SELECT 1
+          FROM project_member member
+          WHERE member.project_id =
+                    note.project_id
+            AND member.user_id =
+                    :userId
+      )
+  )
   AND deleted_at IS NULL
 SQL,
                                 [
-                                    'id' => $id,
+                                    'id' =>
+                                        $id,
+
                                     'userId' =>
                                         $userId,
+
                                     'title' =>
                                         trim($title),
+
                                     'content' =>
                                         $content,
+
                                     'collectionId' =>
                                         $collectionId,
+
+                                    'projectId' =>
+                                        $projectId,
 
                                     'isPinned' =>
                                         $isPinned,
@@ -454,9 +588,14 @@ SQL,
                         'note',
                         $id,
                         [
-                            'tagIds' => $tagIds,
+                            'tagIds' =>
+                                $tagIds,
+
                             'collectionId' =>
                                 $collectionId,
+
+                            'projectId' =>
+                                $projectId,
 
                             'isPinned' =>
                                 $isPinned,
@@ -500,6 +639,7 @@ INSERT INTO note (
     title,
     content,
     collection_id,
+    project_id,
     color
 )
 VALUES (
@@ -507,6 +647,7 @@ VALUES (
     :title,
     :content,
     :collectionId,
+    :projectId,
     :color
 )
 RETURNING id
@@ -531,6 +672,11 @@ SQL,
                                         !== null
                                             ? (int) $original['collectionId']
                                             : null,
+
+                                'projectId' =>
+                                    $original['projectId'] !== null
+                                        ? (int) $original['projectId']
+                                        : null,
 
                                 'color' =>
                                     (string) $original['color'],
@@ -829,6 +975,11 @@ SQL,
                 ? (int) $row['collectionId']
                 : null;
 
+        $row['projectId'] =
+            $row['projectId'] !== null
+                ? (int) $row['projectId']
+                : null;
+
         $row['taskCount'] =
             (int) $row['taskCount'];
 
@@ -868,6 +1019,58 @@ SQL,
         }
 
         return strtoupper($color);
+    }
+
+    private function validateProject(
+        ?int $projectId,
+    ): void {
+        if ($projectId === null) {
+            return;
+        }
+
+        $exists =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT 1
+FROM project_member
+WHERE project_id = :projectId
+  AND user_id = :userId
+LIMIT 1
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+
+                        'userId' =>
+                            $this->currentUser
+                                ->id(),
+                    ],
+                );
+
+        if ($exists === false) {
+            throw new \InvalidArgumentException(
+                'Selected project does not exist.'
+            );
+        }
+    }
+
+    private function hasPersonalOwner(
+        int $noteId,
+    ): bool {
+        return $this->connection
+            ->fetchOne(
+                <<<'SQL'
+SELECT 1
+FROM note
+WHERE id = :id
+  AND user_id IS NOT NULL
+LIMIT 1
+SQL,
+                [
+                    'id' => $noteId,
+                ],
+            ) !== false;
     }
 
     private function validateCollection(
@@ -967,12 +1170,24 @@ SQL,
         int $noteId,
         array $tagIds,
     ): void {
-        $this->connection->delete(
-            'note_tag',
-            [
-                'note_id' => $noteId,
-            ],
-        );
+        $this->connection
+            ->executeStatement(
+                <<<'SQL'
+DELETE FROM note_tag
+USING tag
+WHERE note_tag.note_id = :noteId
+  AND tag.id = note_tag.tag_id
+  AND tag.user_id = :userId
+SQL,
+                [
+                    'noteId' =>
+                        $noteId,
+
+                    'userId' =>
+                        $this->currentUser
+                            ->id(),
+                ],
+            );
 
         foreach ($tagIds as $tagId) {
             $this->connection->insert(

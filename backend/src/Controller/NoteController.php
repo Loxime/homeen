@@ -27,6 +27,13 @@ final readonly class NoteController
                 )
                 : null;
 
+        $projectId =
+            $request->query->has('projectId')
+                ? $request->query->getInt(
+                    'projectId'
+                )
+                : null;
+
         return new JsonResponse([
             'notes' => $this->notes->list(
                 (string) $request->query->get(
@@ -39,6 +46,10 @@ final readonly class NoteController
                 $collectionId !== null
                 && $collectionId > 0
                     ? $collectionId
+                    : null,
+                $projectId !== null
+                && $projectId > 0
+                    ? $projectId
                     : null,
             ),
         ]);
@@ -54,23 +65,28 @@ final readonly class NoteController
     public function create(Request $request): JsonResponse
     {
         $data = $this->input->read($request);
+
         return new JsonResponse(
             $this->notes->create(
                 (string) ($data['title'] ?? ''),
                 (string) ($data['content'] ?? ''),
                 $this->tagIds(
-                    $data['tagIds']
-                    ?? [],
+                    $data['tagIds'] ?? [],
                 ),
                 isset($data['collectionId'])
                     ? (int) $data['collectionId']
                     : null,
-
+                array_key_exists(
+                    'projectId',
+                    $data,
+                )
+                && $data['projectId'] !== null
+                    ? (int) $data['projectId']
+                    : null,
                 $this->booleanValue(
                     $data,
                     'isPinned',
                 ) ?? false,
-
                 (string) (
                     $data['color']
                     ?? '#FFFFFF'
@@ -84,24 +100,33 @@ final readonly class NoteController
     public function update(int $id, Request $request): JsonResponse
     {
         $data = $this->input->read($request);
+
+        $projectProvided =
+            array_key_exists(
+                'projectId',
+                $data,
+            );
+
         return new JsonResponse(
             $this->notes->update(
                 $id,
                 (string) ($data['title'] ?? ''),
                 (string) ($data['content'] ?? ''),
                 $this->tagIds(
-                    $data['tagIds']
-                    ?? [],
+                    $data['tagIds'] ?? [],
                 ),
                 isset($data['collectionId'])
                     ? (int) $data['collectionId']
                     : null,
-
+                $projectProvided
+                && $data['projectId'] !== null
+                    ? (int) $data['projectId']
+                    : null,
+                $projectProvided,
                 $this->booleanValue(
                     $data,
                     'isPinned',
                 ),
-
                 isset($data['color'])
                     ? (string) $data['color']
                     : null,

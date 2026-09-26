@@ -582,6 +582,330 @@ SQL,
         );
     }
 
+    public function testNotesBridgeToSharedProject():
+    void {
+        $ownerUserId =
+            $this->createOtherUser();
+
+        $projectId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO project (
+    name,
+    description,
+    color
+)
+VALUES (
+    'Shared project',
+    'Shared note bridge',
+    '#74C0FC'
+)
+RETURNING id
+SQL,
+                );
+
+        self::assertNotFalse(
+            $projectId,
+        );
+
+        $projectId =
+            (int) $projectId;
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $projectId,
+                'user_id' =>
+                    $ownerUserId,
+                'role' =>
+                    'owner',
+            ],
+        );
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $projectId,
+                'user_id' =>
+                    $this->userId,
+                'role' =>
+                    'member',
+            ],
+        );
+
+        $created =
+            $this->jsonRequest(
+                'POST',
+                '/api/notes',
+                [
+                    'title' =>
+                        'Project API note',
+                    'content' =>
+                        'Created through projectId',
+                    'tagIds' => [],
+                    'projectId' =>
+                        $projectId,
+                ],
+            );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            $projectId,
+            $created['projectId'],
+        );
+
+        self::assertSame(
+            'Shared project',
+            $created['projectName'],
+        );
+
+        $filtered =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/notes?projectId=%d',
+                    $projectId,
+                ),
+            );
+
+        self::assertCount(
+            1,
+            $filtered['notes'],
+        );
+
+        /*
+         * Simulate a Channel note already
+         * migrated to Project ownership.
+         */
+        $sharedNoteId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO note (
+    user_id,
+    project_id,
+    title,
+    content
+)
+VALUES (
+    NULL,
+    :projectId,
+    'Migrated shared note',
+    'Shared content'
+)
+RETURNING id
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $sharedNoteId,
+        );
+
+        $sharedNoteId =
+            (int) $sharedNoteId;
+
+        $this->connection->insert(
+            'task',
+            [
+                'note_id' =>
+                    $sharedNoteId,
+                'content' =>
+                    'Existing shared task',
+                'priority' =>
+                    'normal',
+                'status' =>
+                    'todo',
+                'position' =>
+                    0,
+            ],
+        );
+
+        $detail =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/notes/%d',
+                    $sharedNoteId,
+                ),
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            $projectId,
+            $detail['projectId'],
+        );
+
+        self::assertCount(
+            1,
+            $detail['tasks'],
+        );
+
+        $updated =
+            $this->jsonRequest(
+                'PUT',
+                sprintf(
+                    '/api/notes/%d',
+                    $sharedNoteId,
+                ),
+                [
+                    'title' =>
+                        'Migrated note updated',
+                    'content' =>
+                        'Still shared',
+                    'tagIds' => [],
+                ],
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            $projectId,
+            $updated['projectId'],
+        );
+
+        $detached =
+            $this->jsonRequest(
+                'PUT',
+                sprintf(
+                    '/api/notes/%d',
+                    $sharedNoteId,
+                ),
+                [
+                    'title' =>
+                        'Migrated note updated',
+                    'content' =>
+                        'Still shared',
+                    'tagIds' => [],
+                    'projectId' =>
+                        null,
+                ],
+            );
+
+        self::assertSame(
+            422,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'A shared note must belong to a project.',
+            $detached['error'],
+        );
+
+        $duplicate =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/notes/%d/duplicate',
+                    $sharedNoteId,
+                ),
+            );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            $projectId,
+            $duplicate['projectId'],
+        );
+
+        self::assertCount(
+            1,
+            $duplicate['tasks'],
+        );
+
+        $foreignProjectId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO project (
+    name,
+    description,
+    color
+)
+VALUES (
+    'Foreign project',
+    '',
+    '#1A73E8'
+)
+RETURNING id
+SQL,
+                );
+
+        self::assertNotFalse(
+            $foreignProjectId,
+        );
+
+        $foreignProjectId =
+            (int) $foreignProjectId;
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $foreignProjectId,
+                'user_id' =>
+                    $ownerUserId,
+                'role' =>
+                    'owner',
+            ],
+        );
+
+        $foreign =
+            $this->jsonRequest(
+                'POST',
+                '/api/notes',
+                [
+                    'title' =>
+                        'Forbidden project note',
+                    'tagIds' => [],
+                    'projectId' =>
+                        $foreignProjectId,
+                ],
+            );
+
+        self::assertSame(
+            422,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'Selected project does not exist.',
+            $foreign['error'],
+        );
+    }
+
     private function authenticate(): void
     {
         $this->client->request(

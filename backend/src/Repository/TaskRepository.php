@@ -41,7 +41,17 @@ final readonly class TaskRepository
 SELECT 1
 FROM note
 WHERE id = :noteId
-  AND user_id = :userId
+  AND (
+      user_id = :userId
+      OR EXISTS (
+          SELECT 1
+          FROM project_member member
+          WHERE member.project_id =
+                    note.project_id
+            AND member.user_id =
+                    :userId
+      )
+  )
 LIMIT 1
 SQL,
             [
