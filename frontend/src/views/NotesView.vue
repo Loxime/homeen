@@ -25,6 +25,7 @@ import {
 } from '../composables/useToast'
 
 import type {
+  ImageAsset,
   Note,
   NoteCollection,
   NoteSummary,
@@ -65,11 +66,21 @@ const error = ref('')
 const quickComposerOpen =
   ref(false)
 
+const quickMode =
+  ref<'note' | 'list'>(
+    'note',
+  )
+
 const quickTitle =
   ref('')
 
 const quickContent =
   ref('')
+
+const quickTasks =
+  ref<string[]>([
+    '',
+  ])
 
 const quickSaving =
   ref(false)
@@ -79,6 +90,11 @@ const quickActionBusyId =
 
 const quickContentInput =
   ref<HTMLTextAreaElement | null>(
+    null,
+  )
+
+const quickTitleInput =
+  ref<HTMLInputElement | null>(
     null,
   )
 
@@ -210,6 +226,33 @@ const gridSections =
     },
   )
 
+const quickCanCreate =
+  computed(
+    () => {
+      if (
+        quickTitle.value.trim()
+        !== ''
+      ) {
+        return true
+      }
+
+      if (
+        quickMode.value
+        === 'note'
+      ) {
+        return (
+          quickContent.value.trim()
+          !== ''
+        )
+      }
+
+      return quickTasks.value.some(
+        task =>
+          task.trim() !== '',
+      )
+    },
+  )
+
 async function load():
 Promise<void> {
   loading.value = true
@@ -306,6 +349,7 @@ async function openNote(
 
 async function openQuickComposer():
 Promise<void> {
+  quickMode.value = 'note'
   quickComposerOpen.value = true
 
   await nextTick()
@@ -313,30 +357,159 @@ Promise<void> {
   quickContentInput.value?.focus()
 }
 
+async function openQuickListComposer():
+Promise<void> {
+  quickMode.value = 'list'
+  quickComposerOpen.value = true
+
+  await nextTick()
+
+  quickTitleInput.value?.focus()
+}
+
+function resetQuickComposer(): void {
+  quickComposerOpen.value = false
+  quickMode.value = 'note'
+  quickTitle.value = ''
+  quickContent.value = ''
+  quickTasks.value = ['']
+}
+
 function closeQuickComposer(): void {
   if (quickSaving.value) {
     return
   }
 
-  quickComposerOpen.value = false
-  quickTitle.value = ''
-  quickContent.value = ''
+  resetQuickComposer()
+}
+
+function addQuickTask(): void {
+  quickTasks.value.push('')
+}
+
+function removeQuickTask(
+  index: number,
+): void {
+  if (
+    quickTasks.value.length
+    === 1
+  ) {
+    quickTasks.value[0] = ''
+    return
+  }
+
+  quickTasks.value.splice(
+    index,
+    1,
+  )
 }
 
 async function createQuickNote():
 Promise<void> {
+  if (
+    quickSaving.value
+    || !quickCanCreate.value
+  ) {
+    return
+  }
+
   const title =
     quickTitle.value.trim()
 
   const content =
-    quickContent.value.trim()
+    quickMode.value === 'note'
+      ? quickContent.value.trim()
+      : ''
+
+  const tasks =
+    quickTasks.value
+      .map(
+        task => task.trim(),
+      )
+      .filter(
+        task => task !== '',
+      )
+
+  quickSaving.value = true
+  error.value = ''
+
+  try {
+    const note =
+      await api<Note>(
+        '/api/notes',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            title,
+            content,
+            tagIds: [],
+            collectionId:
+              collectionFilter.value,
+            isPinned: false,
+            color: '#FFFFFF',
+          }),
+        },
+      )
+
+    if (
+      quickMode.value === 'list'
+    ) {
+      for (
+        const task
+        of tasks
+      ) {
+        await api(
+          `/api/notes/${note.id}/tasks`,
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              content: task,
+            }),
+          },
+        )
+      }
+    }
+
+    resetQuickComposer()
+
+    await load()
+
+    showSuccess(
+      tasks.length > 0
+        ? 'Liste créée.'
+        : 'Note créée.',
+    )
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de créer la note.'
+
+    /*
+     * A failure after note creation may leave
+     * the successfully created portion intact.
+     * Reload so the UI reflects server state.
+     */
+    await load()
+  } finally {
+    quickSaving.value = false
+  }
+}
+
+async function createImageNote(
+  event: Event,
+): Promise<void> {
+  const input =
+    event.target as HTMLInputElement
+
+  const file =
+    input.files?.[0]
+
+  input.value = ''
 
   if (
-    quickSaving.value
-    || (
-      title === ''
-      && content === ''
-    )
+    !file
+    || quickSaving.value
   ) {
     return
   }
@@ -345,36 +518,66 @@ Promise<void> {
   error.value = ''
 
   try {
-    await api<Note>(
-      '/api/notes',
+    const form =
+      new FormData()
+
+    form.append(
+      'image',
+      file,
+    )
+
+    const image =
+      await api<ImageAsset>(
+        '/api/images',
+        {
+          method: 'POST',
+          body: form,
+        },
+      )
+
+    const note =
+      await api<Note>(
+        '/api/notes',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            title: '',
+            content: '',
+            tagIds: [],
+            collectionId:
+              collectionFilter.value,
+            isPinned: false,
+            color: '#FFFFFF',
+          }),
+        },
+      )
+
+    await api(
+      `/api/images/${image.id}/notes/${note.id}`,
       {
         method: 'POST',
-        body: JSON.stringify({
-          title,
-          content,
-          tagIds: [],
-          collectionId:
-            collectionFilter.value,
-          isPinned: false,
-          color: '#FFFFFF',
-        }),
       },
     )
 
-    quickTitle.value = ''
-    quickContent.value = ''
-    quickComposerOpen.value = false
-
     await load()
 
+    selected.value =
+      await api<Note>(
+        `/api/notes/${note.id}`,
+      )
+
+    modalOpen.value = true
+
     showSuccess(
-      'Note créée.',
+      'Note avec image créée.',
     )
   } catch (exception) {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Impossible de créer la note.'
+        : 'Impossible de créer la note avec image.'
+
+    await load()
   } finally {
     quickSaving.value = false
   }
@@ -961,31 +1164,60 @@ onMounted(
       </div>
     </section>
 
-    <button
+    <div
       v-if="
         scope === 'active'
         && !quickComposerOpen
       "
-      class="keep-note-composer"
-      type="button"
-      @click="openQuickComposer"
+      class="keep-note-composer-shell"
     >
-      <AppIcon
-        name="note"
-        :size="21"
-      />
-
-      <span>
-        Créer une note…
-      </span>
-
-      <span class="keep-composer-actions">
+      <button
+        class="keep-note-composer keep-note-composer-main"
+        type="button"
+        @click="openQuickComposer"
+      >
         <AppIcon
-          name="plus"
-          :size="19"
+          name="note"
+          :size="21"
         />
-      </span>
-    </button>
+
+        <span>
+          Créer une note…
+        </span>
+      </button>
+
+      <label
+        class="keep-note-composer-shortcut"
+        title="Créer une note avec une image"
+        aria-label="Créer une note avec une image"
+      >
+        <AppIcon
+          name="image"
+          :size="20"
+        />
+
+        <input
+          class="image-file-input"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          :disabled="quickSaving"
+          @change="createImageNote"
+        />
+      </label>
+
+      <button
+        class="keep-note-composer-shortcut"
+        type="button"
+        title="Créer une liste"
+        aria-label="Créer une liste"
+        @click="openQuickListComposer"
+      >
+        <AppIcon
+          name="list"
+          :size="20"
+        />
+      </button>
+    </div>
 
     <form
       v-else-if="
@@ -996,7 +1228,27 @@ onMounted(
         createQuickNote
       "
     >
+      <div class="keep-quick-mode-heading">
+        <AppIcon
+          :name="
+            quickMode === 'list'
+              ? 'list'
+              : 'note'
+          "
+          :size="18"
+        />
+
+        <span>
+          {{
+            quickMode === 'list'
+              ? 'Nouvelle liste'
+              : 'Nouvelle note'
+          }}
+        </span>
+      </div>
+
       <input
+        ref="quickTitleInput"
         v-model="quickTitle"
         class="keep-quick-title"
         maxlength="255"
@@ -1005,6 +1257,9 @@ onMounted(
       />
 
       <textarea
+        v-if="
+          quickMode === 'note'
+        "
         ref="quickContentInput"
         v-model="quickContent"
         class="keep-quick-content"
@@ -1021,6 +1276,66 @@ onMounted(
           closeQuickComposer
         "
       />
+
+      <div
+        v-else
+        class="keep-quick-list"
+      >
+        <div
+          v-for="(_, index) in quickTasks"
+          :key="index"
+          class="keep-quick-task"
+        >
+          <input
+            v-model="
+              quickTasks[index]
+            "
+            maxlength="4000"
+            :placeholder="
+              `Élément ${index + 1}`
+            "
+            :aria-label="
+              `Élément ${index + 1}`
+            "
+            @keydown.ctrl.enter.prevent="
+              createQuickNote
+            "
+            @keydown.meta.enter.prevent="
+              createQuickNote
+            "
+            @keydown.esc="
+              closeQuickComposer
+            "
+          />
+
+          <button
+            type="button"
+            title="Retirer cet élément"
+            aria-label="Retirer cet élément"
+            @click="
+              removeQuickTask(index)
+            "
+          >
+            <AppIcon
+              name="close"
+              :size="15"
+            />
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="keep-quick-add-task"
+          @click="addQuickTask"
+        >
+          <AppIcon
+            name="plus"
+            :size="16"
+          />
+
+          Ajouter un élément
+        </button>
+      </div>
 
       <footer class="keep-quick-actions">
         <span class="muted">
@@ -1044,10 +1359,7 @@ onMounted(
             class="keep-quick-create"
             :disabled="
               quickSaving
-              || (
-                !quickTitle.trim()
-                && !quickContent.trim()
-              )
+              || !quickCanCreate
             "
           >
             {{

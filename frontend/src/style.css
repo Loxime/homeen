@@ -2984,3 +2984,148 @@ h3 { margin-bottom: .35rem; }
     transform: none;
   }
 }
+
+/* Sprint 2 — Keep composer shortcuts and responsive polish */
+
+.keep-note-composer-shell {
+  width: min(600px, 100%);
+  margin: 0 auto 20px;
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    48px
+    48px;
+  overflow: hidden;
+  border: 1px solid #dadce0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(60,64,67,.2),
+    0 1px 3px 1px rgba(60,64,67,.1);
+}
+
+.keep-note-composer-shell
+.keep-note-composer {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.keep-note-composer-shortcut {
+  position: relative;
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-left: 1px solid #f1f3f4;
+  background: transparent;
+  color: #5f6368;
+  cursor: pointer;
+}
+
+.keep-note-composer-shortcut:hover {
+  background: #f1f3f4;
+  color: #202124;
+}
+
+.keep-quick-mode-heading {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #5f6368;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.keep-quick-list {
+  display: grid;
+  gap: 4px;
+  padding: 4px 0 8px;
+}
+
+.keep-quick-task {
+  min-height: 38px;
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    34px;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid #f1f3f4;
+}
+
+.keep-quick-task input {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.keep-quick-task button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #777;
+}
+
+.keep-quick-task button:hover {
+  background: #f1f3f4;
+}
+
+.keep-quick-add-task {
+  justify-self: start;
+  min-height: 34px;
+  padding: 5px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #5f6368;
+  font-size: .78rem;
+}
+
+.keep-quick-add-task:hover {
+  background: #f1f3f4;
+}
+
+@media (max-width: 640px) {
+  .keep-note-composer-shell,
+  .keep-quick-composer {
+    width: 100%;
+  }
+
+  .keep-quick-actions {
+    align-items: flex-end;
+  }
+
+  .keep-quick-actions > span {
+    max-width: 130px;
+    line-height: 1.35;
+  }
+
+  .keep-note-section-title {
+    margin-left: 2px;
+  }
+
+  .note-card-preview {
+    max-height: 180px;
+  }
+
+  .note-card-quick-actions {
+    top: 6px;
+    right: 6px;
+  }
+}
