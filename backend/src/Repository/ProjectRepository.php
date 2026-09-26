@@ -185,6 +185,25 @@ SQL,
                         ],
                     );
 
+                    $connection
+                        ->executeStatement(
+                            <<<'SQL'
+INSERT INTO project_workflow_stage (
+    project_id,
+    name,
+    position
+)
+VALUES
+    (:projectId, 'Backlog', 0),
+    (:projectId, 'En cours', 1),
+    (:projectId, 'Terminé', 2)
+SQL,
+                            [
+                                'projectId' =>
+                                    $projectId,
+                            ],
+                        );
+
                     $this->logger->log(
                         'PROJECT_CREATED',
                         'project',

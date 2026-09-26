@@ -2345,6 +2345,360 @@ SQL,
         );
     }
 
+    public function testProjectWorkflowLifecycle():
+    void {
+        $project =
+            $this->jsonRequest(
+                'POST',
+                '/api/projects',
+                [
+                    'name' =>
+                        'Workflow project',
+
+                    'description' =>
+                        '',
+
+                    'color' =>
+                        '#1A73E8',
+                ],
+            );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        $projectId =
+            (int) $project['id'];
+
+        $workflow =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/projects/%d/workflow',
+                    $projectId,
+                ),
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            [
+                'Backlog',
+                'En cours',
+                'Terminé',
+            ],
+            array_column(
+                $workflow['stages'],
+                'name',
+            ),
+        );
+
+        self::assertSame(
+            [0, 1, 2],
+            array_column(
+                $workflow['stages'],
+                'position',
+            ),
+        );
+
+        $created =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/workflow/stages',
+                    $projectId,
+                ),
+                [
+                    'name' =>
+                        'Revue',
+                ],
+            );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'Revue',
+            $created['name'],
+        );
+
+        self::assertSame(
+            3,
+            $created['position'],
+        );
+
+        $stageId =
+            (int) $created['id'];
+
+        $renamed =
+            $this->jsonRequest(
+                'PUT',
+                sprintf(
+                    '/api/projects/%d/workflow/stages/%d',
+                    $projectId,
+                    $stageId,
+                ),
+                [
+                    'name' =>
+                        'Validation',
+                ],
+            );
+
+        self::assertSame(
+            'Validation',
+            $renamed['name'],
+        );
+
+        $defaultIds =
+            array_map(
+                static fn (
+                    mixed $id,
+                ): int => (int) $id,
+                array_column(
+                    $workflow['stages'],
+                    'id',
+                ),
+            );
+
+        $ordered =
+            $this->jsonRequest(
+                'PUT',
+                sprintf(
+                    '/api/projects/%d/workflow/order',
+                    $projectId,
+                ),
+                [
+                    'stageIds' => [
+                        $stageId,
+                        ...$defaultIds,
+                    ],
+                ],
+            );
+
+        self::assertSame(
+            [
+                $stageId,
+                ...$defaultIds,
+            ],
+            array_column(
+                $ordered['stages'],
+                'id',
+            ),
+        );
+
+        self::assertSame(
+            [0, 1, 2, 3],
+            array_column(
+                $ordered['stages'],
+                'position',
+            ),
+        );
+
+        $duplicate =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/workflow/stages',
+                    $projectId,
+                ),
+                [
+                    'name' =>
+                        'backlog',
+                ],
+            );
+
+        self::assertSame(
+            409,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'PROJECT_WORKFLOW_NAME_CONFLICT',
+            $duplicate['code'],
+        );
+
+        /*
+         * Managers only.
+         */
+        $this->connection->update(
+            'project_member',
+            [
+                'role' =>
+                    'member',
+            ],
+            [
+                'project_id' =>
+                    $projectId,
+
+                'user_id' =>
+                    $this->userId,
+            ],
+        );
+
+        $forbidden =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/workflow/stages',
+                    $projectId,
+                ),
+                [
+                    'name' =>
+                        'Interdit',
+                ],
+            );
+
+        self::assertSame(
+            403,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'PROJECT_MANAGEMENT_REQUIRED',
+            $forbidden['code'],
+        );
+
+        $this->connection->update(
+            'project_member',
+            [
+                'role' =>
+                    'owner',
+            ],
+            [
+                'project_id' =>
+                    $projectId,
+
+                'user_id' =>
+                    $this->userId,
+            ],
+        );
+
+        /*
+         * Maximum 20 stages.
+         *
+         * Four already exist.
+         */
+        for (
+            $index = 4;
+            $index < 20;
+            ++$index
+        ) {
+            $extra =
+                $this->jsonRequest(
+                    'POST',
+                    sprintf(
+                        '/api/projects/%d/workflow/stages',
+                        $projectId,
+                    ),
+                    [
+                        'name' =>
+                            sprintf(
+                                'Étape %d',
+                                $index,
+                            ),
+                    ],
+                );
+
+            self::assertSame(
+                201,
+                $this->client
+                    ->getResponse()
+                    ->getStatusCode(),
+            );
+
+            self::assertSame(
+                $index,
+                $extra['position'],
+            );
+        }
+
+        $overflow =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/workflow/stages',
+                    $projectId,
+                ),
+                [
+                    'name' =>
+                        'Étape 21',
+                ],
+            );
+
+        self::assertSame(
+            409,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'PROJECT_WORKFLOW_LIMIT',
+            $overflow['code'],
+        );
+
+        /*
+         * A workflow must always keep at least
+         * one stage.
+         */
+        $keepStageId =
+            $stageId;
+
+        $this->connection
+            ->executeStatement(
+                <<<'SQL'
+DELETE FROM project_workflow_stage
+WHERE project_id = :projectId
+  AND id <> :stageId
+SQL,
+                [
+                    'projectId' =>
+                        $projectId,
+
+                    'stageId' =>
+                        $keepStageId,
+                ],
+            );
+
+        $minimum =
+            $this->jsonRequest(
+                'DELETE',
+                sprintf(
+                    '/api/projects/%d/workflow/stages/%d',
+                    $projectId,
+                    $keepStageId,
+                ),
+            );
+
+        self::assertSame(
+            409,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'PROJECT_WORKFLOW_MINIMUM',
+            $minimum['code'],
+        );
+    }
+
     private function authenticate(): void
     {
         $this->client->request(
