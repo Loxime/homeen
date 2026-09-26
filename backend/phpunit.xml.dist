@@ -2,6 +2,10 @@
 <phpunit bootstrap="tests/bootstrap.php"
          colors="true"
          cacheDirectory="var/cache/phpunit">
+    <php>
+        <env name="APP_ENV" value="test" force="true"/>
+        <env name="KERNEL_CLASS" value="App\Kernel" force="true"/>
+    </php>
     <testsuites>
         <testsuite name="Homeen test suite">
             <directory>tests</directory>

@@ -14,6 +14,7 @@ final readonly class NoteRepository
         private Connection $connection,
         private ActivityLogger $logger,
         private CurrentUser $currentUser,
+        private TaskRepository $tasks,
     ) {
     }
 
@@ -173,29 +174,8 @@ SQL,
             );
         }
 
-        $tasks = $this->connection
-            ->fetchAllAssociative(
-                <<<'SQL'
-SELECT
-    id,
-    content,
-    is_completed AS "isCompleted",
-    completed_at AS "completedAt",
-    created_at AS "createdAt",
-    updated_at AS "updatedAt"
-FROM task
-WHERE note_id = :id
-ORDER BY is_completed ASC,
-         created_at ASC,
-         id ASC
-SQL,
-                ['id' => $id],
-            );
-
-        $note['tasks'] = array_map(
-            $this->normalizeTask(...),
-            $tasks,
-        );
+        $note['tasks'] =
+            $this->tasks->forNote($id);
 
         $note['id'] = (int) $note['id'];
 
@@ -418,20 +398,64 @@ SQL,
                         $original['tasks']
                         as $task
                     ) {
-                        $this->connection
-                            ->insert(
-                                'task',
-                                [
-                                    'note_id' =>
-                                        $newNoteId,
+                        $taskId =
+                            $this->connection
+                                ->fetchOne(
+                                    <<<'SQL'
+INSERT INTO task (
+    note_id,
+    content,
+    priority,
+    status,
+    position,
+    is_completed
+)
+VALUES (
+    :noteId,
+    :content,
+    :priority,
+    'todo',
+    :position,
+    FALSE
+)
+RETURNING id
+SQL,
+                                    [
+                                        'noteId' =>
+                                            $newNoteId,
 
-                                    'content' =>
-                                        (string) $task['content'],
+                                        'content' =>
+                                            (string) $task['content'],
 
-                                    'is_completed' =>
-                                        false,
-                                ],
+                                        'priority' =>
+                                            (string) $task['priority'],
+
+                                        'position' =>
+                                            (int) $task['position'],
+                                    ],
+                                );
+
+                        if ($taskId === false) {
+                            throw new \RuntimeException(
+                                'Unable to duplicate task.'
                             );
+                        }
+
+                        foreach (
+                            $task['tags'] as $tag
+                        ) {
+                            $this->connection
+                                ->insert(
+                                    'task_tag',
+                                    [
+                                        'task_id' =>
+                                            (int) $taskId,
+
+                                        'tag_id' =>
+                                            (int) $tag['id'],
+                                    ],
+                                );
+                        }
                     }
 
                     $this->logger->log(
@@ -594,22 +618,6 @@ SQL,
             (int) $row[
                 'completedTaskCount'
             ];
-
-        return $row;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     * @return array<string, mixed>
-     */
-    private function normalizeTask(
-        array $row,
-    ): array {
-        $row['id'] =
-            (int) $row['id'];
-
-        $row['isCompleted'] =
-            (bool) $row['isCompleted'];
 
         return $row;
     }
