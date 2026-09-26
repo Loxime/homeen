@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-  computed,
   onMounted,
   onUnmounted,
   ref,
@@ -9,10 +8,8 @@ import {
 
 import {
   useRoute,
-  useRouter,
 } from 'vue-router'
 
-import BaseModal from './BaseModal.vue'
 import AppToast from './AppToast.vue'
 import Sidebar from './Sidebar.vue'
 import TopBar from './TopBar.vue'
@@ -26,25 +23,13 @@ import {
   usePomodoro,
 } from '../composables/usePomodoro'
 
-import {
-  useChannelInvitations,
-} from '../composables/useChannelInvitations'
-
 const route = useRoute()
-const router = useRouter()
 
 const {
   startGlobalTimer,
   stopGlobalTimer,
   loadPresets,
 } = usePomodoro()
-
-const {
-  start:
-    startInvitationNotifications,
-  stop:
-    stopInvitationNotifications,
-} = useChannelInvitations()
 
 const MOBILE_QUERY =
   '(max-width: 720px)'
@@ -68,17 +53,6 @@ const sidebarCollapsed = ref(
     : savedDesktopState,
 )
 
-const deniedChannelCode = computed(
-  () => {
-    const value =
-      route.query.channelDenied
-
-    return typeof value === 'string'
-      ? value
-      : null
-  },
-)
-
 function toggleSidebar(): void {
   sidebarCollapsed.value =
     !sidebarCollapsed.value
@@ -98,19 +72,6 @@ function handleViewportChange(
         'homeen-sidebar-collapsed',
       ) === '1'
   }
-}
-
-async function closeDeniedModal(): Promise<void> {
-  const query = {
-    ...route.query,
-  }
-
-  delete query.channelDenied
-
-  await router.replace({
-    path: route.path,
-    query,
-  })
 }
 
 watch(
@@ -142,7 +103,6 @@ onMounted(() => {
 
   startUsageTracking()
   startGlobalTimer()
-  startInvitationNotifications()
 
   void loadPresets()
 })
@@ -155,7 +115,6 @@ onUnmounted(() => {
 
   stopUsageTracking()
   stopGlobalTimer()
-  stopInvitationNotifications()
 })
 </script>
 
@@ -220,34 +179,5 @@ onUnmounted(() => {
 
     <AppToast />
 
-    <BaseModal
-      :open="
-        deniedChannelCode !== null
-      "
-      title="Accès au canal refusé"
-      @close="
-        closeDeniedModal
-      "
-    >
-      <div class="channel-denied-modal">
-        <p>
-          Vous n'êtes pas autorisé
-          à entrer dans le canal
-          <strong>
-            {{ deniedChannelCode }}
-          </strong>.
-        </p>
-
-        <button
-          class="primary"
-          type="button"
-          @click="
-            closeDeniedModal
-          "
-        >
-          Fermer
-        </button>
-      </div>
-    </BaseModal>
   </div>
 </template>

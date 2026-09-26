@@ -12,8 +12,6 @@ import SearchView from '../views/SearchView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import ProjectsView from '../views/ProjectsView.vue'
 import ProjectBoardView from '../views/ProjectBoardView.vue'
-import ChannelsView from '../views/ChannelsView.vue'
-import ChannelView from '../views/ChannelView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -90,12 +88,12 @@ export const router = createRouter({
 
     {
       path: '/channels',
-      component: ChannelsView,
+      redirect: '/projects',
     },
 
     {
       path: '/canal/:code(\\d{9})',
-      component: ChannelView,
+      redirect: '/projects',
     },
 
     {
