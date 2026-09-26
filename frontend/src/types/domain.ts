@@ -28,13 +28,38 @@ export interface NoteCollection {
   noteCount: number
 }
 
+export type TaskPriority =
+  | 'low'
+  | 'normal'
+  | 'high'
+  | 'urgent'
+
+export type TaskStatus =
+  | 'todo'
+  | 'in_progress'
+  | 'done'
+
+export interface Tag {
+  id: number
+  name: string
+  color: string
+  createdAt?: string
+  updatedAt?: string
+  taskCount?: number
+}
+
 export interface Task {
   id: number
+  noteId: number
   content: string
+  priority: TaskPriority
+  status: TaskStatus
+  position: number
   isCompleted: boolean
   completedAt: string | null
   createdAt: string
   updatedAt: string
+  tags: Tag[]
 }
 
 export interface NoteSummary {

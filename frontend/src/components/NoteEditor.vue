@@ -13,13 +13,17 @@ import type {
   Label,
   Note,
   NoteCollection,
+  Tag,
   Task,
+  TaskPriority,
+  TaskStatus,
 } from '../types/domain'
 
 const props = withDefaults(
   defineProps<{
     note: Note | null
     labels: Label[]
+    tags: Tag[]
     collections: NoteCollection[]
     defaultCollectionId?: number | null
   }>(),
@@ -87,6 +91,12 @@ function cloneNote(
     tasks: note.tasks.map(
       task => ({
         ...task,
+
+        tags: task.tags.map(
+          tag => ({
+            ...tag,
+          }),
+        ),
       }),
     ),
   }
@@ -459,6 +469,118 @@ async function addTask(): Promise<void> {
   taskText.value = ''
 
   emit('changed')
+}
+
+async function updateTask(
+  task: Task,
+  payload: {
+    priority?: TaskPriority
+    status?: TaskStatus
+    tagIds?: number[]
+  },
+): Promise<void> {
+  error.value = ''
+
+  try {
+    const updated =
+      await api<Task>(
+        `/api/tasks/${task.id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(
+            payload,
+          ),
+        },
+      )
+
+    Object.assign(
+      task,
+      updated,
+    )
+
+    emit('changed')
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de modifier la tâche.'
+  }
+}
+
+async function setTaskPriority(
+  task: Task,
+  event: Event,
+): Promise<void> {
+  const select =
+    event.target as HTMLSelectElement
+
+  await updateTask(
+    task,
+    {
+      priority:
+        select.value as TaskPriority,
+    },
+  )
+}
+
+async function setTaskStatus(
+  task: Task,
+  event: Event,
+): Promise<void> {
+  const select =
+    event.target as HTMLSelectElement
+
+  await updateTask(
+    task,
+    {
+      status:
+        select.value as TaskStatus,
+    },
+  )
+}
+
+function isTaskTagged(
+  task: Task,
+  tagId: number,
+): boolean {
+  return task.tags.some(
+    tag =>
+      tag.id === tagId,
+  )
+}
+
+async function toggleTaskTag(
+  task: Task,
+  tagId: number,
+  event: Event,
+): Promise<void> {
+  const input =
+    event.target as HTMLInputElement
+
+  const currentIds =
+    task.tags.map(
+      tag => tag.id,
+    )
+
+  const tagIds =
+    input.checked
+      ? Array.from(
+          new Set([
+            ...currentIds,
+            tagId,
+          ]),
+        )
+      : currentIds.filter(
+          id =>
+            id !== tagId,
+        )
+
+  await updateTask(
+    task,
+    {
+      tagIds,
+    },
+  )
 }
 
 async function toggleTask(
@@ -949,9 +1071,124 @@ async function restore(): Promise<void> {
                 @change="toggleTask(task)"
               />
 
-              <span>
-                {{ task.content }}
-              </span>
+              <div class="task-main">
+                <span class="task-content">
+                  {{ task.content }}
+                </span>
+
+                <div class="task-meta">
+                  <label class="task-field">
+                    <span>
+                      Priorité
+                    </span>
+
+                    <select
+                      :value="task.priority"
+                      @change="
+                        setTaskPriority(
+                          task,
+                          $event,
+                        )
+                      "
+                    >
+                      <option value="low">
+                        Basse
+                      </option>
+
+                      <option value="normal">
+                        Normale
+                      </option>
+
+                      <option value="high">
+                        Haute
+                      </option>
+
+                      <option value="urgent">
+                        Urgente
+                      </option>
+                    </select>
+                  </label>
+
+                  <label class="task-field">
+                    <span>
+                      État
+                    </span>
+
+                    <select
+                      :value="task.status"
+                      @change="
+                        setTaskStatus(
+                          task,
+                          $event,
+                        )
+                      "
+                    >
+                      <option value="todo">
+                        À faire
+                      </option>
+
+                      <option value="in_progress">
+                        En cours
+                      </option>
+
+                      <option value="done">
+                        Terminée
+                      </option>
+                    </select>
+                  </label>
+
+                  <div
+                    v-if="tags.length > 0"
+                    class="task-tags"
+                  >
+                    <span class="task-tags-label">
+                      Tags
+                    </span>
+
+                    <label
+                      v-for="tag in tags"
+                      :key="tag.id"
+                      class="task-tag-option"
+                      :class="{
+                        active:
+                          isTaskTagged(
+                            task,
+                            tag.id,
+                          ),
+                      }"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="
+                          isTaskTagged(
+                            task,
+                            tag.id,
+                          )
+                        "
+                        @change="
+                          toggleTaskTag(
+                            task,
+                            tag.id,
+                            $event,
+                          )
+                        "
+                      />
+
+                      <span
+                        class="task-tag-dot"
+                        :style="{
+                          background:
+                            tag.color,
+                        }"
+                      />
+
+                      <span>
+                        {{ tag.name }}
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
 
               <button
                 class="icon-button small"

@@ -11,6 +11,7 @@ import {
 
 import AppIcon from './AppIcon.vue'
 import SidebarLabels from './SidebarLabels.vue'
+import SidebarTags from './SidebarTags.vue'
 
 import {
   usePomodoro,
@@ -73,6 +74,9 @@ const quickLoading = ref(false)
 const labelsOpen =
   ref(false)
 
+const tagsOpen =
+  ref(false)
+
 function toggleLabels(): void {
   if (props.collapsed) {
     emit('expand-sidebar')
@@ -83,6 +87,18 @@ function toggleLabels(): void {
 
   labelsOpen.value =
     !labelsOpen.value
+}
+
+function toggleTags(): void {
+  if (props.collapsed) {
+    emit('expand-sidebar')
+    tagsOpen.value = true
+
+    return
+  }
+
+  tagsOpen.value =
+    !tagsOpen.value
 }
 
 const quickLabel = computed(() => {
@@ -230,6 +246,39 @@ async function quickFocus(): Promise<void> {
         <SidebarLabels
           v-show="
             labelsOpen
+            && !collapsed
+          "
+        />
+      </div>
+
+      <div class="sidebar-label-section">
+        <button
+          class="sidebar-entry sidebar-label-toggle"
+          :class="{
+            active: tagsOpen,
+          }"
+          type="button"
+          :aria-expanded="
+            tagsOpen
+            && !collapsed
+          "
+          title="Gérer les tags de tâches"
+          @click="
+            toggleTags
+          "
+        >
+          <span class="sidebar-icon-slot">
+            <AppIcon name="tag" />
+          </span>
+
+          <span class="sidebar-label">
+            Tags
+          </span>
+        </button>
+
+        <SidebarTags
+          v-show="
+            tagsOpen
             && !collapsed
           "
         />

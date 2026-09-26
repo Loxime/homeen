@@ -20,6 +20,10 @@ import {
 } from '../composables/useLabels'
 
 import {
+  useTags,
+} from '../composables/useTags'
+
+import {
   useToast,
 } from '../composables/useToast'
 
@@ -51,6 +55,11 @@ const {
   labels,
   load: loadLabels,
 } = useLabels()
+
+const {
+  tags,
+  load: loadTags,
+} = useTags()
 
 const collections =
   ref<NoteCollection[]>([])
@@ -179,6 +188,7 @@ Promise<void> {
       ),
 
       loadLabels(),
+      loadTags(),
     ])
 
     notes.value =
@@ -948,6 +958,7 @@ onMounted(
         "
         :note="selected"
         :labels="labels"
+        :tags="tags"
         :collections="collections"
         :default-collection-id="
           collectionFilter
