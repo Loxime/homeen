@@ -306,6 +306,15 @@ SQL,
         bool $isPinned,
         string $color,
     ): array {
+        if (
+            $collectionId !== null
+            && $projectId !== null
+        ) {
+            throw new \InvalidArgumentException(
+                'A note cannot belong to both a collection and a project.'
+            );
+        }
+
         $this->validateTitle($title);
 
         $color =

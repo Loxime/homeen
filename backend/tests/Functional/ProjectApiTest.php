@@ -906,6 +906,602 @@ SQL,
         );
     }
 
+    public function testProjectInvitationsRolesAndRemoval():
+    void {
+        $project =
+            $this->jsonRequest(
+                'POST',
+                '/api/projects',
+                [
+                    'name' =>
+                        'Shared workspace',
+                ],
+            );
+
+        $projectId =
+            (int) $project['id'];
+
+        $otherUserId =
+            $this->createOtherUser();
+
+        $otherEmail =
+            $this->primaryEmail(
+                $otherUserId,
+            );
+
+        $invitation =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/invitations',
+                    $projectId,
+                ),
+                [
+                    'email' =>
+                        $otherEmail,
+                ],
+            );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            $projectId,
+            $invitation['projectId'],
+        );
+
+        self::assertSame(
+            $otherEmail,
+            $invitation['email'],
+        );
+
+        $duplicateInvitation =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/invitations',
+                    $projectId,
+                ),
+                [
+                    'email' =>
+                        $otherEmail,
+                ],
+            );
+
+        self::assertSame(
+            409,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'PROJECT_ALREADY_INVITED',
+            $duplicateInvitation['code'],
+        );
+
+        $selfInvitation =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/invitations',
+                    $projectId,
+                ),
+                [
+                    'email' =>
+                        $this->email,
+                ],
+            );
+
+        self::assertSame(
+            409,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'PROJECT_CANNOT_INVITE_SELF',
+            $selfInvitation['code'],
+        );
+
+        /*
+         * Simulate invitation acceptance by the
+         * other account so owner-side role
+         * management can be tested without
+         * switching browser sessions.
+         */
+        $this->connection->delete(
+            'project_invitation',
+            [
+                'id' =>
+                    (int) $invitation['id'],
+            ],
+        );
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $projectId,
+
+                'user_id' =>
+                    $otherUserId,
+
+                'role' =>
+                    'member',
+            ],
+        );
+
+        $promoted =
+            $this->jsonRequest(
+                'PUT',
+                sprintf(
+                    '/api/projects/%d/members/%d/role',
+                    $projectId,
+                    $otherUserId,
+                ),
+                [
+                    'role' => 'admin',
+                ],
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'admin',
+            $promoted['role'],
+        );
+
+        $members =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/projects/%d/members',
+                    $projectId,
+                ),
+            );
+
+        self::assertCount(
+            2,
+            $members['members'],
+        );
+
+        $this->jsonRequest(
+            'DELETE',
+            sprintf(
+                '/api/projects/%d/members/%d',
+                $projectId,
+                $otherUserId,
+            ),
+        );
+
+        self::assertSame(
+            204,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertFalse(
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT 1
+FROM project_member
+WHERE project_id = :projectId
+  AND user_id = :userId
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+
+                        'userId' =>
+                            $otherUserId,
+                    ],
+                ),
+        );
+
+        $ownerCannotLeave =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/leave',
+                    $projectId,
+                ),
+            );
+
+        self::assertSame(
+            409,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'PROJECT_OWNER_CANNOT_LEAVE',
+            $ownerCannotLeave['code'],
+        );
+    }
+
+    public function testProjectInvitationAcceptRejectAndLeave():
+    void {
+        $ownerUserId =
+            $this->createOtherUser();
+
+        $projectId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO project (
+    name,
+    description,
+    color
+)
+VALUES (
+    'Invited project',
+    '',
+    '#1A73E8'
+)
+RETURNING id
+SQL,
+                );
+
+        self::assertNotFalse(
+            $projectId,
+        );
+
+        $projectId =
+            (int) $projectId;
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $projectId,
+
+                'user_id' =>
+                    $ownerUserId,
+
+                'role' =>
+                    'owner',
+            ],
+        );
+
+        $invitationId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO project_invitation (
+    project_id,
+    invited_user_id,
+    invited_by_user_id
+)
+VALUES (
+    :projectId,
+    :userId,
+    :ownerUserId
+)
+RETURNING id
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+
+                        'userId' =>
+                            $this->userId,
+
+                        'ownerUserId' =>
+                            $ownerUserId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $invitationId,
+        );
+
+        $pending =
+            $this->jsonRequest(
+                'GET',
+                '/api/project-invitations',
+            );
+
+        self::assertCount(
+            1,
+            $pending['invitations'],
+        );
+
+        self::assertSame(
+            $projectId,
+            $pending[
+                'invitations'
+            ][0]['projectId'],
+        );
+
+        $accepted =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/project-invitations/%d/accept',
+                    (int) $invitationId,
+                ),
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            $projectId,
+            $accepted['projectId'],
+        );
+
+        self::assertSame(
+            'member',
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT role
+FROM project_member
+WHERE project_id = :projectId
+  AND user_id = :userId
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+
+                        'userId' =>
+                            $this->userId,
+                    ],
+                ),
+        );
+
+        $forbiddenRole =
+            $this->jsonRequest(
+                'PUT',
+                sprintf(
+                    '/api/projects/%d/members/%d/role',
+                    $projectId,
+                    $ownerUserId,
+                ),
+                [
+                    'role' => 'admin',
+                ],
+            );
+
+        self::assertSame(
+            403,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'PROJECT_OWNER_REQUIRED',
+            $forbiddenRole['code'],
+        );
+
+        $this->jsonRequest(
+            'POST',
+            sprintf(
+                '/api/projects/%d/leave',
+                $projectId,
+            ),
+        );
+
+        self::assertSame(
+            204,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertFalse(
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT 1
+FROM project_member
+WHERE project_id = :projectId
+  AND user_id = :userId
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+
+                        'userId' =>
+                            $this->userId,
+                    ],
+                ),
+        );
+
+        /*
+         * Separate invitation used to exercise
+         * explicit rejection.
+         */
+        $secondProjectId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO project (
+    name,
+    description,
+    color
+)
+VALUES (
+    'Rejected project',
+    '',
+    '#1A73E8'
+)
+RETURNING id
+SQL,
+                );
+
+        self::assertNotFalse(
+            $secondProjectId,
+        );
+
+        $secondProjectId =
+            (int) $secondProjectId;
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $secondProjectId,
+
+                'user_id' =>
+                    $ownerUserId,
+
+                'role' =>
+                    'owner',
+            ],
+        );
+
+        $rejectId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO project_invitation (
+    project_id,
+    invited_user_id,
+    invited_by_user_id
+)
+VALUES (
+    :projectId,
+    :userId,
+    :ownerUserId
+)
+RETURNING id
+SQL,
+                    [
+                        'projectId' =>
+                            $secondProjectId,
+
+                        'userId' =>
+                            $this->userId,
+
+                        'ownerUserId' =>
+                            $ownerUserId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $rejectId,
+        );
+
+        $this->jsonRequest(
+            'DELETE',
+            sprintf(
+                '/api/project-invitations/%d',
+                (int) $rejectId,
+            ),
+        );
+
+        self::assertSame(
+            204,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertFalse(
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT 1
+FROM project_invitation
+WHERE id = :id
+SQL,
+                    [
+                        'id' =>
+                            (int) $rejectId,
+                    ],
+                ),
+        );
+    }
+
+    public function testNoteCannotTargetCollectionAndProjectTogether():
+    void {
+        $project =
+            $this->jsonRequest(
+                'POST',
+                '/api/projects',
+                [
+                    'name' =>
+                        'Project target',
+                ],
+            );
+
+        $collectionId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO note_collection (
+    user_id,
+    name,
+    color
+)
+VALUES (
+    :userId,
+    'Legacy collection',
+    '#1A73E8'
+)
+RETURNING id
+SQL,
+                    [
+                        'userId' =>
+                            $this->userId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $collectionId,
+        );
+
+        $response =
+            $this->jsonRequest(
+                'POST',
+                '/api/notes',
+                [
+                    'title' =>
+                        'Ambiguous note',
+
+                    'tagIds' => [],
+
+                    'collectionId' =>
+                        (int) $collectionId,
+
+                    'projectId' =>
+                        (int) $project['id'],
+                ],
+            );
+
+        self::assertSame(
+            422,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'A note cannot belong to both a collection and a project.',
+            $response['error'],
+        );
+    }
+
     private function authenticate(): void
     {
         $this->client->request(
@@ -1009,6 +1605,32 @@ SQL,
         return $id;
     }
 
+    private function primaryEmail(
+        int $userId,
+    ): string {
+        $email =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT email
+FROM user_email
+WHERE user_id = :userId
+  AND is_primary = TRUE
+LIMIT 1
+SQL,
+                    [
+                        'userId' =>
+                            $userId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $email,
+        );
+
+        return (string) $email;
+    }
+
     /**
      * @param array<string, mixed> $payload
      *
@@ -1049,14 +1671,27 @@ SQL,
      */
     private function responseData(): array
     {
-        $content =
+        $response =
             $this->client
-                ->getResponse()
-                ->getContent();
+                ->getResponse();
+
+        if (
+            $response->getStatusCode()
+            === 204
+        ) {
+            return [];
+        }
+
+        $content =
+            $response->getContent();
 
         self::assertNotFalse(
             $content,
         );
+
+        if ($content === '') {
+            return [];
+        }
 
         $data = json_decode(
             $content,
