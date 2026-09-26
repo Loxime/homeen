@@ -584,6 +584,114 @@ SQL,
         );
     }
 
+    public function testGlobalSearchFindsNotesTasksAndTags(): void
+    {
+        $tag = $this->createTag(
+            'SearchNeedleTag',
+            '#4455CC',
+        );
+
+        $contentTask = $this->jsonRequest(
+            'POST',
+            sprintf(
+                '/api/notes/%d/tasks',
+                $this->noteId,
+            ),
+            [
+                'content' =>
+                    'Unique searchable task content',
+            ],
+        );
+
+        $taggedTask = $this->jsonRequest(
+            'POST',
+            sprintf(
+                '/api/notes/%d/tasks',
+                $this->noteId,
+            ),
+            [
+                'content' =>
+                    'Ordinary tagged task',
+
+                'tagIds' => [
+                    $tag['id'],
+                ],
+            ],
+        );
+
+        $noteSearch = $this->jsonRequest(
+            'GET',
+            '/api/search?q=Functional%20task%20test',
+        );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertCount(
+            1,
+            $noteSearch['notes'],
+        );
+
+        self::assertSame(
+            $this->noteId,
+            $noteSearch['notes'][0]['id'],
+        );
+
+        $taskSearch = $this->jsonRequest(
+            'GET',
+            '/api/search?q=Unique%20searchable',
+        );
+
+        self::assertCount(
+            1,
+            $taskSearch['tasks'],
+        );
+
+        self::assertSame(
+            $contentTask['id'],
+            $taskSearch['tasks'][0]['id'],
+        );
+
+        self::assertSame(
+            $this->noteId,
+            $taskSearch['tasks'][0]['noteId'],
+        );
+
+        $tagSearch = $this->jsonRequest(
+            'GET',
+            '/api/search?q=SearchNeedleTag',
+        );
+
+        self::assertCount(
+            1,
+            $tagSearch['tasks'],
+        );
+
+        self::assertSame(
+            $taggedTask['id'],
+            $tagSearch['tasks'][0]['id'],
+        );
+
+        $emptySearch = $this->jsonRequest(
+            'GET',
+            '/api/search',
+        );
+
+        self::assertSame(
+            [],
+            $emptySearch['notes'],
+        );
+
+        self::assertSame(
+            [],
+            $emptySearch['tasks'],
+        );
+    }
+
     public function testInvalidPriorityAndStatusAreRejected(): void
     {
         $invalidPriority =

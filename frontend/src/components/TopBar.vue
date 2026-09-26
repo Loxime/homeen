@@ -38,7 +38,7 @@ async function search(): Promise<void> {
   const value = query.value.trim()
 
   await router.push({
-    path: '/notes',
+    path: '/search',
     query: value
       ? { q: value }
       : {},
@@ -93,8 +93,8 @@ async function signOut(): Promise<void> {
       <input
         v-model="query"
         type="search"
-        placeholder="Rechercher dans vos notes"
-        aria-label="Rechercher dans vos notes"
+        placeholder="Rechercher notes, tâches, tags"
+        aria-label="Recherche globale"
       />
     </form>
 
