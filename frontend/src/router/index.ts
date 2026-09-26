@@ -10,6 +10,7 @@ import StatisticsView from '../views/StatisticsView.vue'
 import TaskView from '../views/TaskView.vue'
 import SearchView from '../views/SearchView.vue'
 import ProfileView from '../views/ProfileView.vue'
+import ProjectsView from '../views/ProjectsView.vue'
 import ChannelsView from '../views/ChannelsView.vue'
 import ChannelView from '../views/ChannelView.vue'
 
@@ -74,6 +75,11 @@ export const router = createRouter({
     {
       path: '/statistics',
       component: StatisticsView,
+    },
+
+    {
+      path: '/projects',
+      component: ProjectsView,
     },
 
     {

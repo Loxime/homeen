@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   computed,
-  onUnmounted,
   ref,
 } from 'vue'
 
@@ -15,14 +14,6 @@ import SidebarTags from './SidebarTags.vue'
 import {
   usePomodoro,
 } from '../composables/usePomodoro'
-
-import {
-  useChannelInvitations,
-} from '../composables/useChannelInvitations'
-
-import {
-  useChannelUnreadMessages,
-} from '../composables/useChannelUnreadMessages'
 
 const props =
   defineProps<{
@@ -40,33 +31,6 @@ const {
   store,
   start,
 } = usePomodoro()
-
-const {
-  unreadCount,
-  start: startInvitationNotifications,
-  stop: stopInvitationNotifications,
-} = useChannelInvitations()
-
-const {
-  total: unreadMessageCount,
-  start: startUnreadMessages,
-  stop: stopUnreadMessages,
-} = useChannelUnreadMessages()
-
-const channelNotificationCount =
-  computed(
-    () =>
-      unreadCount.value
-      + unreadMessageCount.value,
-  )
-
-startInvitationNotifications()
-startUnreadMessages()
-
-onUnmounted(() => {
-  stopInvitationNotifications()
-  stopUnreadMessages()
-})
 
 const quickLoading = ref(false)
 
@@ -262,40 +226,15 @@ async function quickFocus(): Promise<void> {
       </RouterLink>
 
       <RouterLink
-        class="sidebar-entry channel-entry"
-        to="/channels"
+        class="sidebar-entry"
+        to="/projects"
       >
         <span class="sidebar-icon-slot">
           <AppIcon name="users" />
-
-          <span
-            v-if="
-              collapsed
-              && channelNotificationCount > 0
-            "
-            class="sidebar-notification-dot"
-          />
         </span>
 
         <span class="sidebar-label">
-          Canaux
-        </span>
-
-        <span
-          v-if="
-            !collapsed
-            && channelNotificationCount > 0
-          "
-          class="sidebar-notification-badge"
-          :title="
-            `${channelNotificationCount} notification${channelNotificationCount > 1 ? 's' : ''} non lue${channelNotificationCount > 1 ? 's' : ''}`
-          "
-        >
-          {{
-            channelNotificationCount > 99
-              ? '99+'
-              : channelNotificationCount
-          }}
+          Projets
         </span>
       </RouterLink>
 

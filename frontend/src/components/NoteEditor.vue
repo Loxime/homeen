@@ -12,6 +12,7 @@ import type {
   ImageAsset,
   Note,
   NoteCollection,
+  Project,
   Tag,
   Task,
   TaskPriority,
@@ -23,10 +24,14 @@ const props = withDefaults(
     note: Note | null
     tags: Tag[]
     collections: NoteCollection[]
+    projects?: Project[]
     defaultCollectionId?: number | null
+    defaultProjectId?: number | null
   }>(),
   {
+    projects: () => [],
     defaultCollectionId: null,
+    defaultProjectId: null,
   },
 )
 
@@ -85,6 +90,10 @@ const selectedNoteTagIds =
 
 const collectionId =
   ref<number | null>(null)
+
+const projectId =
+  ref<number | null>(null)
+
 const taskText = ref('')
 const saving = ref(false)
 const error = ref('')
@@ -109,6 +118,18 @@ const imageLibraryOpen =
 
 const imageLibraryLoading =
   ref(false)
+
+const projectName =
+  computed(
+    () =>
+      props.projects.find(
+        project =>
+          project.id
+          === projectId.value,
+      )?.name
+      ?? localNote.value?.projectName
+      ?? null,
+  )
 
 const isNew = computed(
   () => localNote.value === null,
@@ -156,6 +177,7 @@ watch(
   () => [
     props.note,
     props.defaultCollectionId,
+    props.defaultProjectId,
   ] as const,
   ([value]) => {
     localNote.value =
@@ -183,6 +205,11 @@ watch(
     collectionId.value =
       value?.collectionId
       ?? props.defaultCollectionId
+      ?? null
+
+    projectId.value =
+      value?.projectId
+      ?? props.defaultProjectId
       ?? null
 
     taskText.value = ''
@@ -223,6 +250,9 @@ Promise<Note | null> {
           selectedNoteTagIds.value,
         collectionId:
           collectionId.value,
+
+        projectId:
+          projectId.value,
       })
 
     const note =
@@ -1143,7 +1173,24 @@ async function restore(): Promise<void> {
         </section>
 
         <div class="note-organization-grid">
-          <label>
+          <div
+            v-if="
+              projectId !== null
+            "
+          >
+            <span class="keep-label-caption">
+              Projet
+            </span>
+
+            <div class="keep-label-select">
+              {{
+                projectName
+                ?? 'Projet'
+              }}
+            </div>
+          </div>
+
+          <label v-else>
             <span class="keep-label-caption">
               Collection
             </span>

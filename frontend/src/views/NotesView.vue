@@ -29,6 +29,7 @@ import type {
   Note,
   NoteCollection,
   NoteSummary,
+  Project,
 } from '../types/domain'
 
 const props =
@@ -56,6 +57,9 @@ const {
 
 const collections =
   ref<NoteCollection[]>([])
+
+const projects =
+  ref<Project[]>([])
 
 const collectionFilter =
   ref<number | null>(null)
@@ -156,6 +160,38 @@ const query =
       typeof route.query.q === 'string'
         ? route.query.q
         : '',
+  )
+
+const projectId =
+  computed<number | null>(
+    () => {
+      const raw =
+        route.query.projectId
+
+      if (
+        typeof raw !== 'string'
+        || !/^\d+$/.test(raw)
+      ) {
+        return null
+      }
+
+      const id =
+        Number(raw)
+
+      return id > 0
+        ? id
+        : null
+    },
+  )
+
+const activeProject =
+  computed(
+    () =>
+      projects.value.find(
+        project =>
+          project.id
+          === projectId.value,
+      ) ?? null,
   )
 
 const activeCollection =
@@ -267,6 +303,16 @@ Promise<void> {
     }
 
     if (
+      projectId.value
+      !== null
+    ) {
+      params.set(
+        'projectId',
+        String(
+          projectId.value,
+        ),
+      )
+    } else if (
       collectionFilter.value
       !== null
     ) {
@@ -281,6 +327,7 @@ Promise<void> {
     const [
       noteResponse,
       collectionResponse,
+      projectResponse,
     ] = await Promise.all([
       api<{
         notes: NoteSummary[]
@@ -295,6 +342,12 @@ Promise<void> {
         '/api/collections',
       ),
 
+      api<{
+        projects: Project[]
+      }>(
+        '/api/projects',
+      ),
+
       loadTags(),
     ])
 
@@ -303,6 +356,9 @@ Promise<void> {
 
     collections.value =
       collectionResponse.collections
+
+    projects.value =
+      projectResponse.projects
 
     if (
       collectionFilter.value
@@ -439,7 +495,13 @@ Promise<void> {
             content,
             tagIds: [],
             collectionId:
-              collectionFilter.value,
+              projectId.value === null
+                ? collectionFilter.value
+                : null,
+
+            projectId:
+              projectId.value,
+
             isPinned: false,
             color: '#FFFFFF',
           }),
@@ -540,7 +602,13 @@ async function createImageNote(
             content: '',
             tagIds: [],
             collectionId:
-              collectionFilter.value,
+              projectId.value === null
+                ? collectionFilter.value
+                : null,
+
+            projectId:
+              projectId.value,
+
             isPinned: false,
             color: '#FFFFFF',
           }),
@@ -920,6 +988,7 @@ watch(
   () => [
     props.scope,
     route.query.q,
+    route.query.projectId,
   ],
   () => {
     collectionFilter.value = null
@@ -950,6 +1019,16 @@ onMounted(
           class="muted"
         >
           Résultats pour « {{ query }} »
+        </p>
+
+        <p
+          v-else-if="
+            activeProject
+          "
+          class="muted"
+        >
+          Projet :
+          {{ activeProject.name }}
         </p>
 
         <p
@@ -1021,7 +1100,10 @@ onMounted(
     </header>
 
     <section
-      v-if="scope === 'active'"
+      v-if="
+        scope === 'active'
+        && projectId === null
+      "
       class="collection-shelf"
     >
       <div class="collection-shelf-header">
@@ -1807,13 +1889,19 @@ onMounted(
       <NoteEditor
         :key="
           selected?.id
-          ?? `new-note-${collectionFilter ?? 'all'}`
+          ?? `new-note-${projectId ?? collectionFilter ?? 'all'}`
         "
         :note="selected"
         :tags="tags"
         :collections="collections"
+        :projects="projects"
         :default-collection-id="
-          collectionFilter
+          projectId === null
+            ? collectionFilter
+            : null
+        "
+        :default-project-id="
+          projectId
         "
         @saved="
           (note) => {
