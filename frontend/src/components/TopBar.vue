@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import {
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import AppIcon from './AppIcon.vue'
@@ -24,6 +29,9 @@ const query = ref(
     : '',
 )
 
+const searchInput =
+  ref<HTMLInputElement | null>(null)
+
 watch(
   () => route.query.q,
   (value) => {
@@ -33,6 +41,42 @@ watch(
         : ''
   },
 )
+
+function focusSearch(
+  event: KeyboardEvent,
+): void {
+  const shortcut =
+    (
+      event.ctrlKey
+      || event.metaKey
+    )
+    && !event.altKey
+    && !event.shiftKey
+    && event.key.toLowerCase() === 'k'
+
+  if (!shortcut) {
+    return
+  }
+
+  event.preventDefault()
+
+  searchInput.value?.focus()
+  searchInput.value?.select()
+}
+
+onMounted(() => {
+  window.addEventListener(
+    'keydown',
+    focusSearch,
+  )
+})
+
+onUnmounted(() => {
+  window.removeEventListener(
+    'keydown',
+    focusSearch,
+  )
+})
 
 async function search(): Promise<void> {
   const value = query.value.trim()
@@ -91,6 +135,7 @@ async function signOut(): Promise<void> {
       />
 
       <input
+        ref="searchInput"
         v-model="query"
         type="search"
         placeholder="Rechercher notes, tâches, tags"
