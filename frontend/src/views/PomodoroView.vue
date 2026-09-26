@@ -47,6 +47,7 @@ const completedSession =
   )
 
 const starting = ref(false)
+const stopping = ref(false)
 const ratingSaving = ref(false)
 
 const phaseLabel =
@@ -114,6 +115,14 @@ Promise<void> {
     )
 }
 
+async function refreshOverview():
+Promise<void> {
+  await Promise.all([
+    loadHistory(),
+    loadInsights(),
+  ])
+}
+
 async function begin(
   minutes =
     workMinutes.value,
@@ -138,10 +147,12 @@ async function begin(
     workMinutes.value =
       minutes
 
-    await Promise.all([
-      loadHistory(),
-      loadInsights(),
-    ])
+    try {
+      await refreshOverview()
+    } catch {
+      error.value =
+        'La session a démarré, mais certaines informations n’ont pas pu être rafraîchies.'
+    }
   } catch (exception) {
     error.value =
       exception instanceof Error
@@ -153,18 +164,36 @@ async function begin(
 }
 
 async function end(): Promise<void> {
-  const completed =
-    await stop()
-
-  if (completed) {
-    completedSession.value =
-      completed
+  if (stopping.value) {
+    return
   }
 
-  await Promise.all([
-    loadHistory(),
-    loadInsights(),
-  ])
+  stopping.value = true
+  error.value = ''
+
+  try {
+    const completed =
+      await stop()
+
+    if (completed) {
+      completedSession.value =
+        completed
+    }
+
+    try {
+      await refreshOverview()
+    } catch {
+      error.value =
+        'La session est arrêtée, mais certaines informations n’ont pas pu être rafraîchies.'
+    }
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible d’arrêter la session.'
+  } finally {
+    stopping.value = false
+  }
 }
 
 async function rateSession(
@@ -194,10 +223,12 @@ async function rateSession(
 
     completedSession.value = null
 
-    await Promise.all([
-      loadHistory(),
-      loadInsights(),
-    ])
+    try {
+      await refreshOverview()
+    } catch {
+      error.value =
+        'Votre ressenti est enregistré, mais certaines informations n’ont pas pu être rafraîchies.'
+    }
   } catch (exception) {
     error.value =
       exception instanceof Error
@@ -222,21 +253,30 @@ function useRecommendation(): void {
 }
 
 onMounted(async () => {
-  await loadActive()
+  error.value = ''
 
-  await Promise.all([
-    loadPresets(),
-    loadHistory(),
-    loadInsights(),
-  ])
+  try {
+    await loadActive()
 
-  if (
-    insights.value
-      ?.recommendedMinutes
-  ) {
-    workMinutes.value =
+    await Promise.all([
+      loadPresets(),
+      loadHistory(),
+      loadInsights(),
+    ])
+
+    if (
       insights.value
-        .recommendedMinutes
+        ?.recommendedMinutes
+    ) {
+      workMinutes.value =
+        insights.value
+          .recommendedMinutes
+    }
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de charger les données Pomodoro.'
   }
 })
 </script>
@@ -483,9 +523,14 @@ onMounted(async () => {
 
       <button
         class="stop-button"
+        :disabled="stopping"
         @click="end"
       >
-        Arrêter la session
+        {{
+          stopping
+            ? 'Arrêt…'
+            : 'Arrêter la session'
+        }}
       </button>
     </div>
 

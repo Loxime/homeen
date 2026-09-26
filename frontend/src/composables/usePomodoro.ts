@@ -141,15 +141,36 @@ async function loadPresets(): Promise<void> {
 
 async function start(workMinutes: number): Promise<void> {
   enableAudio()
-  store.active = await api<PomodoroSession>('/api/pomodoro/sessions', {
-    method: 'POST',
-    body: JSON.stringify({ workMinutes }),
-  })
+
+  store.active =
+    await api<PomodoroSession>(
+      '/api/pomodoro/sessions',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          workMinutes,
+        }),
+      },
+    )
+
   previousPhase = 'work'
+
   playPomodoroSound('start')
-  channel?.postMessage({ type: 'started' })
-  await loadPresets()
+
+  channel?.postMessage({
+    type: 'started',
+  })
+
   tick()
+
+  /*
+   * The session is already running at this
+   * point. A preset refresh must therefore
+   * never turn a successful start into an
+   * apparent failure.
+   */
+  void loadPresets()
+    .catch(() => undefined)
 }
 
 async function stop(): Promise<PomodoroSession | null> {
