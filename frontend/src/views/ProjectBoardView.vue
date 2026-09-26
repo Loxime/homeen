@@ -41,6 +41,15 @@ const creatingTaskStageId =
 const busyTaskId =
   ref<number | null>(null)
 
+const draggedTaskId =
+  ref<number | null>(null)
+
+const dragOverStageId =
+  ref<number | null>(null)
+
+const dragOverTaskId =
+  ref<number | null>(null)
+
 const stageName = ref('')
 const creatingStage = ref(false)
 
@@ -288,6 +297,163 @@ async function moveTask(
         : 'Impossible de déplacer la tâche.'
   } finally {
     busyTaskId.value = null
+  }
+}
+
+function startTaskDrag(
+  task: ProjectTask,
+  event: DragEvent,
+): void {
+  draggedTaskId.value =
+    task.id
+
+  event.dataTransfer?.setData(
+    'text/plain',
+    String(task.id),
+  )
+
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed =
+      'move'
+  }
+}
+
+function endTaskDrag(): void {
+  draggedTaskId.value = null
+  dragOverStageId.value = null
+  dragOverTaskId.value = null
+}
+
+function markTaskDropTarget(
+  stageId: number,
+  taskId: number | null,
+): void {
+  dragOverStageId.value =
+    stageId
+
+  dragOverTaskId.value =
+    taskId
+}
+
+async function dropTask(
+  stage: ProjectWorkflowStage,
+  beforeTask: ProjectTask | null,
+): Promise<void> {
+  const taskId =
+    draggedTaskId.value
+
+  if (
+    taskId === null
+    || busyTaskId.value !== null
+  ) {
+    return
+  }
+
+  if (
+    beforeTask !== null
+    && beforeTask.id === taskId
+  ) {
+    endTaskDrag()
+    return
+  }
+
+  const taskExists =
+    tasks.value.some(
+      candidate =>
+        candidate.id === taskId,
+    )
+
+  if (!taskExists) {
+    endTaskDrag()
+    return
+  }
+
+  const columns =
+    stages.value.map(
+      candidateStage => ({
+        workflowStageId:
+          candidateStage.id,
+
+        taskIds:
+          tasksForStage(
+            candidateStage.id,
+          )
+            .filter(
+              candidate =>
+                candidate.id !== taskId,
+            )
+            .map(
+              candidate =>
+                candidate.id,
+            ),
+      }),
+    )
+
+  const target =
+    columns.find(
+      column =>
+        column.workflowStageId
+        === stage.id,
+    )
+
+  if (target === undefined) {
+    endTaskDrag()
+    return
+  }
+
+  if (beforeTask === null) {
+    target.taskIds.push(
+      taskId
+    )
+  } else {
+    const index =
+      target.taskIds.indexOf(
+        beforeTask.id,
+      )
+
+    if (index < 0) {
+      target.taskIds.push(
+        taskId
+      )
+    } else {
+      target.taskIds.splice(
+        index,
+        0,
+        taskId,
+      )
+    }
+  }
+
+  busyTaskId.value =
+    taskId
+
+  error.value = ''
+
+  try {
+    const response =
+      await api<{
+        tasks: ProjectTask[]
+      }>(
+        `/api/projects/${projectId.value}/tasks/order`,
+        {
+          method: 'PUT',
+
+          body: JSON.stringify({
+            columns,
+          }),
+        },
+      )
+
+    tasks.value =
+      response.tasks
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de réordonner les tâches.'
+  } finally {
+    busyTaskId.value = null
+    endTaskDrag()
   }
 }
 
@@ -789,7 +955,28 @@ onMounted(
             </div>
           </header>
 
-          <div class="project-task-list">
+          <div
+            class="project-task-list"
+            :class="{
+              'project-task-list--over':
+                dragOverStageId
+                  === stage.id
+                && dragOverTaskId
+                  === null,
+            }"
+            @dragover.prevent="
+              markTaskDropTarget(
+                stage.id,
+                null,
+              )
+            "
+            @drop.prevent="
+              dropTask(
+                stage,
+                null,
+              )
+            "
+          >
             <article
               v-for="
                 task
@@ -802,7 +989,39 @@ onMounted(
               :class="{
                 'project-task-card--done':
                   task.isCompleted,
+
+                'project-task-card--dragging':
+                  draggedTaskId
+                    === task.id,
+
+                'project-task-card--drop-before':
+                  dragOverStageId
+                    === stage.id
+                  && dragOverTaskId
+                    === task.id,
               }"
+              draggable="true"
+              @dragstart="
+                startTaskDrag(
+                  task,
+                  $event,
+                )
+              "
+              @dragend="
+                endTaskDrag
+              "
+              @dragover.stop.prevent="
+                markTaskDropTarget(
+                  stage.id,
+                  task.id,
+                )
+              "
+              @drop.stop.prevent="
+                dropTask(
+                  stage,
+                  task,
+                )
+              "
             >
               <div class="project-task-heading">
                 <button
@@ -1065,6 +1284,32 @@ onMounted(
 
 .project-task-card--done {
   opacity: 0.65;
+}
+
+.project-task-card--dragging {
+  opacity: 0.35;
+}
+
+.project-task-card--drop-before {
+  box-shadow:
+    0 -3px 0
+    var(--primary, #1a73e8);
+}
+
+.project-task-list--over {
+  min-height: 3rem;
+  border-radius: 10px;
+  outline: 2px dashed
+    var(--border-color, #dadce0);
+  outline-offset: 3px;
+}
+
+.project-task-card {
+  cursor: grab;
+}
+
+.project-task-card:active {
+  cursor: grabbing;
 }
 
 .project-task-heading {

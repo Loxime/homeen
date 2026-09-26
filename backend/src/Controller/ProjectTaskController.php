@@ -269,6 +269,89 @@ final readonly class ProjectTaskController
         );
     }
 
+    #[Route(
+        '/order',
+        name: 'api_project_tasks_order',
+        methods: ['PUT'],
+    )]
+    public function reorder(
+        int $projectId,
+        Request $request,
+    ): JsonResponse {
+        $data =
+            $this->input->read(
+                $request
+            );
+
+        $rawColumns =
+            $data['columns']
+            ?? null;
+
+        if (!is_array($rawColumns)) {
+            throw new \InvalidArgumentException(
+                'columns must be an array.'
+            );
+        }
+
+        $columns = [];
+
+        foreach ($rawColumns as $rawColumn) {
+            if (!is_array($rawColumn)) {
+                throw new \InvalidArgumentException(
+                    'Each task-order column must be an object.'
+                );
+            }
+
+            $stageId =
+                $this->positiveInt(
+                    $rawColumn[
+                        'workflowStageId'
+                    ] ?? null,
+                    'workflowStageId',
+                );
+
+            $rawTaskIds =
+                $rawColumn[
+                    'taskIds'
+                ] ?? null;
+
+            if (!is_array($rawTaskIds)) {
+                throw new \InvalidArgumentException(
+                    'taskIds must be an array.'
+                );
+            }
+
+            $taskIds = [];
+
+            foreach (
+                $rawTaskIds
+                as $rawTaskId
+            ) {
+                $taskIds[] =
+                    $this->positiveInt(
+                        $rawTaskId,
+                        'taskId',
+                    );
+            }
+
+            $columns[] = [
+                'workflowStageId' =>
+                    $stageId,
+
+                'taskIds' =>
+                    $taskIds,
+            ];
+        }
+
+        return new JsonResponse([
+            'tasks' =>
+                $this->tasks->reorder(
+                    $projectId,
+                    $columns,
+                ),
+        ]);
+    }
+
     private function positiveInt(
         mixed $value,
         string $field,

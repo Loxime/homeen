@@ -3208,6 +3208,166 @@ SQL,
         );
     }
 
+    public function testProjectTaskOrderAcrossWorkflowStages():
+    void {
+        $project =
+            $this->jsonRequest(
+                'POST',
+                '/api/projects',
+                [
+                    'name' =>
+                        'Ordered board',
+
+                    'description' =>
+                        '',
+
+                    'color' =>
+                        '#228BE6',
+                ],
+            );
+
+        $projectId =
+            (int) $project['id'];
+
+        $workflow =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/projects/%d/workflow',
+                    $projectId,
+                ),
+            );
+
+        $firstStageId =
+            (int) $workflow[
+                'stages'
+            ][0]['id'];
+
+        $secondStageId =
+            (int) $workflow[
+                'stages'
+            ][1]['id'];
+
+        $thirdStageId =
+            (int) $workflow[
+                'stages'
+            ][2]['id'];
+
+        $taskIds = [];
+
+        foreach (
+            ['One', 'Two', 'Three']
+            as $content
+        ) {
+            $task =
+                $this->jsonRequest(
+                    'POST',
+                    sprintf(
+                        '/api/projects/%d/tasks',
+                        $projectId,
+                    ),
+                    [
+                        'content' =>
+                            $content,
+
+                        'workflowStageId' =>
+                            $firstStageId,
+                    ],
+                );
+
+            $taskIds[] =
+                (int) $task['id'];
+        }
+
+        $ordered =
+            $this->jsonRequest(
+                'PUT',
+                sprintf(
+                    '/api/projects/%d/tasks/order',
+                    $projectId,
+                ),
+                [
+                    'columns' => [
+                        [
+                            'workflowStageId' =>
+                                $firstStageId,
+
+                            'taskIds' => [
+                                $taskIds[2],
+                            ],
+                        ],
+
+                        [
+                            'workflowStageId' =>
+                                $secondStageId,
+
+                            'taskIds' => [
+                                $taskIds[1],
+                                $taskIds[0],
+                            ],
+                        ],
+
+                        [
+                            'workflowStageId' =>
+                                $thirdStageId,
+
+                            'taskIds' => [],
+                        ],
+                    ],
+                ],
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            [
+                $taskIds[2],
+                $taskIds[1],
+                $taskIds[0],
+            ],
+            array_column(
+                $ordered['tasks'],
+                'id',
+            ),
+        );
+
+        self::assertSame(
+            [
+                [
+                    $firstStageId,
+                    0,
+                ],
+                [
+                    $secondStageId,
+                    0,
+                ],
+                [
+                    $secondStageId,
+                    1,
+                ],
+            ],
+            array_map(
+                static fn (
+                    array $task,
+                ): array => [
+                    (int) $task[
+                        'workflowStageId'
+                    ],
+
+                    (int) $task[
+                        'position'
+                    ],
+                ],
+                $ordered['tasks'],
+            ),
+        );
+    }
+
     private function authenticate(): void
     {
         $this->client->request(

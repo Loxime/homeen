@@ -559,6 +559,220 @@ SQL,
     }
 
     /**
+     * @param list<array{
+     *     workflowStageId:int,
+     *     taskIds:list<int>
+     * }> $columns
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function reorder(
+        int $projectId,
+        array $columns,
+    ): array {
+        $this->assertProjectAccess(
+            $projectId
+        );
+
+        $existingStageIds =
+            array_map(
+                static fn (
+                    mixed $id,
+                ): int => (int) $id,
+                $this->connection
+                    ->fetchFirstColumn(
+                        <<<'SQL'
+SELECT id
+FROM project_workflow_stage
+WHERE project_id = :projectId
+ORDER BY position, id
+SQL,
+                        [
+                            'projectId' =>
+                                $projectId,
+                        ],
+                    ),
+            );
+
+        $providedStageIds = [];
+        $providedTaskIds = [];
+
+        foreach ($columns as $column) {
+            $stageId =
+                $column[
+                    'workflowStageId'
+                ];
+
+            if (
+                $stageId <= 0
+                || in_array(
+                    $stageId,
+                    $providedStageIds,
+                    true,
+                )
+            ) {
+                throw new \InvalidArgumentException(
+                    'Project task order contains invalid workflow stages.'
+                );
+            }
+
+            $providedStageIds[] =
+                $stageId;
+
+            foreach (
+                $column['taskIds']
+                as $taskId
+            ) {
+                if (
+                    $taskId <= 0
+                    || in_array(
+                        $taskId,
+                        $providedTaskIds,
+                        true,
+                    )
+                ) {
+                    throw new \InvalidArgumentException(
+                        'Project task order contains invalid task identifiers.'
+                    );
+                }
+
+                $providedTaskIds[] =
+                    $taskId;
+            }
+        }
+
+        $expectedStages =
+            $existingStageIds;
+
+        $receivedStages =
+            $providedStageIds;
+
+        sort($expectedStages);
+        sort($receivedStages);
+
+        if (
+            $expectedStages
+            !== $receivedStages
+        ) {
+            throw new \InvalidArgumentException(
+                'Project task order must contain every workflow stage exactly once.'
+            );
+        }
+
+        $existingTaskIds =
+            array_map(
+                static fn (
+                    mixed $id,
+                ): int => (int) $id,
+                $this->connection
+                    ->fetchFirstColumn(
+                        <<<'SQL'
+SELECT id
+FROM task
+WHERE project_id = :projectId
+  AND note_id IS NULL
+ORDER BY id
+SQL,
+                        [
+                            'projectId' =>
+                                $projectId,
+                        ],
+                    ),
+            );
+
+        $receivedTaskIds =
+            $providedTaskIds;
+
+        sort($existingTaskIds);
+        sort($receivedTaskIds);
+
+        if (
+            $existingTaskIds
+            !== $receivedTaskIds
+        ) {
+            throw new \InvalidArgumentException(
+                'Project task order must contain every project task exactly once.'
+            );
+        }
+
+        $this->connection
+            ->transactional(
+                function (
+                    Connection $connection,
+                ) use (
+                    $projectId,
+                    $columns,
+                ): void {
+                    foreach (
+                        $columns
+                        as $column
+                    ) {
+                        foreach (
+                            $column['taskIds']
+                            as $position =>
+                                $taskId
+                        ) {
+                            $affected =
+                                $connection
+                                    ->executeStatement(
+                                        <<<'SQL'
+UPDATE task
+SET
+    workflow_stage_id =
+        :workflowStageId,
+    position = :position,
+    updated_at = NOW()
+WHERE id = :taskId
+  AND project_id = :projectId
+  AND note_id IS NULL
+SQL,
+                                        [
+                                            'taskId' =>
+                                                $taskId,
+
+                                            'projectId' =>
+                                                $projectId,
+
+                                            'workflowStageId' =>
+                                                $column[
+                                                    'workflowStageId'
+                                                ],
+
+                                            'position' =>
+                                                $position,
+                                        ],
+                                    );
+
+                            if ($affected !== 1) {
+                                throw new \RuntimeException(
+                                    'Unable to reorder project task.'
+                                );
+                            }
+                        }
+                    }
+
+                    $this->touchProject(
+                        $projectId
+                    );
+                },
+            );
+
+        $this->logger->log(
+            'PROJECT_TASKS_REORDERED',
+            'project',
+            $projectId,
+            [
+                'columns' =>
+                    $columns,
+            ],
+        );
+
+        return $this->all(
+            $projectId
+        );
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function setCompleted(
