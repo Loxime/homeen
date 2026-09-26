@@ -1900,6 +1900,451 @@ SQL,
         );
     }
 
+    public function testProjectMembersShareAttachedImagesWithoutSharingPrivateLibrary():
+    void {
+        $ownerUserId =
+            $this->createOtherUser();
+
+        $projectId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO project (
+    name,
+    description,
+    color
+)
+VALUES (
+    'Shared resources',
+    '',
+    '#74C0FC'
+)
+RETURNING id
+SQL,
+                );
+
+        self::assertNotFalse(
+            $projectId,
+        );
+
+        $projectId =
+            (int) $projectId;
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $projectId,
+
+                'user_id' =>
+                    $ownerUserId,
+
+                'role' =>
+                    'owner',
+            ],
+        );
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $projectId,
+
+                'user_id' =>
+                    $this->userId,
+
+                'role' =>
+                    'member',
+            ],
+        );
+
+        $sharedNoteId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO note (
+    user_id,
+    project_id,
+    title,
+    content
+)
+VALUES (
+    NULL,
+    :projectId,
+    'Shared resource note',
+    ''
+)
+RETURNING id
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $sharedNoteId,
+        );
+
+        $sharedNoteId =
+            (int) $sharedNoteId;
+
+        $ownerPrivateNoteId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO note (
+    user_id,
+    title,
+    content
+)
+VALUES (
+    :userId,
+    'Owner private note',
+    ''
+)
+RETURNING id
+SQL,
+                    [
+                        'userId' =>
+                            $ownerUserId,
+                    ],
+                );
+
+        self::assertNotFalse(
+            $ownerPrivateNoteId,
+        );
+
+        $ownerPrivateNoteId =
+            (int) $ownerPrivateNoteId;
+
+        $foreignImageId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO image_asset (
+    user_id,
+    stored_name,
+    original_name,
+    mime_type,
+    size_bytes
+)
+VALUES (
+    :userId,
+    :storedName,
+    'shared.png',
+    'image/png',
+    128
+)
+RETURNING id
+SQL,
+                    [
+                        'userId' =>
+                            $ownerUserId,
+
+                        'storedName' =>
+                            sha1(
+                                sprintf(
+                                    'project-shared-%d-%d',
+                                    $ownerUserId,
+                                    $this->userId,
+                                ),
+                            ).'.png',
+                    ],
+                );
+
+        self::assertNotFalse(
+            $foreignImageId,
+        );
+
+        $foreignImageId =
+            (int) $foreignImageId;
+
+        /*
+         * Same asset is also used by one
+         * private note of the uploader.
+         */
+        $this->connection->insert(
+            'note_image',
+            [
+                'note_id' =>
+                    $sharedNoteId,
+
+                'image_id' =>
+                    $foreignImageId,
+            ],
+        );
+
+        $this->connection->insert(
+            'note_image',
+            [
+                'note_id' =>
+                    $ownerPrivateNoteId,
+
+                'image_id' =>
+                    $foreignImageId,
+            ],
+        );
+
+        $images =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/images/note/%d',
+                    $sharedNoteId,
+                ),
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertCount(
+            1,
+            $images['images'],
+        );
+
+        self::assertSame(
+            $foreignImageId,
+            $images['images'][0]['id'],
+        );
+
+        /*
+         * Only the visible Project attachment
+         * is counted; the uploader's private
+         * note must not leak through noteCount.
+         */
+        self::assertSame(
+            1,
+            $images['images'][0]['noteCount'],
+        );
+
+        $projectNotes =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/notes?projectId=%d',
+                    $projectId,
+                ),
+            );
+
+        self::assertSame(
+            sprintf(
+                '/api/images/%d/content',
+                $foreignImageId,
+            ),
+            $projectNotes[
+                'notes'
+            ][0]['previewImageUrl'],
+        );
+
+        /*
+         * The collaborator can request the
+         * shared asset. The fixture has no
+         * physical file, so reaching storage
+         * proves repository authorization.
+         */
+        $content =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/images/%d/content',
+                    $foreignImageId,
+                ),
+            );
+
+        self::assertSame(
+            404,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'IMAGE_FILE_NOT_FOUND',
+            $content['code'],
+        );
+
+        /*
+         * Shared access does not add the
+         * uploader's asset to my library.
+         */
+        $library =
+            $this->jsonRequest(
+                'GET',
+                '/api/images',
+            );
+
+        self::assertFalse(
+            in_array(
+                $foreignImageId,
+                array_column(
+                    $library['images'],
+                    'id',
+                ),
+                true,
+            ),
+        );
+
+        /*
+         * A member may attach an asset from
+         * their own private library to the
+         * Project note.
+         */
+        $ownImageId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO image_asset (
+    user_id,
+    stored_name,
+    original_name,
+    mime_type,
+    size_bytes
+)
+VALUES (
+    :userId,
+    :storedName,
+    'mine.png',
+    'image/png',
+    64
+)
+RETURNING id
+SQL,
+                    [
+                        'userId' =>
+                            $this->userId,
+
+                        'storedName' =>
+                            sha1(
+                                sprintf(
+                                    'project-own-%d',
+                                    $this->userId,
+                                ),
+                            ).'.png',
+                    ],
+                );
+
+        self::assertNotFalse(
+            $ownImageId,
+        );
+
+        $ownImageId =
+            (int) $ownImageId;
+
+        $attached =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/images/%d/notes/%d',
+                    $ownImageId,
+                    $sharedNoteId,
+                ),
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertTrue(
+            $attached['attached'],
+        );
+
+        /*
+         * Any Project member may detach a
+         * resource from the shared note, but
+         * the underlying image remains owned
+         * by its uploader.
+         */
+        $this->jsonRequest(
+            'DELETE',
+            sprintf(
+                '/api/images/%d/notes/%d',
+                $foreignImageId,
+                $sharedNoteId,
+            ),
+        );
+
+        self::assertSame(
+            204,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertFalse(
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT 1
+FROM note_image
+WHERE note_id = :noteId
+  AND image_id = :imageId
+LIMIT 1
+SQL,
+                    [
+                        'noteId' =>
+                            $sharedNoteId,
+
+                        'imageId' =>
+                            $foreignImageId,
+                    ],
+                ),
+        );
+
+        self::assertSame(
+            1,
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT COUNT(*)
+FROM note_image
+WHERE note_id = :noteId
+  AND image_id = :imageId
+SQL,
+                    [
+                        'noteId' =>
+                            $ownerPrivateNoteId,
+
+                        'imageId' =>
+                            $foreignImageId,
+                    ],
+                ),
+        );
+
+        /*
+         * Once detached from every accessible
+         * note, the foreign asset becomes
+         * private again.
+         */
+        $content =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/images/%d/content',
+                    $foreignImageId,
+                ),
+            );
+
+        self::assertSame(
+            404,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'IMAGE_NOT_FOUND',
+            $content['code'],
+        );
+    }
+
     private function authenticate(): void
     {
         $this->client->request(

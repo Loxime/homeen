@@ -198,17 +198,45 @@ SQL,
                 ->fetchAssociative(
                     <<<'SQL'
 SELECT
-    stored_name AS "storedName",
-    original_name AS "originalName",
-    mime_type AS "mimeType"
-FROM image_asset
-WHERE id = :id
-  AND user_id = :userId
+    image.stored_name AS "storedName",
+    image.original_name AS "originalName",
+    image.mime_type AS "mimeType"
+FROM image_asset image
+WHERE image.id = :id
+  AND (
+      image.user_id = :userId
+      OR EXISTS (
+          SELECT 1
+          FROM note_image access_link
+          INNER JOIN note access_note
+              ON access_note.id =
+                  access_link.note_id
+          WHERE access_link.image_id =
+                    image.id
+            AND access_note.deleted_at
+                    IS NULL
+            AND (
+                access_note.user_id =
+                    :userId
+                OR EXISTS (
+                    SELECT 1
+                    FROM project_member access_member
+                    WHERE access_member.project_id =
+                              access_note.project_id
+                      AND access_member.user_id =
+                              :userId
+                )
+            )
+      )
+  )
 SQL,
                     [
-                        'id' => $id,
+                        'id' =>
+                            $id,
+
                         'userId' =>
-                            $this->currentUser->id(),
+                            $this->currentUser
+                                ->id(),
                     ],
                 );
 
@@ -259,14 +287,32 @@ SELECT
     (
         SELECT COUNT(*)
         FROM note_image count_link
-        WHERE count_link.image_id
-            = image.id
+        INNER JOIN note count_note
+            ON count_note.id =
+                count_link.note_id
+        WHERE count_link.image_id =
+                image.id
+          AND count_note.deleted_at
+                IS NULL
+          AND (
+              count_note.user_id =
+                    :userId
+              OR EXISTS (
+                  SELECT 1
+                  FROM project_member count_member
+                  WHERE count_member.project_id =
+                            count_note.project_id
+                    AND count_member.user_id =
+                            :userId
+              )
+          )
     ) AS "noteCount"
 FROM note_image
 INNER JOIN image_asset image
-    ON image.id = note_image.image_id
-WHERE note_image.note_id = :noteId
-  AND image.user_id = :userId
+    ON image.id =
+        note_image.image_id
+WHERE note_image.note_id =
+        :noteId
 ORDER BY
     note_image.created_at ASC,
     image.id ASC
@@ -276,7 +322,8 @@ SQL,
                             $noteId,
 
                         'userId' =>
-                            $this->currentUser->id(),
+                            $this->currentUser
+                                ->id(),
                     ],
                 );
 
@@ -333,9 +380,30 @@ SQL,
             $noteId
         );
 
-        $this->get(
-            $imageId
-        );
+        $attached =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT 1
+FROM note_image
+WHERE note_id = :noteId
+  AND image_id = :imageId
+LIMIT 1
+SQL,
+                    [
+                        'noteId' =>
+                            $noteId,
+
+                        'imageId' =>
+                            $imageId,
+                    ],
+                );
+
+        if ($attached === false) {
+            throw new \OutOfBoundsException(
+                'Image not found.'
+            );
+        }
 
         $this->connection
             ->executeStatement(
@@ -400,8 +468,20 @@ SQL,
 SELECT 1
 FROM note
 WHERE id = :noteId
-  AND user_id = :userId
-  AND channel_id IS NULL
+  AND (
+      (
+          user_id = :userId
+          AND channel_id IS NULL
+      )
+      OR EXISTS (
+          SELECT 1
+          FROM project_member member
+          WHERE member.project_id =
+                    note.project_id
+            AND member.user_id =
+                    :userId
+      )
+  )
   AND deleted_at IS NULL
 LIMIT 1
 SQL,
@@ -410,7 +490,8 @@ SQL,
                             $noteId,
 
                         'userId' =>
-                            $this->currentUser->id(),
+                            $this->currentUser
+                                ->id(),
                     ],
                 );
 
@@ -430,15 +511,28 @@ SQL,
 UPDATE note
 SET updated_at = NOW()
 WHERE id = :noteId
-  AND user_id = :userId
-  AND channel_id IS NULL
+  AND (
+      (
+          user_id = :userId
+          AND channel_id IS NULL
+      )
+      OR EXISTS (
+          SELECT 1
+          FROM project_member member
+          WHERE member.project_id =
+                    note.project_id
+            AND member.user_id =
+                    :userId
+      )
+  )
 SQL,
                 [
                     'noteId' =>
                         $noteId,
 
                     'userId' =>
-                        $this->currentUser->id(),
+                        $this->currentUser
+                            ->id(),
                 ],
             );
     }

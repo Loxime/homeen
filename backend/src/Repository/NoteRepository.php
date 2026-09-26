@@ -140,7 +140,6 @@ SELECT
             ON preview_image.id =
                 preview_link.image_id
         WHERE preview_link.note_id = n.id
-          AND preview_image.user_id = :userId
         ORDER BY
             preview_link.created_at ASC,
             preview_image.id ASC
@@ -217,7 +216,6 @@ SELECT
             ON preview_image.id =
                 preview_link.image_id
         WHERE preview_link.note_id = n.id
-          AND preview_image.user_id = :userId
         ORDER BY
             preview_link.created_at ASC,
             preview_image.id ASC
