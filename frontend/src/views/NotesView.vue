@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   computed,
+  nextTick,
   onMounted,
   ref,
   watch,
@@ -60,6 +61,23 @@ const collectionFilter =
 
 const loading = ref(true)
 const error = ref('')
+
+const quickComposerOpen =
+  ref(false)
+
+const quickTitle =
+  ref('')
+
+const quickContent =
+  ref('')
+
+const quickSaving =
+  ref(false)
+
+const quickContentInput =
+  ref<HTMLTextAreaElement | null>(
+    null,
+  )
 
 const savedDisplay =
   localStorage.getItem(
@@ -283,9 +301,80 @@ async function openNote(
   modalOpen.value = true
 }
 
-function newNote(): void {
-  selected.value = null
-  modalOpen.value = true
+async function openQuickComposer():
+Promise<void> {
+  quickComposerOpen.value = true
+
+  await nextTick()
+
+  quickContentInput.value?.focus()
+}
+
+function closeQuickComposer(): void {
+  if (quickSaving.value) {
+    return
+  }
+
+  quickComposerOpen.value = false
+  quickTitle.value = ''
+  quickContent.value = ''
+}
+
+async function createQuickNote():
+Promise<void> {
+  const title =
+    quickTitle.value.trim()
+
+  const content =
+    quickContent.value.trim()
+
+  if (
+    quickSaving.value
+    || (
+      title === ''
+      && content === ''
+    )
+  ) {
+    return
+  }
+
+  quickSaving.value = true
+  error.value = ''
+
+  try {
+    await api<Note>(
+      '/api/notes',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          title,
+          content,
+          tagIds: [],
+          collectionId:
+            collectionFilter.value,
+          isPinned: false,
+          color: '#FFFFFF',
+        }),
+      },
+    )
+
+    quickTitle.value = ''
+    quickContent.value = ''
+    quickComposerOpen.value = false
+
+    await load()
+
+    showSuccess(
+      'Note créée.',
+    )
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de créer la note.'
+  } finally {
+    quickSaving.value = false
+  }
 }
 
 async function createCollection():
@@ -706,9 +795,13 @@ onMounted(
     </section>
 
     <button
-      v-if="scope === 'active'"
+      v-if="
+        scope === 'active'
+        && !quickComposerOpen
+      "
       class="keep-note-composer"
-      @click="newNote"
+      type="button"
+      @click="openQuickComposer"
     >
       <AppIcon
         name="note"
@@ -726,6 +819,79 @@ onMounted(
         />
       </span>
     </button>
+
+    <form
+      v-else-if="
+        scope === 'active'
+      "
+      class="keep-quick-composer"
+      @submit.prevent="
+        createQuickNote
+      "
+    >
+      <input
+        v-model="quickTitle"
+        class="keep-quick-title"
+        maxlength="255"
+        placeholder="Titre"
+        aria-label="Titre de la note"
+      />
+
+      <textarea
+        ref="quickContentInput"
+        v-model="quickContent"
+        class="keep-quick-content"
+        placeholder="Créer une note…"
+        aria-label="Contenu de la note"
+        rows="3"
+        @keydown.ctrl.enter.prevent="
+          createQuickNote
+        "
+        @keydown.meta.enter.prevent="
+          createQuickNote
+        "
+        @keydown.esc="
+          closeQuickComposer
+        "
+      />
+
+      <footer class="keep-quick-actions">
+        <span class="muted">
+          Ctrl/Cmd + Entrée pour créer
+        </span>
+
+        <div>
+          <button
+            type="button"
+            class="keep-quick-close"
+            :disabled="quickSaving"
+            @click="
+              closeQuickComposer
+            "
+          >
+            Fermer
+          </button>
+
+          <button
+            type="submit"
+            class="keep-quick-create"
+            :disabled="
+              quickSaving
+              || (
+                !quickTitle.trim()
+                && !quickContent.trim()
+              )
+            "
+          >
+            {{
+              quickSaving
+                ? 'Création…'
+                : 'Créer'
+            }}
+          </button>
+        </div>
+      </footer>
+    </form>
 
     <p
       v-if="error"
