@@ -1072,9 +1072,13 @@ async function restore(): Promise<void> {
               />
 
               <div class="task-main">
-                <span class="task-content">
+                <RouterLink
+                  class="task-content task-content-link"
+                  :to="`/tasks/${task.id}`"
+                  title="Ouvrir la tâche en plein écran"
+                >
                   {{ task.content }}
-                </span>
+                </RouterLink>
 
                 <div class="task-meta">
                   <label class="task-field">

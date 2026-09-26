@@ -7,6 +7,7 @@ import NotesView from '../views/NotesView.vue'
 import LibraryView from '../views/LibraryView.vue'
 import PomodoroView from '../views/PomodoroView.vue'
 import StatisticsView from '../views/StatisticsView.vue'
+import TaskView from '../views/TaskView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import ChannelsView from '../views/ChannelsView.vue'
 import ChannelView from '../views/ChannelView.vue'
@@ -52,6 +53,11 @@ export const router = createRouter({
     {
       path: '/labels',
       redirect: '/notes',
+    },
+
+    {
+      path: '/tasks/:id(\\d+)',
+      component: TaskView,
     },
 
     {

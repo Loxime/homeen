@@ -41,6 +41,12 @@ final readonly class TaskController
                 $this->tagIds(
                     $data['tagIds'] ?? [],
                 ),
+                $this->dateValue(
+                    $data['startDate'] ?? null,
+                ),
+                $this->dateValue(
+                    $data['dueDate'] ?? null,
+                ),
             ),
             201,
         );
@@ -99,6 +105,30 @@ final readonly class TaskController
                     : $this->currentTagIds(
                         $current,
                     ),
+                array_key_exists(
+                    'startDate',
+                    $data,
+                )
+                    ? $this->dateValue(
+                        $data['startDate'],
+                    )
+                    : (
+                        $current['startDate'] !== null
+                            ? (string) $current['startDate']
+                            : null
+                    ),
+                array_key_exists(
+                    'dueDate',
+                    $data,
+                )
+                    ? $this->dateValue(
+                        $data['dueDate'],
+                    )
+                    : (
+                        $current['dueDate'] !== null
+                            ? (string) $current['dueDate']
+                            : null
+                    ),
             ),
         );
     }
@@ -139,6 +169,26 @@ final readonly class TaskController
             null,
             204,
         );
+    }
+
+    private function dateValue(
+        mixed $value,
+    ): ?string {
+        if ($value === null) {
+            return null;
+        }
+
+        if (!is_string($value)) {
+            throw new \InvalidArgumentException(
+                'Task dates must be strings or null.'
+            );
+        }
+
+        $value = trim($value);
+
+        return $value === ''
+            ? null
+            : $value;
     }
 
     /**

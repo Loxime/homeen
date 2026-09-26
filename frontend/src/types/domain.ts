@@ -55,6 +55,8 @@ export interface Task {
   priority: TaskPriority
   status: TaskStatus
   position: number
+  startDate: string | null
+  dueDate: string | null
   isCompleted: boolean
   completedAt: string | null
   createdAt: string

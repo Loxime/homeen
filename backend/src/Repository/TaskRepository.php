@@ -66,6 +66,8 @@ SELECT
     t.priority,
     t.status,
     t.position,
+    t.start_date AS "startDate",
+    t.due_date AS "dueDate",
     t.is_completed AS "isCompleted",
     t.completed_at AS "completedAt",
     t.created_at AS "createdAt",
@@ -115,11 +117,25 @@ SQL,
         string $status = 'todo',
         ?int $position = null,
         array $tagIds = [],
+        ?string $startDate = null,
+        ?string $dueDate = null,
     ): array {
         $content = $this->validateContent($content);
         $priority = $this->validatePriority($priority);
         $status = $this->validateStatus($status);
         $tagIds = $this->validateTagIds($tagIds);
+        $startDate = $this->validateDate(
+            $startDate,
+            'startDate',
+        );
+        $dueDate = $this->validateDate(
+            $dueDate,
+            'dueDate',
+        );
+        $this->validateDateRange(
+            $startDate,
+            $dueDate,
+        );
 
         $userId = $this->currentUser->id();
 
@@ -169,6 +185,8 @@ SQL,
                 $status,
                 $position,
                 $tagIds,
+                $startDate,
+                $dueDate,
                 $userId,
             ): array {
                 $completed = $status === 'done';
@@ -181,6 +199,8 @@ INSERT INTO task (
     priority,
     status,
     position,
+    start_date,
+    due_date,
     is_completed,
     completed_at
 )
@@ -190,6 +210,8 @@ VALUES (
     :priority,
     :status,
     :position,
+    :startDate,
+    :dueDate,
     :completed,
     CASE
         WHEN :completed = TRUE
@@ -205,6 +227,8 @@ SQL,
                         'priority' => $priority,
                         'status' => $status,
                         'position' => $position,
+                        'startDate' => $startDate,
+                        'dueDate' => $dueDate,
                         'completed' => $completed,
                     ],
                     [
@@ -259,12 +283,26 @@ SQL,
         string $status,
         int $position,
         array $tagIds,
+        ?string $startDate,
+        ?string $dueDate,
     ): array {
         $content = $this->validateContent($content);
         $priority = $this->validatePriority($priority);
         $status = $this->validateStatus($status);
         $this->validatePosition($position);
         $tagIds = $this->validateTagIds($tagIds);
+        $startDate = $this->validateDate(
+            $startDate,
+            'startDate',
+        );
+        $dueDate = $this->validateDate(
+            $dueDate,
+            'dueDate',
+        );
+        $this->validateDateRange(
+            $startDate,
+            $dueDate,
+        );
 
         $context = $this->findOwned($id);
 
@@ -290,6 +328,8 @@ SQL,
                 $status,
                 $position,
                 $tagIds,
+                $startDate,
+                $dueDate,
                 $noteId,
                 $wasCompleted,
                 $completed,
@@ -302,6 +342,8 @@ SET content = :content,
     priority = :priority,
     status = :status,
     position = :position,
+    start_date = :startDate,
+    due_date = :dueDate,
     is_completed = :completed,
     completed_at = CASE
         WHEN :completed = TRUE
@@ -322,6 +364,8 @@ SQL,
                             'priority' => $priority,
                             'status' => $status,
                             'position' => $position,
+                            'startDate' => $startDate,
+                            'dueDate' => $dueDate,
                             'completed' => $completed,
                         ],
                         [
@@ -505,6 +549,8 @@ SELECT
     t.priority,
     t.status,
     t.position,
+    t.start_date AS "startDate",
+    t.due_date AS "dueDate",
     t.is_completed AS "isCompleted",
     t.completed_at AS "completedAt",
     t.created_at AS "createdAt",
@@ -782,6 +828,62 @@ SQL,
         }
 
         return $status;
+    }
+
+    private function validateDate(
+        ?string $date,
+        string $field,
+    ): ?string {
+        if (
+            $date === null
+            || trim($date) === ''
+        ) {
+            return null;
+        }
+
+        $date = trim($date);
+
+        $parsed =
+            \DateTimeImmutable::createFromFormat(
+                '!Y-m-d',
+                $date,
+            );
+
+        $errors =
+            \DateTimeImmutable::getLastErrors();
+
+        if (
+            $parsed === false
+            || (
+                $errors !== false
+                && (
+                    $errors['warning_count'] > 0
+                    || $errors['error_count'] > 0
+                )
+            )
+            || $parsed->format('Y-m-d') !== $date
+        ) {
+            throw new \InvalidArgumentException(
+                $field.' must use YYYY-MM-DD.'
+            );
+        }
+
+        return $date;
+    }
+
+    private function validateDateRange(
+        ?string $startDate,
+        ?string $dueDate,
+    ): void {
+        if (
+            $startDate !== null
+            && $dueDate !== null
+            && $dueDate < $startDate
+        ) {
+            throw new \InvalidArgumentException(
+                'Task due date cannot be before start date.'
+            );
+        }
     }
 
     private function validatePosition(

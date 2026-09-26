@@ -179,6 +179,14 @@ SQL,
             $defaultTask['completedAt'],
         );
 
+        self::assertNull(
+            $defaultTask['startDate'],
+        );
+
+        self::assertNull(
+            $defaultTask['dueDate'],
+        );
+
         self::assertSame(
             [],
             $defaultTask['tags'],
@@ -432,6 +440,150 @@ SQL,
         );
     }
 
+    public function testTaskDatesCanBeCreatedUpdatedClearedAndValidated(): void
+    {
+        $task = $this->jsonRequest(
+            'POST',
+            sprintf(
+                '/api/notes/%d/tasks',
+                $this->noteId,
+            ),
+            [
+                'content' =>
+                    'Scheduled task',
+
+                'startDate' =>
+                    '2026-10-01',
+
+                'dueDate' =>
+                    '2026-10-15',
+            ],
+        );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            '2026-10-01',
+            $task['startDate'],
+        );
+
+        self::assertSame(
+            '2026-10-15',
+            $task['dueDate'],
+        );
+
+        /*
+         * Fields omitted from a partial update
+         * must retain their current values.
+         */
+        $preserved = $this->jsonRequest(
+            'PUT',
+            sprintf(
+                '/api/tasks/%d',
+                $task['id'],
+            ),
+            [
+                'priority' => 'high',
+            ],
+        );
+
+        self::assertSame(
+            'high',
+            $preserved['priority'],
+        );
+
+        self::assertSame(
+            '2026-10-01',
+            $preserved['startDate'],
+        );
+
+        self::assertSame(
+            '2026-10-15',
+            $preserved['dueDate'],
+        );
+
+        /*
+         * Explicit null removes a date.
+         */
+        $cleared = $this->jsonRequest(
+            'PUT',
+            sprintf(
+                '/api/tasks/%d',
+                $task['id'],
+            ),
+            [
+                'startDate' => null,
+                'dueDate' => null,
+            ],
+        );
+
+        self::assertNull(
+            $cleared['startDate'],
+        );
+
+        self::assertNull(
+            $cleared['dueDate'],
+        );
+
+        $invalidFormat =
+            $this->jsonRequest(
+                'PUT',
+                sprintf(
+                    '/api/tasks/%d',
+                    $task['id'],
+                ),
+                [
+                    'startDate' =>
+                        '01/10/2026',
+                ],
+            );
+
+        self::assertSame(
+            422,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'startDate must use YYYY-MM-DD.',
+            $invalidFormat['error'],
+        );
+
+        $invalidRange =
+            $this->jsonRequest(
+                'PUT',
+                sprintf(
+                    '/api/tasks/%d',
+                    $task['id'],
+                ),
+                [
+                    'startDate' =>
+                        '2026-10-20',
+
+                    'dueDate' =>
+                        '2026-10-10',
+                ],
+            );
+
+        self::assertSame(
+            422,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'Task due date cannot be before start date.',
+            $invalidRange['error'],
+        );
+    }
+
     public function testInvalidPriorityAndStatusAreRejected(): void
     {
         $invalidPriority =
@@ -517,6 +669,12 @@ SQL,
                 'position' =>
                     7,
 
+                'startDate' =>
+                    '2026-11-03',
+
+                'dueDate' =>
+                    '2026-11-21',
+
                 'tagIds' => [
                     $tag['id'],
                 ],
@@ -564,6 +722,16 @@ SQL,
         self::assertSame(
             7,
             $duplicatedTask['position'],
+        );
+
+        self::assertSame(
+            '2026-11-03',
+            $duplicatedTask['startDate'],
+        );
+
+        self::assertSame(
+            '2026-11-21',
+            $duplicatedTask['dueDate'],
         );
 
         self::assertSame(

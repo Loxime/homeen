@@ -408,6 +408,8 @@ INSERT INTO task (
     priority,
     status,
     position,
+    start_date,
+    due_date,
     is_completed
 )
 VALUES (
@@ -416,6 +418,8 @@ VALUES (
     :priority,
     'todo',
     :position,
+    :startDate,
+    :dueDate,
     FALSE
 )
 RETURNING id
@@ -432,6 +436,16 @@ SQL,
 
                                         'position' =>
                                             (int) $task['position'],
+
+                                        'startDate' =>
+                                            $task['startDate'] !== null
+                                                ? (string) $task['startDate']
+                                                : null,
+
+                                        'dueDate' =>
+                                            $task['dueDate'] !== null
+                                                ? (string) $task['dueDate']
+                                                : null,
                                     ],
                                 );
 
