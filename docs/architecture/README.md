@@ -7,7 +7,10 @@ Homeen is a private productivity application. It intentionally does not implemen
 ## Domain model
 
 - `tag`: user-owned reusable classification with a six-digit hexadecimal color.
-- `note`: text note with archive/trash timestamps, optional collection, and zero or more tags through `note_tag`.
+- `note`: text note with archive/trash timestamps, Keep-style pin state and color, optional collection, and zero or more tags through `note_tag`.
+- `note_collection`: lightweight user-owned single-assignment grouping for notes. It remains distinct from the richer project/workflow model planned separately.
+- `image_asset`: private reusable image owned by one user.
+- `note_image`: many-to-many attachment between notes and private image assets.
 - `task`: belongs to exactly one note; content up to 4000 characters, priority, status, position, optional start/due dates, and zero or more tags through `task_tag`.
 - `pomodoro_preset`: unique work duration in minutes. Work duration is at least 5 minutes and has no application-defined upper bound.
 - `pomodoro_session`: one launch-to-stop interval. Only one session may run at once.
@@ -21,7 +24,7 @@ The legacy `label` table and `note.label_id` column are retained temporarily as 
 
 `active -> archived -> active` and `active|archived -> trash -> active`. A daily scheduler permanently deletes notes that have remained in trash for at least 30 days. Tasks and `note_tag` associations cascade-delete only when the note is permanently purged. Deleting a tag removes its note/task associations without deleting either object.
 
-Duplicating a note copies title, content, collection, note tags, task metadata, task dates and task tags. Duplicated tasks are deliberately reset to `todo` and incomplete so the copy represents a new actionable note.
+Duplicating a note copies title, content, color, collection, note tags, image attachments, task metadata, task dates and task tags. Image files are not duplicated: the copied note links to the same private `image_asset` records. The duplicated note is deliberately not pinned, and duplicated tasks are reset to `todo` and incomplete so the copy represents a new actionable note.
 
 ## Pomodoro semantics
 

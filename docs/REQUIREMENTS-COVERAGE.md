@@ -10,6 +10,13 @@
 | Modify tag color | Hex color picker + backend/database validation |
 | Multiple tags per note | `note_tag` many-to-many relationship |
 | Multiple tags per task | `task_tag` many-to-many relationship |
+| Pin / unpin note | Persistent `note.is_pinned` + pinned/other grid sections + quick card action |
+| Note color | Persistent validated `note.color` + editor palette + quick card color action |
+| Note image attachments | Private `image_asset` library + `note_image` many-to-many relationship |
+| Image preview on note card | First attached private image exposed as card preview |
+| Quick note creation | Inline Keep-style composer |
+| Quick image note | Image composer shortcut creates and attaches a private image |
+| Quick task list | List composer creates a note plus real task records |
 | Grid display | Notes grid |
 | List display | Notes list |
 | Random whiteboard | Randomized/jittered board with shuffle |

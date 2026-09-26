@@ -562,6 +562,36 @@ SQL,
                             );
                     }
 
+                    $this->connection
+                        ->executeStatement(
+                            <<<'SQL'
+INSERT INTO note_image (
+    note_id,
+    image_id,
+    created_at
+)
+SELECT
+    :newNoteId,
+    source_image.image_id,
+    source_image.created_at
+FROM note_image source_image
+INNER JOIN image_asset image
+    ON image.id = source_image.image_id
+WHERE source_image.note_id = :sourceNoteId
+  AND image.user_id = :userId
+SQL,
+                            [
+                                'newNoteId' =>
+                                    $newNoteId,
+
+                                'sourceNoteId' =>
+                                    $id,
+
+                                'userId' =>
+                                    $userId,
+                            ],
+                        );
+
                     foreach (
                         $original['tasks']
                         as $task

@@ -54,9 +54,11 @@ If `origin` already exists, use `git remote set-url origin https://github.com/Lo
 
 ## Functional scope
 
-- Notes: create, edit, duplicate, archive, trash, restore; automatic permanent deletion after 30 days.
+- Notes: quick create, edit, duplicate, pin/unpin, per-note color, archive, trash and restore; automatic permanent deletion after 30 days.
 - Reusable colored tags shared by notes and tasks; multiple tags can be attached to each note or task.
-- Note views: grid, list, randomized whiteboard.
+- Keep-style note experience: pinned/other sections, quick card actions, first-image card previews, inline text composer, image-note shortcut and task-list shortcut.
+- Note views: grid, list and randomized whiteboard.
+- Private image library with reusable image assets attachable to notes.
 - Tasks belong to exactly one note; priority, status, position, optional start/due dates, reusable tags, completion state, and content up to 4000 characters.
 - Global search across note title/content, collections and tags, plus task content and tags.
 - Infinite Pomodoro: configurable work duration (minimum 5 minutes, no maximum), fixed 5-minute break, saved presets, quick relaunch, tab countdown, audible phase transitions.

@@ -230,25 +230,20 @@ const quickCanCreate =
   computed(
     () => {
       if (
-        quickTitle.value.trim()
-        !== ''
-      ) {
-        return true
-      }
-
-      if (
         quickMode.value
-        === 'note'
+        === 'list'
       ) {
-        return (
-          quickContent.value.trim()
-          !== ''
+        return quickTasks.value.some(
+          task =>
+            task.trim() !== '',
         )
       }
 
-      return quickTasks.value.some(
-        task =>
-          task.trim() !== '',
+      return (
+        quickTitle.value.trim()
+        !== ''
+        || quickContent.value.trim()
+        !== ''
       )
     },
   )

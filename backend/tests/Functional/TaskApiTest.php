@@ -852,7 +852,7 @@ SQL,
             'POST',
             sprintf(
                 '/api/notes/%d/duplicate',
-                $pinned['id'],
+                $plain['id'],
             ),
         );
 
@@ -861,8 +861,18 @@ SQL,
         );
 
         self::assertSame(
-            '#D3F9D8',
+            '#C5F6FA',
             $duplicate['color'],
+        );
+
+        self::assertSame(
+            sprintf(
+                '/api/images/%d/content',
+                $imageId,
+            ),
+            $duplicate[
+                'previewImageUrl'
+            ],
         );
     }
 
