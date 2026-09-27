@@ -115,6 +115,32 @@ SQL,
             $noteId,
         );
 
+        $noteType =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT note_type
+FROM note
+WHERE id = :noteId
+  AND channel_id = :channelId
+  AND user_id IS NULL
+LIMIT 1
+SQL,
+                    [
+                        'noteId' =>
+                            $noteId,
+
+                        'channelId' =>
+                            $channelId,
+                    ],
+                );
+
+        if ((string) $noteType !== 'list') {
+            throw new \InvalidArgumentException(
+                'Tasks can only be added to list notes.'
+            );
+        }
+
         $row = $this->connection
             ->fetchAssociative(
                 <<<'SQL'

@@ -717,22 +717,6 @@ SQL,
         $sharedNoteId =
             (int) $sharedNoteId;
 
-        $this->connection->insert(
-            'task',
-            [
-                'note_id' =>
-                    $sharedNoteId,
-                'content' =>
-                    'Existing shared task',
-                'priority' =>
-                    'normal',
-                'status' =>
-                    'todo',
-                'position' =>
-                    0,
-            ],
-        );
-
         $detail =
             $this->jsonRequest(
                 'GET',
@@ -755,7 +739,7 @@ SQL,
         );
 
         self::assertCount(
-            1,
+            0,
             $detail['tasks'],
         );
 
@@ -839,7 +823,7 @@ SQL,
         );
 
         self::assertCount(
-            1,
+            0,
             $duplicate['tasks'],
         );
 
@@ -1499,13 +1483,15 @@ INSERT INTO note (
     user_id,
     project_id,
     title,
-    content
+    content,
+    note_type
 )
 VALUES (
     NULL,
     :projectId,
     'Shared task note',
-    ''
+    '',
+    'list'
 )
 RETURNING id
 SQL,

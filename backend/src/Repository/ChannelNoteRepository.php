@@ -10,6 +10,11 @@ use Doctrine\DBAL\Connection;
 
 final readonly class ChannelNoteRepository
 {
+    private const NOTE_TYPES = [
+        'text',
+        'list',
+    ];
+
     public function __construct(
         private Connection $connection,
         private ActivityLogger $logger,
@@ -84,6 +89,7 @@ SELECT
     n.id,
     n.title,
     n.content,
+    n.note_type AS "noteType",
     n.version,
     n.created_by_user_id
         AS "createdByUserId",
@@ -145,6 +151,7 @@ SELECT
     n.id,
     n.title,
     n.content,
+    n.note_type AS "noteType",
     n.version,
     n.created_by_user_id
         AS "createdByUserId",
@@ -222,8 +229,20 @@ SQL,
         string $code,
         string $title,
         string $content,
+        string $noteType,
     ): array {
         $this->validateTitle($title);
+
+        $noteType =
+            $this->validateNoteType(
+                $noteType
+            );
+
+        $content =
+            $this->validateContentForType(
+                $noteType,
+                $content,
+            );
 
         $channelId =
             $this->accessibleChannelId($code);
@@ -241,6 +260,7 @@ INSERT INTO note (
     label_id,
     title,
     content,
+    note_type,
     version
 )
 VALUES (
@@ -250,6 +270,7 @@ VALUES (
     NULL,
     :title,
     :content,
+    :noteType,
     1
 )
 RETURNING id
@@ -266,6 +287,9 @@ SQL,
 
                     'content' =>
                         $content,
+
+                    'noteType' =>
+                        $noteType,
                 ],
             );
 
@@ -307,6 +331,18 @@ SQL,
         $this->validateVersion(
             $expectedVersion
         );
+
+        $current =
+            $this->get(
+                $code,
+                $noteId,
+            );
+
+        $content =
+            $this->validateContentForType(
+                (string) $current['noteType'],
+                $content,
+            );
 
         $channelId =
             $this->accessibleChannelId($code);
@@ -440,6 +476,7 @@ INSERT INTO note (
     label_id,
     title,
     content,
+    note_type,
     version
 )
 VALUES (
@@ -449,6 +486,7 @@ VALUES (
     NULL,
     :title,
     :content,
+    :noteType,
     1
 )
 RETURNING id
@@ -475,6 +513,11 @@ SQL,
                                 'content' =>
                                     (string) $original[
                                         'content'
+                                    ],
+
+                                'noteType' =>
+                                    (string) $original[
+                                        'noteType'
                                     ],
                             ],
                         );
@@ -835,6 +878,44 @@ SQL,
             );
 
         return $row;
+    }
+
+    private function validateNoteType(
+        string $noteType,
+    ): string {
+        $noteType = trim($noteType);
+
+        if (
+            !in_array(
+                $noteType,
+                self::NOTE_TYPES,
+                true,
+            )
+        ) {
+            throw new \InvalidArgumentException(
+                'Unknown note type.'
+            );
+        }
+
+        return $noteType;
+    }
+
+    private function validateContentForType(
+        string $noteType,
+        string $content,
+    ): string {
+        if (
+            $noteType === 'list'
+            && trim($content) !== ''
+        ) {
+            throw new \InvalidArgumentException(
+                'List notes cannot contain free text.'
+            );
+        }
+
+        return $noteType === 'list'
+            ? ''
+            : $content;
     }
 
     private function validateTitle(

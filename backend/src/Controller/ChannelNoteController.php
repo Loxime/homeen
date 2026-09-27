@@ -104,6 +104,10 @@ final readonly class ChannelNoteController
                         $data['content']
                         ?? ''
                     ),
+                    (string) (
+                        $data['noteType']
+                        ?? 'text'
+                    ),
                 ),
                 201,
             );

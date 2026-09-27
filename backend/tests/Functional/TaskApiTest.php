@@ -92,12 +92,14 @@ SQL,
 INSERT INTO note (
     user_id,
     title,
-    content
+    content,
+    note_type
 )
 VALUES (
     :userId,
     'Functional task test',
-    ''
+    '',
+    'list'
 )
 RETURNING id
 SQL,
@@ -581,6 +583,145 @@ SQL,
         self::assertSame(
             'Task due date cannot be before start date.',
             $invalidRange['error'],
+        );
+    }
+
+    public function testTextAndListNotesAreSeparated(): void
+    {
+        $textNote = $this->jsonRequest(
+            'POST',
+            '/api/notes',
+            [
+                'title' => 'Text note',
+                'content' => 'Free text body',
+            ],
+        );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'text',
+            $textNote['noteType'],
+        );
+
+        $rejectedTask = $this->jsonRequest(
+            'POST',
+            sprintf(
+                '/api/notes/%d/tasks',
+                $textNote['id'],
+            ),
+            [
+                'content' =>
+                    'Forbidden item',
+            ],
+        );
+
+        self::assertSame(
+            422,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'Tasks can only be added to list notes.',
+            $rejectedTask['error'],
+        );
+
+        $listNote = $this->jsonRequest(
+            'POST',
+            '/api/notes',
+            [
+                'title' => 'Checklist',
+                'content' => '',
+                'noteType' => 'list',
+            ],
+        );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'list',
+            $listNote['noteType'],
+        );
+
+        $task = $this->jsonRequest(
+            'POST',
+            sprintf(
+                '/api/notes/%d/tasks',
+                $listNote['id'],
+            ),
+            [
+                'content' =>
+                    'Allowed item',
+            ],
+        );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            $listNote['id'],
+            $task['noteId'],
+        );
+
+        $invalidList = $this->jsonRequest(
+            'POST',
+            '/api/notes',
+            [
+                'title' => 'Invalid list',
+                'content' =>
+                    'Lists have no free text',
+                'noteType' => 'list',
+            ],
+        );
+
+        self::assertSame(
+            422,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'List notes cannot contain free text.',
+            $invalidList['error'],
+        );
+
+        $invalidType = $this->jsonRequest(
+            'POST',
+            '/api/notes',
+            [
+                'title' => 'Invalid type',
+                'content' => '',
+                'noteType' => 'board',
+            ],
+        );
+
+        self::assertSame(
+            422,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'Unknown note type.',
+            $invalidType['error'],
         );
     }
 

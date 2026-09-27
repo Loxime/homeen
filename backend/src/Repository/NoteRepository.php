@@ -12,6 +12,11 @@ use Doctrine\DBAL\ParameterType;
 
 final readonly class NoteRepository
 {
+    private const NOTE_TYPES = [
+        'text',
+        'list',
+    ];
+
     public function __construct(
         private Connection $connection,
         private ActivityLogger $logger,
@@ -106,6 +111,7 @@ SELECT
     n.id,
     n.title,
     n.content,
+    n.note_type AS "noteType",
     n.is_pinned AS "isPinned",
     n.color,
     n.project_id AS "projectId",
@@ -160,6 +166,7 @@ SELECT
     n.id,
     n.title,
     n.content,
+    n.note_type AS "noteType",
     n.is_pinned AS "isPinned",
     n.color,
     n.project_id AS "projectId",
@@ -228,12 +235,24 @@ SQL,
     public function create(
         string $title,
         string $content,
+        string $noteType,
         array $tagIds,
         ?int $projectId,
         bool $isPinned,
         string $color,
     ): array {
         $this->validateTitle($title);
+
+        $noteType =
+            $this->validateNoteType(
+                $noteType
+            );
+
+        $content =
+            $this->validateContentForType(
+                $noteType,
+                $content,
+            );
 
         $color =
             $this->validateColor(
@@ -259,6 +278,7 @@ SQL,
                 function () use (
                     $title,
                     $content,
+                    $noteType,
                     $tagIds,
                     $projectId,
                     $isPinned,
@@ -273,6 +293,7 @@ INSERT INTO note (
     user_id,
     title,
     content,
+    note_type,
     project_id,
     is_pinned,
     color
@@ -281,6 +302,7 @@ VALUES (
     :userId,
     :title,
     :content,
+    :noteType,
     :projectId,
     :isPinned,
     :color
@@ -296,6 +318,9 @@ SQL,
 
                                     'content' =>
                                         $content,
+
+                                    'noteType' =>
+                                        $noteType,
                                     'projectId' =>
                                         $projectId,
 
@@ -546,6 +571,7 @@ INSERT INTO note (
     user_id,
     title,
     content,
+    note_type,
     project_id,
     color
 )
@@ -553,6 +579,7 @@ VALUES (
     :userId,
     :title,
     :content,
+    :noteType,
     :projectId,
     :color
 )
@@ -572,6 +599,9 @@ SQL,
 
                                 'content' =>
                                     (string) $original['content'],
+
+                                'noteType' =>
+                                    (string) $original['noteType'],
 
                                 'projectId' =>
                                     $original['projectId'] !== null
@@ -937,6 +967,42 @@ SQL,
                 'Note title cannot exceed 255 characters.'
             );
         }
+    }
+
+    private function validateNoteType(
+        string $noteType,
+    ): string {
+        if (
+            !in_array(
+                $noteType,
+                self::NOTE_TYPES,
+                true,
+            )
+        ) {
+            throw new \InvalidArgumentException(
+                'Unknown note type.'
+            );
+        }
+
+        return $noteType;
+    }
+
+    private function validateContentForType(
+        string $noteType,
+        string $content,
+    ): string {
+        if (
+            $noteType === 'list'
+            && trim($content) !== ''
+        ) {
+            throw new \InvalidArgumentException(
+                'List notes cannot contain free text.'
+            );
+        }
+
+        return $noteType === 'list'
+            ? ''
+            : $content;
     }
 
     private function validateColor(

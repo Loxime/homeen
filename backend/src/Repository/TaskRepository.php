@@ -149,9 +149,9 @@ SQL,
 
         $userId = $this->currentUser->id();
 
-        $noteExists = $this->connection->fetchOne(
+        $noteType = $this->connection->fetchOne(
             <<<'SQL'
-SELECT 1
+SELECT note_type
 FROM note
 WHERE id = :noteId
   AND (
@@ -177,9 +177,15 @@ SQL,
             ],
         );
 
-        if ($noteExists === false) {
+        if ($noteType === false) {
             throw new \OutOfBoundsException(
                 'Note not found or is in trash.'
+            );
+        }
+
+        if ((string) $noteType !== 'list') {
+            throw new \InvalidArgumentException(
+                'Tasks can only be added to list notes.'
             );
         }
 

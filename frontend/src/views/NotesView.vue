@@ -435,6 +435,10 @@ Promise<void> {
           body: JSON.stringify({
             title,
             content,
+            noteType:
+              quickMode.value === 'list'
+                ? 'list'
+                : 'text',
             tagIds: [],
             projectId:
               projectId.value,

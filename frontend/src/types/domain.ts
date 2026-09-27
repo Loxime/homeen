@@ -46,6 +46,10 @@ export interface ProjectTask {
   tags: Tag[]
 }
 
+export type NoteType =
+  | 'text'
+  | 'list'
+
 export type TaskPriority =
   | 'low'
   | 'normal'
@@ -87,6 +91,7 @@ export interface NoteSummary {
   id: number
   title: string
   content: string
+  noteType: NoteType
   isPinned: boolean
   color: string
   tags: Tag[]

@@ -59,6 +59,7 @@ final readonly class NoteController
             $this->notes->create(
                 (string) ($data['title'] ?? ''),
                 (string) ($data['content'] ?? ''),
+                (string) ($data['noteType'] ?? 'text'),
                 $this->tagIds(
                     $data['tagIds'] ?? [],
                 ),
