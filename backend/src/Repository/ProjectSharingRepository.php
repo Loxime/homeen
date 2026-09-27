@@ -102,104 +102,38 @@ SQL,
     }
 
     /**
+     * @return array{
+     *     email:string
+     * }
+     */
+    public function lookupInvitee(
+        int $projectId,
+        string $email,
+    ): array {
+        $target =
+            $this->invitableTarget(
+                $projectId,
+                $email,
+            );
+
+        return [
+            'email' =>
+                $target['email'],
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function invite(
         int $projectId,
         string $email,
     ): array {
-        $email = trim($email);
-
-        if (
-            $email === ''
-            || strlen($email) > 254
-            || filter_var(
-                $email,
-                FILTER_VALIDATE_EMAIL,
-            ) === false
-        ) {
-            throw new \InvalidArgumentException(
-                'Invalid email address.',
-            );
-        }
-
-        $context =
-            $this->context($projectId);
-
-        $this->requireManager(
-            $context['role'],
-        );
-
         $target =
-            $this->users
-                ->findIdentityByEmail(
-                    $email,
-                );
-
-        if ($target === null) {
-            throw new \OutOfBoundsException(
-                'User not found.',
+            $this->invitableTarget(
+                $projectId,
+                $email,
             );
-        }
-
-        if (
-            $target['id']
-            === $context['currentUserId']
-        ) {
-            throw new \DomainException(
-                'PROJECT_CANNOT_INVITE_SELF',
-            );
-        }
-
-        $alreadyMember =
-            $this->connection
-                ->fetchOne(
-                    <<<'SQL'
-SELECT 1
-FROM project_member
-WHERE project_id = :projectId
-  AND user_id = :userId
-LIMIT 1
-SQL,
-                    [
-                        'projectId' =>
-                            $projectId,
-
-                        'userId' =>
-                            $target['id'],
-                    ],
-                );
-
-        if ($alreadyMember !== false) {
-            throw new \DomainException(
-                'PROJECT_ALREADY_MEMBER',
-            );
-        }
-
-        $alreadyInvited =
-            $this->connection
-                ->fetchOne(
-                    <<<'SQL'
-SELECT 1
-FROM project_invitation
-WHERE project_id = :projectId
-  AND invited_user_id = :userId
-LIMIT 1
-SQL,
-                    [
-                        'projectId' =>
-                            $projectId,
-
-                        'userId' =>
-                            $target['id'],
-                    ],
-                );
-
-        if ($alreadyInvited !== false) {
-            throw new \DomainException(
-                'PROJECT_ALREADY_INVITED',
-            );
-        }
 
         try {
             $row =
@@ -228,7 +162,7 @@ SQL,
                                 $target['id'],
 
                             'invitedByUserId' =>
-                                $context[
+                                $target[
                                     'currentUserId'
                                 ],
                         ],
@@ -577,6 +511,122 @@ SQL,
             'project',
             $projectId,
         );
+    }
+
+    /**
+     * @return array{
+     *     id:int,
+     *     email:string,
+     *     currentUserId:int
+     * }
+     */
+    private function invitableTarget(
+        int $projectId,
+        string $email,
+    ): array {
+        $email = trim($email);
+
+        if (
+            $email === ''
+            || strlen($email) > 254
+            || filter_var(
+                $email,
+                FILTER_VALIDATE_EMAIL,
+            ) === false
+        ) {
+            throw new \InvalidArgumentException(
+                'Invalid email address.',
+            );
+        }
+
+        $context =
+            $this->context($projectId);
+
+        $this->requireManager(
+            $context['role'],
+        );
+
+        $target =
+            $this->users
+                ->findIdentityByEmail(
+                    $email,
+                );
+
+        if ($target === null) {
+            throw new \OutOfBoundsException(
+                'User not found.',
+            );
+        }
+
+        if (
+            $target['id']
+            === $context['currentUserId']
+        ) {
+            throw new \DomainException(
+                'PROJECT_CANNOT_INVITE_SELF',
+            );
+        }
+
+        $alreadyMember =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT 1
+FROM project_member
+WHERE project_id = :projectId
+  AND user_id = :userId
+LIMIT 1
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+
+                        'userId' =>
+                            $target['id'],
+                    ],
+                );
+
+        if ($alreadyMember !== false) {
+            throw new \DomainException(
+                'PROJECT_ALREADY_MEMBER',
+            );
+        }
+
+        $alreadyInvited =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT 1
+FROM project_invitation
+WHERE project_id = :projectId
+  AND invited_user_id = :userId
+LIMIT 1
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+
+                        'userId' =>
+                            $target['id'],
+                    ],
+                );
+
+        if ($alreadyInvited !== false) {
+            throw new \DomainException(
+                'PROJECT_ALREADY_INVITED',
+            );
+        }
+
+        return [
+            'id' =>
+                (int) $target['id'],
+
+            'email' =>
+                (string) $target['email'],
+
+            'currentUserId' =>
+                $context['currentUserId'],
+        ];
     }
 
     /**

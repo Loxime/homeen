@@ -1318,6 +1318,72 @@ SQL,
         $projectId =
             (int) $project['id'];
 
+        $unknownLookup =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/invitees/lookup',
+                    $projectId,
+                ),
+                [
+                    'email' =>
+                        'not-registered@example.test',
+                ],
+            );
+
+        self::assertSame(
+            404,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'PROJECT_USER_NOT_FOUND',
+            $unknownLookup['code'],
+        );
+
+        $unknownUser =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/invitations',
+                    $projectId,
+                ),
+                [
+                    'email' =>
+                        'not-registered@example.test',
+                ],
+            );
+
+        self::assertSame(
+            404,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'PROJECT_USER_NOT_FOUND',
+            $unknownUser['code'],
+        );
+
+        self::assertSame(
+            0,
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT COUNT(*)
+FROM project_invitation
+WHERE project_id = :projectId
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+                    ],
+                ),
+        );
+
         $otherUserId =
             $this->createOtherUser();
 
@@ -1325,6 +1391,31 @@ SQL,
             $this->primaryEmail(
                 $otherUserId,
             );
+
+        $lookup =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/invitees/lookup',
+                    $projectId,
+                ),
+                [
+                    'email' =>
+                        $otherEmail,
+                ],
+            );
+
+        self::assertSame(
+            200,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            $otherEmail,
+            $lookup['email'],
+        );
 
         $invitation =
             $this->jsonRequest(
@@ -1663,6 +1754,33 @@ SQL,
                             $this->userId,
                     ],
                 ),
+        );
+
+        $memberLookup =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/invitees/lookup',
+                    $projectId,
+                ),
+                [
+                    'email' =>
+                        $this->primaryEmail(
+                            $ownerUserId,
+                        ),
+                ],
+            );
+
+        self::assertSame(
+            403,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'PROJECT_MANAGEMENT_REQUIRED',
+            $memberLookup['code'],
         );
 
         $forbiddenRole =

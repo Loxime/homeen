@@ -7,7 +7,10 @@ import {
 import Swal from 'sweetalert2'
 
 import AppIcon from '../components/AppIcon.vue'
-import { api } from '../services/api'
+import {
+  ApiError,
+  api,
+} from '../services/api'
 
 import type {
   Project,
@@ -29,6 +32,10 @@ interface ProjectMember {
   email: string
   role: ProjectRole
   joinedAt: string
+}
+
+interface ProjectInvitee {
+  email: string
 }
 
 interface AccessStatus {
@@ -62,6 +69,17 @@ const creating = ref(false)
 
 const inviteEmails =
   ref<Record<number, string>>({})
+
+const confirmedInvitees =
+  ref<
+    Record<
+      number,
+      ProjectInvitee | undefined
+    >
+  >({})
+
+const lookupBusyProjectId =
+  ref<number | null>(null)
 
 const busyProjectId =
   ref<number | null>(null)
@@ -159,7 +177,42 @@ Promise<void> {
   }
 }
 
-async function invite(
+function invitationErrorMessage(
+  exception: unknown,
+  fallback: string,
+): string {
+  if (!(exception instanceof ApiError)) {
+    return fallback
+  }
+
+  return {
+    PROJECT_INVALID_INPUT:
+      'Saisissez une adresse email valide.',
+
+    PROJECT_USER_NOT_FOUND:
+      'Aucun compte Harpocrate ne correspond à cette adresse.',
+
+    PROJECT_ALREADY_MEMBER:
+      'Cet utilisateur est déjà membre du projet.',
+
+    PROJECT_ALREADY_INVITED:
+      'Une invitation est déjà en attente pour cet utilisateur.',
+
+    PROJECT_CANNOT_INVITE_SELF:
+      'Vous ne pouvez pas vous inviter vous-même.',
+  }[exception.code ?? '']
+    ?? exception.message
+}
+
+function clearConfirmedInvitee(
+  projectId: number,
+): void {
+  delete confirmedInvitees.value[
+    projectId
+  ]
+}
+
+async function lookupInvitee(
   project: Project,
 ): Promise<void> {
   const email =
@@ -171,7 +224,101 @@ async function invite(
 
   if (
     email === ''
+    || lookupBusyProjectId.value
+      !== null
+    || busyProjectId.value
+      !== null
+  ) {
+    return
+  }
+
+  clearConfirmedInvitee(
+    project.id,
+  )
+
+  lookupBusyProjectId.value =
+    project.id
+
+  error.value = ''
+
+  try {
+    const invitee =
+      await api<ProjectInvitee>(
+        `/api/projects/${project.id}/invitees/lookup`,
+        {
+          method: 'POST',
+
+          body: JSON.stringify({
+            email,
+          }),
+        },
+      )
+
+    /*
+     * Le champ peut avoir changé pendant
+     * la requête. Ne jamais confirmer une
+     * ancienne valeur dans ce cas.
+     */
+    if (
+      (
+        inviteEmails.value[
+          project.id
+        ] ?? ''
+      ).trim() !== email
+    ) {
+      return
+    }
+
+    confirmedInvitees.value[
+      project.id
+    ] = invitee
+
+    /*
+     * Utilise l'adresse primaire canonique
+     * retournée par Harpocrate.
+     */
+    inviteEmails.value[
+      project.id
+    ] = invitee.email
+  } catch (exception) {
+    clearConfirmedInvitee(
+      project.id,
+    )
+
+    error.value =
+      invitationErrorMessage(
+        exception,
+        'Impossible de vérifier ce compte.',
+      )
+  } finally {
+    lookupBusyProjectId.value = null
+  }
+}
+
+async function invite(
+  project: Project,
+): Promise<void> {
+  const invitee =
+    confirmedInvitees.value[
+      project.id
+    ]
+
+  const email =
+    (
+      inviteEmails.value[
+        project.id
+      ] ?? ''
+    ).trim()
+
+  if (
+    invitee === undefined
+    || email === ''
+    || email.toLowerCase()
+      !== invitee.email
+        .toLowerCase()
     || busyProjectId.value !== null
+    || lookupBusyProjectId.value
+      !== null
   ) {
     return
   }
@@ -188,7 +335,7 @@ async function invite(
         method: 'POST',
 
         body: JSON.stringify({
-          email,
+          email: invitee.email,
         }),
       },
     )
@@ -196,11 +343,16 @@ async function invite(
     inviteEmails.value[
       project.id
     ] = ''
+
+    clearConfirmedInvitee(
+      project.id,
+    )
   } catch (exception) {
     error.value =
-      exception instanceof Error
-        ? exception.message
-        : 'Impossible d’envoyer l’invitation.'
+      invitationErrorMessage(
+        exception,
+        'Impossible d’envoyer l’invitation.',
+      )
   } finally {
     busyProjectId.value = null
   }
@@ -285,8 +437,8 @@ function sameEmail(
   second: string,
 ): boolean {
   return (
-    first.trim().toLocaleLowerCase()
-    === second.trim().toLocaleLowerCase()
+    first.trim().toLowerCase()
+    === second.trim().toLowerCase()
   )
 }
 
@@ -1248,19 +1400,82 @@ onMounted(
             invite(project)
           "
         >
-          <input
-            v-model="
-              inviteEmails[project.id]
-            "
-            type="email"
-            maxlength="254"
-            placeholder="Inviter par email"
-          />
+          <div class="project-invite-field">
+            <input
+              v-model="
+                inviteEmails[project.id]
+              "
+              type="email"
+              maxlength="254"
+              autocomplete="email"
+              placeholder="Rechercher un compte Harpocrate"
+              aria-label="Compte Harpocrate à rechercher"
+              @input="
+                clearConfirmedInvitee(
+                  project.id,
+                )
+              "
+            />
+
+            <small
+              v-if="
+                confirmedInvitees[
+                  project.id
+                ]
+              "
+              class="project-invite-selected"
+            >
+              Compte sélectionné :
+              <strong>
+                {{
+                  confirmedInvitees[
+                    project.id
+                  ]?.email
+                }}
+              </strong>
+            </small>
+
+            <small
+              v-else
+              class="muted"
+            >
+              Saisissez l’email exact
+              d’un compte Harpocrate.
+            </small>
+          </div>
 
           <button
             class="ui-button ui-button--secondary"
+            type="button"
+            :disabled="
+              lookupBusyProjectId !== null
+              || busyProjectId !== null
+              || !inviteEmails[
+                project.id
+              ]?.trim()
+            "
+            @click="
+              lookupInvitee(project)
+            "
+          >
+            {{
+              lookupBusyProjectId
+                === project.id
+                ? 'Vérification…'
+                : 'Vérifier'
+            }}
+          </button>
+
+          <button
+            class="ui-button ui-button--secondary"
+            type="submit"
             :disabled="
               busyProjectId !== null
+              || lookupBusyProjectId
+                !== null
+              || !confirmedInvitees[
+                project.id
+              ]
             "
           >
             Inviter
@@ -1386,8 +1601,20 @@ onMounted(
   gap: 0.5rem;
 }
 
-.project-invite-form input {
+.project-invite-field {
+  display: grid;
+  gap: 0.25rem;
   flex: 1;
+  min-width: 0;
+}
+
+.project-invite-field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.project-invite-selected {
+  overflow-wrap: anywhere;
 }
 
 .project-card-actions {

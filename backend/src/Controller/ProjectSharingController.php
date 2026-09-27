@@ -32,6 +32,38 @@ final readonly class ProjectSharingController
     }
 
     #[Route(
+        '/api/projects/{id<\d+>}/invitees/lookup',
+        name: 'api_project_invitee_lookup',
+        methods: ['POST'],
+    )]
+    public function lookupInvitee(
+        int $id,
+        Request $request,
+    ): JsonResponse {
+        $data =
+            $this->input->read(
+                $request,
+            );
+
+        try {
+            return new JsonResponse(
+                $this->sharing
+                    ->lookupInvitee(
+                        $id,
+                        (string) (
+                            $data['email']
+                            ?? ''
+                        ),
+                    ),
+            );
+        } catch (\Throwable $exception) {
+            return $this->error(
+                $exception,
+            );
+        }
+    }
+
+    #[Route(
         '/api/projects/{id<\d+>}/invitations',
         name: 'api_project_invitation_create',
         methods: ['POST'],
