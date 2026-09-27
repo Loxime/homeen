@@ -8,6 +8,8 @@ import {
   useRoute,
 } from 'vue-router'
 
+import Swal from 'sweetalert2'
+
 import { api } from '../services/api'
 
 import type {
@@ -624,12 +626,23 @@ async function toggleTask(
 async function deleteTask(
   task: ProjectTask,
 ): Promise<void> {
-  if (
-    busyTaskId.value !== null
-    || !window.confirm(
-      'Supprimer cette tâche ?',
-    )
-  ) {
+  if (busyTaskId.value !== null) {
+    return
+  }
+
+  const result =
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Supprimer cette tâche ?',
+      text:
+        `La tâche #${task.projectTaskNumber} sera supprimée définitivement.`,
+      showCancelButton: true,
+      confirmButtonText: 'Supprimer',
+      cancelButtonText: 'Annuler',
+      focusCancel: true,
+    })
+
+  if (!result.isConfirmed) {
     return
   }
 
@@ -712,15 +725,31 @@ async function renameStage(
     return
   }
 
-  const name =
-    window.prompt(
-      'Nouveau nom de la colonne',
-      stage.name,
-    )?.trim()
+  const result =
+    await Swal.fire({
+      title: 'Renommer la colonne',
+      input: 'text',
+      inputValue: stage.name,
+      inputAttributes: {
+        maxlength: '80',
+      },
+      showCancelButton: true,
+      confirmButtonText: 'Renommer',
+      cancelButtonText: 'Annuler',
+    })
 
   if (
-    name === undefined
-    || name === ''
+    !result.isConfirmed
+    || typeof result.value !== 'string'
+  ) {
+    return
+  }
+
+  const name =
+    result.value.trim()
+
+  if (
+    name === ''
     || name === stage.name
   ) {
     return
@@ -760,10 +789,24 @@ async function deleteStage(
   if (
     !canManageWorkflow.value
     || busyStageId.value !== null
-    || !window.confirm(
-      `Supprimer la colonne « ${stage.name} » ?`,
-    )
   ) {
+    return
+  }
+
+  const result =
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Supprimer cette colonne ?',
+      text:
+        `« ${stage.name} » doit être vide avant de pouvoir être supprimée.`,
+      showCancelButton: true,
+      confirmButtonText:
+        'Supprimer la colonne',
+      cancelButtonText: 'Annuler',
+      focusCancel: true,
+    })
+
+  if (!result.isConfirmed) {
     return
   }
 

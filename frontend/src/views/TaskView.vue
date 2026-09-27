@@ -10,6 +10,8 @@ import {
   useRouter,
 } from 'vue-router'
 
+import Swal from 'sweetalert2'
+
 import AppIcon from '../components/AppIcon.vue'
 
 import {
@@ -384,12 +386,19 @@ Promise<void> {
     return
   }
 
-  const confirmed =
-    window.confirm(
-      'Supprimer définitivement cette tâche ?',
-    )
+  const result =
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Supprimer cette tâche ?',
+      text:
+        'Cette suppression est définitive.',
+      showCancelButton: true,
+      confirmButtonText: 'Supprimer',
+      cancelButtonText: 'Annuler',
+      focusCancel: true,
+    })
 
-  if (!confirmed) {
+  if (!result.isConfirmed) {
     return
   }
 
