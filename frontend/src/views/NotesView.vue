@@ -719,6 +719,10 @@ function boardPosition(
 function noteExcerpt(
   note: NoteSummary,
 ): string {
+  if (note.noteType !== 'text') {
+    return ''
+  }
+
   return note.content.trim()
     || 'Note vide'
 }
@@ -1211,7 +1215,12 @@ onMounted(
               }}
             </h2>
 
-            <p class="note-excerpt">
+            <p
+              v-if="
+                note.noteType === 'text'
+              "
+              class="note-excerpt"
+            >
               {{ noteExcerpt(note) }}
             </p>
 
@@ -1271,7 +1280,7 @@ onMounted(
 
                 <span
                   v-if="
-                    note.taskCount > 0
+                    note.noteType === 'list'
                   "
                   class="task-ratio"
                 >
@@ -1338,7 +1347,11 @@ onMounted(
             }}
           </strong>
 
-          <span>
+          <span
+            v-if="
+              note.noteType === 'text'
+            "
+          >
             {{ noteExcerpt(note) }}
           </span>
         </div>
@@ -1356,7 +1369,7 @@ onMounted(
         </span>
 
         <span
-          v-if="note.taskCount > 0"
+          v-if="note.noteType === 'list'"
         >
           {{ note.completedTaskCount }}
           /
@@ -1431,7 +1444,11 @@ onMounted(
             }}
           </strong>
 
-          <span>
+          <span
+            v-if="
+              note.noteType === 'text'
+            "
+          >
             {{
               noteExcerpt(note)
                 .slice(0, 150)
@@ -1439,7 +1456,7 @@ onMounted(
           </span>
 
           <small
-            v-if="note.taskCount > 0"
+            v-if="note.noteType === 'list'"
           >
             {{ note.completedTaskCount }}
             /

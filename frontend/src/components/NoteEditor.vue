@@ -203,7 +203,10 @@ Promise<Note | null> {
     const payload =
       JSON.stringify({
         title: title.value,
-        content: content.value,
+        content:
+          localNote.value?.noteType === 'list'
+            ? ''
+            : content.value,
         isPinned:
           isPinned.value,
         color:
@@ -305,6 +308,7 @@ function toggleNoteTag(
 async function addTask(): Promise<void> {
   if (
     !localNote.value
+    || localNote.value.noteType !== 'list'
     || !taskText.value.trim()
   ) {
     return
@@ -699,6 +703,10 @@ async function restore(): Promise<void> {
         />
 
         <textarea
+          v-if="
+            !localNote
+            || localNote.noteType === 'text'
+          "
           v-model="content"
           class="keep-content-input"
           placeholder="Écrivez votre note…"
@@ -786,7 +794,10 @@ async function restore(): Promise<void> {
         </p>
 
         <section
-          v-if="localNote"
+          v-if="
+            localNote
+            && localNote.noteType === 'list'
+          "
           class="tasks-panel keep-tasks-panel"
         >
           <div class="section-heading keep-task-heading">
