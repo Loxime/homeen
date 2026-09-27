@@ -56,6 +56,21 @@ const creatingStage = ref(false)
 const busyStageId =
   ref<number | null>(null)
 
+const editingProject =
+  ref(false)
+
+const savingProject =
+  ref(false)
+
+const projectName =
+  ref('')
+
+const projectDescription =
+  ref('')
+
+const projectColor =
+  ref('#1A73E8')
+
 const projectId =
   computed(
     () => Number(
@@ -69,6 +84,19 @@ const canManageWorkflow =
       project.value?.role === 'owner'
       || project.value?.role === 'admin',
   )
+
+function syncProjectDraft(
+  source: Project,
+): void {
+  projectName.value =
+    source.name
+
+  projectDescription.value =
+    source.description
+
+  projectColor.value =
+    source.color
+}
 
 function priorityLabel(
   priority: TaskPriority,
@@ -154,6 +182,10 @@ async function load(): Promise<void> {
     project.value =
       projectResponse
 
+    syncProjectDraft(
+      projectResponse,
+    )
+
     stages.value =
       workflowResponse.stages
 
@@ -166,6 +198,93 @@ async function load(): Promise<void> {
         : 'Impossible de charger le projet.'
   } finally {
     loading.value = false
+  }
+}
+
+function startProjectEdit():
+void {
+  if (
+    !project.value
+    || !canManageWorkflow.value
+  ) {
+    return
+  }
+
+  syncProjectDraft(
+    project.value,
+  )
+
+  editingProject.value = true
+}
+
+function cancelProjectEdit():
+void {
+  if (project.value) {
+    syncProjectDraft(
+      project.value,
+    )
+  }
+
+  editingProject.value = false
+}
+
+async function saveProject():
+Promise<void> {
+  if (
+    !project.value
+    || !canManageWorkflow.value
+    || savingProject.value
+  ) {
+    return
+  }
+
+  const name =
+    projectName.value.trim()
+
+  if (name === '') {
+    error.value =
+      'Le nom du projet est obligatoire.'
+
+    return
+  }
+
+  savingProject.value = true
+  error.value = ''
+
+  try {
+    const updated =
+      await api<Project>(
+        `/api/projects/${projectId.value}`,
+        {
+          method: 'PUT',
+
+          body: JSON.stringify({
+            name,
+            description:
+              projectDescription.value,
+            color:
+              projectColor.value,
+          }),
+        },
+      )
+
+    project.value =
+      updated
+
+    syncProjectDraft(
+      updated,
+    )
+
+    editingProject.value =
+      false
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de modifier le projet.'
+  } finally {
+    savingProject.value =
+      false
   }
 }
 
@@ -240,25 +359,23 @@ async function createTask(
   }
 }
 
-async function moveTask(
+async function changeTaskStage(
   task: ProjectTask,
-  direction: -1 | 1,
+  event: Event,
 ): Promise<void> {
-  const currentIndex =
-    stages.value.findIndex(
-      stage =>
-        stage.id
-        === task.workflowStageId,
-    )
+  const select =
+    event.target as HTMLSelectElement
 
-  const target =
-    stages.value[
-      currentIndex + direction
-    ]
+  const workflowStageId =
+    Number(select.value)
 
   if (
-    currentIndex < 0
-    || target === undefined
+    !Number.isInteger(
+      workflowStageId,
+    )
+    || workflowStageId <= 0
+    || workflowStageId
+      === task.workflowStageId
     || busyTaskId.value !== null
   ) {
     return
@@ -277,8 +394,7 @@ async function moveTask(
           method: 'PUT',
 
           body: JSON.stringify({
-            workflowStageId:
-              target.id,
+            workflowStageId,
           }),
         },
       )
@@ -291,6 +407,11 @@ async function moveTask(
             : candidate,
       )
   } catch (exception) {
+    select.value =
+      String(
+        task.workflowStageId,
+      )
+
     error.value =
       exception instanceof Error
         ? exception.message
@@ -771,8 +892,14 @@ onMounted(
     </div>
 
     <template v-else-if="project">
-      <header class="project-board-header">
-        <div>
+      <header
+        class="project-board-header"
+        :style="{
+          backgroundColor:
+            `${project.color}14`,
+        }"
+      >
+        <div class="project-board-main">
           <RouterLink
             class="project-back-link"
             to="/projects"
@@ -780,40 +907,116 @@ onMounted(
             ← Projets
           </RouterLink>
 
-          <div class="project-title-row">
-            <span
-              class="project-board-dot"
-              :style="{
-                background:
-                  project.color,
-              }"
-            />
+          <template v-if="!editingProject">
+            <div class="project-title-row">
+              <span
+                class="project-board-dot"
+                :style="{
+                  background:
+                    project.color,
+                }"
+              />
 
-            <h1>
-              {{ project.name }}
-            </h1>
-          </div>
+              <h1>
+                {{ project.name }}
+              </h1>
+            </div>
 
-          <p
-            v-if="project.description"
-            class="muted"
+            <p
+              v-if="project.description"
+              class="muted"
+            >
+              {{ project.description }}
+            </p>
+          </template>
+
+          <form
+            v-else
+            class="project-edit-form"
+            @submit.prevent="saveProject"
           >
-            {{ project.description }}
-          </p>
+            <label>
+              Nom du projet
+
+              <input
+                v-model="projectName"
+                maxlength="120"
+                required
+              />
+            </label>
+
+            <label>
+              Description
+
+              <textarea
+                v-model="projectDescription"
+                maxlength="4000"
+                rows="2"
+              />
+            </label>
+
+            <label class="project-edit-color">
+              Couleur de fond
+
+              <input
+                v-model="projectColor"
+                type="color"
+              />
+            </label>
+
+            <div class="project-edit-actions">
+              <button
+                class="ui-button ui-button--primary"
+                :disabled="
+                  savingProject
+                  || !projectName.trim()
+                "
+              >
+                {{
+                  savingProject
+                    ? 'Enregistrement…'
+                    : 'Enregistrer'
+                }}
+              </button>
+
+              <button
+                class="ui-button ui-button--secondary"
+                type="button"
+                :disabled="savingProject"
+                @click="cancelProjectEdit"
+              >
+                Annuler
+              </button>
+            </div>
+          </form>
         </div>
 
-        <RouterLink
-          class="ui-button ui-button--secondary"
-          :to="{
-            path: '/notes',
-            query: {
-              projectId:
-                String(project.id),
-            },
-          }"
-        >
-          Notes du projet
-        </RouterLink>
+        <div class="project-board-header-actions">
+          <button
+            v-if="
+              canManageWorkflow
+              && !editingProject
+            "
+            class="ui-button ui-button--secondary"
+            type="button"
+            @click="startProjectEdit"
+          >
+            Modifier le projet
+          </button>
+
+          <RouterLink
+            class="ui-button ui-button--secondary"
+            :to="{
+              path: '/notes',
+              query: {
+                projectId:
+                  String(project.id),
+              },
+            }"
+          >
+            Notes du projet
+          </RouterLink>
+        </div>
       </header>
 
       <p
@@ -1078,35 +1281,46 @@ onMounted(
                   Échéance
                   {{ task.dueDate }}
                 </span>
+
+                <select
+                  class="project-task-stage"
+                  :value="
+                    task.workflowStageId
+                  "
+                  :disabled="
+                    busyTaskId !== null
+                  "
+                  aria-label="Colonne de la tâche"
+                  @change="
+                    changeTaskStage(
+                      task,
+                      $event,
+                    )
+                  "
+                >
+                  <option
+                    v-for="
+                      candidateStage
+                      in stages
+                    "
+                    :key="
+                      candidateStage.id
+                    "
+                    :value="
+                      candidateStage.id
+                    "
+                  >
+                    {{
+                      candidateStage.name
+                    }}
+                  </option>
+                </select>
               </div>
 
               <div class="project-task-actions">
-                <button
-                  type="button"
-                  :disabled="
-                    stageIndex === 0
-                    || busyTaskId !== null
-                  "
-                  @click="
-                    moveTask(task, -1)
-                  "
-                >
-                  ←
-                </button>
-
-                <button
-                  type="button"
-                  :disabled="
-                    stageIndex
-                      === stages.length - 1
-                    || busyTaskId !== null
-                  "
-                  @click="
-                    moveTask(task, 1)
-                  "
-                >
-                  →
-                </button>
+                <small class="project-task-drag-hint">
+                  Glisser-déposer pour réordonner
+                </small>
 
                 <button
                   type="button"
@@ -1175,10 +1389,59 @@ onMounted(
 }
 
 .project-board-header {
+  padding: 1rem;
   display: flex;
   justify-content: space-between;
   gap: 1rem;
   align-items: flex-start;
+  border: 1px solid
+    var(--border-color, #dadce0);
+  border-radius: 16px;
+}
+
+.project-board-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.project-board-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  justify-content: flex-end;
+}
+
+.project-edit-form {
+  display: grid;
+  gap: .75rem;
+  max-width: 640px;
+}
+
+.project-edit-form label {
+  display: grid;
+  gap: .35rem;
+  font-size: .82rem;
+  font-weight: 600;
+}
+
+.project-edit-form input,
+.project-edit-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.project-edit-color {
+  max-width: 180px;
+}
+
+.project-edit-color input {
+  min-height: 42px;
+}
+
+.project-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
 }
 
 .project-back-link {
@@ -1359,8 +1622,27 @@ onMounted(
     var(--surface-muted, #f1f3f4);
 }
 
+.project-task-stage {
+  min-width: 0;
+  max-width: 100%;
+  padding: .18rem .45rem;
+  border: 1px solid
+    var(--border-color, #dadce0);
+  border-radius: 999px;
+  background:
+    var(--surface, #fff);
+  font: inherit;
+}
+
 .project-task-actions {
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.project-task-drag-hint {
+  color:
+    var(--text-muted, #6b7280);
+  font-size: .7rem;
 }
 
 .project-task-create {
@@ -1381,6 +1663,25 @@ onMounted(
 @media (max-width: 800px) {
   .project-board-header {
     flex-direction: column;
+  }
+
+  .project-board-header-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .project-board-header-actions
+  .ui-button {
+    flex: 1;
+  }
+
+  .project-edit-actions {
+    flex-direction: column;
+  }
+
+  .project-edit-actions
+  .ui-button {
+    width: 100%;
   }
 
   .workflow-create-form {
