@@ -72,6 +72,12 @@ export const router = createRouter({
     },
 
     {
+      path:
+        '/projects/:projectId(\\d+)/tasks/:id(\\d+)',
+      component: TaskView,
+    },
+
+    {
       path: '/pomodoro',
       component: PomodoroView,
     },

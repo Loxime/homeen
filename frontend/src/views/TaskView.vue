@@ -22,6 +22,9 @@ import {
 
 import type {
   Note,
+  Project,
+  ProjectTask,
+  ProjectWorkflowStage,
   Task,
   TaskPriority,
   TaskStatus,
@@ -35,8 +38,20 @@ const {
   load: loadTags,
 } = useTags()
 
-const task = ref<Task | null>(null)
+const task =
+  ref<Task | ProjectTask | null>(
+    null,
+  )
+
 const note = ref<Note | null>(null)
+const project =
+  ref<Project | null>(null)
+
+const stages =
+  ref<ProjectWorkflowStage[]>([])
+
+const selectedWorkflowStageId =
+  ref<number | null>(null)
 
 const content = ref('')
 const priority =
@@ -63,12 +78,58 @@ const taskId = computed(
   () => Number(route.params.id),
 )
 
+const projectId = computed(
+  () =>
+    Number(
+      route.params.projectId
+      ?? 0,
+    ),
+)
+
+const isProjectTask = computed(
+  () =>
+    Number.isInteger(
+      projectId.value,
+    )
+    && projectId.value > 0,
+)
+
+const taskEndpoint = computed(
+  () =>
+    isProjectTask.value
+      ? `/api/projects/${projectId.value}/tasks/${taskId.value}`
+      : `/api/tasks/${taskId.value}`,
+)
+
+const backPath = computed(
+  () =>
+    isProjectTask.value
+      ? `/projects/${projectId.value}`
+      : '/notes',
+)
+
+const projectTaskNumber =
+  computed(
+    () => {
+      if (
+        task.value
+        && 'projectTaskNumber'
+          in task.value
+      ) {
+        return task.value
+          .projectTaskNumber
+      }
+
+      return null
+    },
+  )
+
 const completed = computed(
   () => status.value === 'done',
 )
 
 function applyTask(
-  value: Task,
+  value: Task | ProjectTask,
 ): void {
   task.value = value
   content.value = value.content
@@ -81,6 +142,11 @@ function applyTask(
     value.tags.map(
       tag => tag.id,
     )
+
+  selectedWorkflowStageId.value =
+    'workflowStageId' in value
+      ? value.workflowStageId
+      : null
 }
 
 async function load(): Promise<void> {
@@ -90,6 +156,11 @@ async function load(): Promise<void> {
   if (
     !Number.isInteger(taskId.value)
     || taskId.value <= 0
+    || (
+      route.params.projectId
+      !== undefined
+      && !isProjectTask.value
+    )
   ) {
     error.value =
       'Identifiant de tâche invalide.'
@@ -99,21 +170,63 @@ async function load(): Promise<void> {
   }
 
   try {
-    const [
-      loadedTask,
-    ] = await Promise.all([
-      api<Task>(
-        `/api/tasks/${taskId.value}`,
-      ),
-      loadTags(),
-    ])
+    if (isProjectTask.value) {
+      const [
+        loadedTask,
+        loadedProject,
+        workflow,
+      ] = await Promise.all([
+        api<ProjectTask>(
+          taskEndpoint.value,
+        ),
 
-    applyTask(loadedTask)
+        api<Project>(
+          `/api/projects/${projectId.value}`,
+        ),
 
-    note.value =
-      await api<Note>(
-        `/api/notes/${loadedTask.noteId}`,
+        api<{
+          stages:
+            ProjectWorkflowStage[]
+        }>(
+          `/api/projects/${projectId.value}/workflow`,
+        ),
+
+        loadTags(),
+      ])
+
+      applyTask(
+        loadedTask,
       )
+
+      project.value =
+        loadedProject
+
+      stages.value =
+        workflow.stages
+
+      note.value = null
+    } else {
+      const [
+        loadedTask,
+      ] = await Promise.all([
+        api<Task>(
+          taskEndpoint.value,
+        ),
+        loadTags(),
+      ])
+
+      applyTask(
+        loadedTask,
+      )
+
+      note.value =
+        await api<Note>(
+          `/api/notes/${loadedTask.noteId}`,
+        )
+
+      project.value = null
+      stages.value = []
+    }
   } catch (exception) {
     error.value =
       exception instanceof Error
@@ -163,6 +276,11 @@ async function save(): Promise<void> {
   if (
     !task.value
     || saving.value
+    || (
+      isProjectTask.value
+      && selectedWorkflowStageId.value
+        === null
+    )
   ) {
     return
   }
@@ -171,31 +289,47 @@ async function save(): Promise<void> {
   error.value = ''
 
   try {
+    const body: Record<
+      string,
+      unknown
+    > = {
+      content:
+        content.value.trim(),
+
+      priority:
+        priority.value,
+
+      status:
+        status.value,
+
+      startDate:
+        startDate.value || null,
+
+      dueDate:
+        dueDate.value || null,
+
+      tagIds:
+        selectedTagIds.value,
+    }
+
+    if (
+      isProjectTask.value
+      && selectedWorkflowStageId.value
+        !== null
+    ) {
+      body.workflowStageId =
+        selectedWorkflowStageId.value
+    }
+
     const updated =
-      await api<Task>(
-        `/api/tasks/${task.value.id}`,
+      await api<Task | ProjectTask>(
+        taskEndpoint.value,
         {
           method: 'PUT',
 
-          body: JSON.stringify({
-            content:
-              content.value.trim(),
-
-            priority:
-              priority.value,
-
-            status:
-              status.value,
-
-            startDate:
-              startDate.value || null,
-
-            dueDate:
-              dueDate.value || null,
-
-            tagIds:
-              selectedTagIds.value,
-          }),
+          body: JSON.stringify(
+            body,
+          ),
         },
       )
 
@@ -220,8 +354,8 @@ Promise<void> {
 
   try {
     const updated =
-      await api<Task>(
-        `/api/tasks/${task.value.id}/completed`,
+      await api<Task | ProjectTask>(
+        `${taskEndpoint.value}/completed`,
         {
           method: 'PUT',
 
@@ -264,13 +398,15 @@ Promise<void> {
 
   try {
     await api(
-      `/api/tasks/${task.value.id}`,
+      taskEndpoint.value,
       {
         method: 'DELETE',
       },
     )
 
-    await router.push('/notes')
+    await router.push(
+      backPath.value,
+    )
   } catch (exception) {
     error.value =
       exception instanceof Error
@@ -282,7 +418,9 @@ Promise<void> {
 }
 
 async function back(): Promise<void> {
-  await router.push('/notes')
+  await router.push(
+    backPath.value,
+  )
 }
 
 onMounted(
@@ -315,7 +453,11 @@ onMounted(
         type="button"
         @click="back"
       >
-        Retour aux notes
+        {{
+          isProjectTask
+            ? 'Retour au projet'
+            : 'Retour aux notes'
+        }}
       </button>
     </div>
 
@@ -327,11 +469,38 @@ onMounted(
             type="button"
             @click="back"
           >
-            ← Retour aux notes
+            ←
+            {{
+              isProjectTask
+                ? 'Retour au projet'
+                : 'Retour aux notes'
+            }}
           </button>
 
           <p
-            v-if="note"
+            v-if="
+              isProjectTask
+              && project
+            "
+            class="task-note-context"
+          >
+            Projet :
+            <strong>
+              {{ project.name }}
+            </strong>
+
+            <span
+              v-if="
+                projectTaskNumber
+                !== null
+              "
+            >
+              · #{{ projectTaskNumber }}
+            </span>
+          </p>
+
+          <p
+            v-else-if="note"
             class="task-note-context"
           >
             Note :
@@ -456,6 +625,31 @@ onMounted(
               </select>
             </label>
 
+            <label
+              v-if="isProjectTask"
+              class="task-detail-field"
+            >
+              <span>
+                Colonne
+              </span>
+
+              <select
+                v-model.number="
+                  selectedWorkflowStageId
+                "
+              >
+                <option
+                  v-for="
+                    stage in stages
+                  "
+                  :key="stage.id"
+                  :value="stage.id"
+                >
+                  {{ stage.name }}
+                </option>
+              </select>
+            </label>
+
             <label class="task-detail-field">
               <span>
                 État
@@ -566,6 +760,16 @@ onMounted(
             <h2>
               Informations
             </h2>
+
+            <span
+              v-if="
+                projectTaskNumber
+                !== null
+              "
+            >
+              Numéro projet :
+              #{{ projectTaskNumber }}
+            </span>
 
             <span>
               Position :

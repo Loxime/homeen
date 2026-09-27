@@ -1254,7 +1254,14 @@ onMounted(
                 </span>
 
                 <p>
-                  {{ task.content }}
+                  <RouterLink
+                    class="project-task-open"
+                    :to="
+                      `/projects/${projectId}/tasks/${task.id}`
+                    "
+                  >
+                    {{ task.content }}
+                  </RouterLink>
                 </p>
               </div>
 
@@ -1588,6 +1595,16 @@ onMounted(
 .project-task-heading p {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.project-task-open {
+  color: inherit;
+  text-decoration: none;
+}
+
+.project-task-open:hover,
+.project-task-open:focus-visible {
+  text-decoration: underline;
 }
 
 .project-task-number {
