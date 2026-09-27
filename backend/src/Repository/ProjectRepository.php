@@ -306,6 +306,81 @@ SQL,
         return $this->context($id);
     }
 
+    public function delete(
+        int $id,
+    ): void {
+        $project =
+            $this->context($id);
+
+        $this->requireOwner(
+            (string) $project['role'],
+        );
+
+        $ownerUserId =
+            $this->currentUser->id();
+
+        $this->connection
+            ->transactional(
+                function (
+                    Connection $connection,
+                ) use (
+                    $id,
+                    $ownerUserId,
+                ): void {
+                    /*
+                     * Keep all notes and their
+                     * archive/trash state.
+                     *
+                     * Historical shared notes may
+                     * have no personal owner. Give
+                     * those to the Project owner
+                     * before removing the Project.
+                     */
+                    $connection
+                        ->executeStatement(
+                            <<<'SQL'
+UPDATE note
+SET
+    user_id = COALESCE(
+        user_id,
+        :ownerUserId
+    ),
+    project_id = NULL,
+    updated_at = NOW()
+WHERE project_id = :projectId
+SQL,
+                            [
+                                'ownerUserId' =>
+                                    $ownerUserId,
+
+                                'projectId' =>
+                                    $id,
+                            ],
+                        );
+
+                    $affected =
+                        $connection->delete(
+                            'project',
+                            [
+                                'id' => $id,
+                            ],
+                        );
+
+                    if ($affected !== 1) {
+                        throw new \OutOfBoundsException(
+                            'Project not found.',
+                        );
+                    }
+                },
+            );
+
+        $this->logger->log(
+            'PROJECT_DELETED',
+            'project',
+            $id,
+        );
+    }
+
     /**
      * @return list<array{
      *     userId:int,
@@ -471,6 +546,18 @@ SQL,
 
         throw new \DomainException(
             'PROJECT_MANAGEMENT_REQUIRED',
+        );
+    }
+
+    private function requireOwner(
+        string $role,
+    ): void {
+        if ($role === 'owner') {
+            return;
+        }
+
+        throw new \DomainException(
+            'PROJECT_OWNER_REQUIRED',
         );
     }
 

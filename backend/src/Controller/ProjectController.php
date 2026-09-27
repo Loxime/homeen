@@ -150,6 +150,46 @@ final readonly class ProjectController
     }
 
     #[Route(
+        '/{id<\d+>}',
+        name: 'api_projects_delete',
+        methods: ['DELETE'],
+    )]
+    public function delete(
+        int $id,
+    ): JsonResponse {
+        try {
+            $this->projects->delete(
+                $id,
+            );
+
+            return new JsonResponse(
+                null,
+                204,
+            );
+        } catch (
+            \DomainException $exception
+        ) {
+            if (
+                $exception->getMessage()
+                !== 'PROJECT_OWNER_REQUIRED'
+            ) {
+                throw $exception;
+            }
+
+            return new JsonResponse(
+                [
+                    'error' =>
+                        'Only the project owner can delete this project.',
+
+                    'code' =>
+                        'PROJECT_OWNER_REQUIRED',
+                ],
+                403,
+            );
+        }
+    }
+
+    #[Route(
         '/{id<\d+>}/members',
         name: 'api_projects_members',
         methods: ['GET'],

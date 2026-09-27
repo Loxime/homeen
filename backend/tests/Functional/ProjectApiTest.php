@@ -515,6 +515,419 @@ SQL,
         );
     }
 
+    public function testProjectOwnerCanDeleteWithoutDeletingNotes():
+    void {
+        $project =
+            $this->jsonRequest(
+                'POST',
+                '/api/projects',
+                [
+                    'name' =>
+                        'Disposable project',
+                ],
+            );
+
+        $projectId =
+            (int) $project['id'];
+
+        $task =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/tasks',
+                    $projectId,
+                ),
+                [
+                    'content' =>
+                        'Project-only task',
+                ],
+            );
+
+        $taskId =
+            (int) $task['id'];
+
+        $activeNoteId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO note (
+    user_id,
+    project_id,
+    title,
+    content
+)
+VALUES (
+    :userId,
+    :projectId,
+    'Active project note',
+    'Keep me'
+)
+RETURNING id
+SQL,
+                    [
+                        'userId' =>
+                            $this->userId,
+
+                        'projectId' =>
+                            $projectId,
+                    ],
+                );
+
+        $archivedNoteId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO note (
+    user_id,
+    project_id,
+    title,
+    content,
+    archived_at
+)
+VALUES (
+    :userId,
+    :projectId,
+    'Archived project note',
+    'Keep archive state',
+    NOW()
+)
+RETURNING id
+SQL,
+                    [
+                        'userId' =>
+                            $this->userId,
+
+                        'projectId' =>
+                            $projectId,
+                    ],
+                );
+
+        $trashedNoteId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO note (
+    user_id,
+    project_id,
+    title,
+    content,
+    deleted_at
+)
+VALUES (
+    :userId,
+    :projectId,
+    'Trashed project note',
+    'Keep trash state',
+    NOW()
+)
+RETURNING id
+SQL,
+                    [
+                        'userId' =>
+                            $this->userId,
+
+                        'projectId' =>
+                            $projectId,
+                    ],
+                );
+
+        $sharedNoteId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO note (
+    user_id,
+    project_id,
+    title,
+    content
+)
+VALUES (
+    NULL,
+    :projectId,
+    'Historical shared note',
+    'Keep ownership safely'
+)
+RETURNING id
+SQL,
+                    [
+                        'projectId' =>
+                            $projectId,
+                    ],
+                );
+
+        foreach (
+            [
+                $activeNoteId,
+                $archivedNoteId,
+                $trashedNoteId,
+                $sharedNoteId,
+            ]
+            as $noteId
+        ) {
+            self::assertNotFalse(
+                $noteId,
+            );
+        }
+
+        $this->jsonRequest(
+            'DELETE',
+            sprintf(
+                '/api/projects/%d',
+                $projectId,
+            ),
+        );
+
+        self::assertSame(
+            204,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertFalse(
+            $this->connection
+                ->fetchOne(
+                    'SELECT 1 FROM project '
+                    .'WHERE id = :id',
+                    [
+                        'id' =>
+                            $projectId,
+                    ],
+                ),
+        );
+
+        self::assertFalse(
+            $this->connection
+                ->fetchOne(
+                    'SELECT 1 FROM task '
+                    .'WHERE id = :id',
+                    [
+                        'id' =>
+                            $taskId,
+                    ],
+                ),
+        );
+
+        $active =
+            $this->connection
+                ->fetchAssociative(
+                    <<<'SQL'
+SELECT
+    user_id,
+    project_id,
+    archived_at,
+    deleted_at
+FROM note
+WHERE id = :id
+SQL,
+                    [
+                        'id' =>
+                            (int) $activeNoteId,
+                    ],
+                );
+
+        self::assertIsArray(
+            $active,
+        );
+
+        self::assertNull(
+            $active['project_id'],
+        );
+
+        self::assertNull(
+            $active['archived_at'],
+        );
+
+        self::assertNull(
+            $active['deleted_at'],
+        );
+
+        $archived =
+            $this->connection
+                ->fetchAssociative(
+                    <<<'SQL'
+SELECT
+    project_id,
+    archived_at,
+    deleted_at
+FROM note
+WHERE id = :id
+SQL,
+                    [
+                        'id' =>
+                            (int) $archivedNoteId,
+                    ],
+                );
+
+        self::assertIsArray(
+            $archived,
+        );
+
+        self::assertNull(
+            $archived['project_id'],
+        );
+
+        self::assertNotNull(
+            $archived['archived_at'],
+        );
+
+        self::assertNull(
+            $archived['deleted_at'],
+        );
+
+        $trashed =
+            $this->connection
+                ->fetchAssociative(
+                    <<<'SQL'
+SELECT
+    project_id,
+    archived_at,
+    deleted_at
+FROM note
+WHERE id = :id
+SQL,
+                    [
+                        'id' =>
+                            (int) $trashedNoteId,
+                    ],
+                );
+
+        self::assertIsArray(
+            $trashed,
+        );
+
+        self::assertNull(
+            $trashed['project_id'],
+        );
+
+        self::assertNotNull(
+            $trashed['deleted_at'],
+        );
+
+        $shared =
+            $this->connection
+                ->fetchAssociative(
+                    <<<'SQL'
+SELECT
+    user_id,
+    project_id
+FROM note
+WHERE id = :id
+SQL,
+                    [
+                        'id' =>
+                            (int) $sharedNoteId,
+                    ],
+                );
+
+        self::assertIsArray(
+            $shared,
+        );
+
+        self::assertSame(
+            $this->userId,
+            (int) $shared['user_id'],
+        );
+
+        self::assertNull(
+            $shared['project_id'],
+        );
+    }
+
+    public function testOnlyProjectOwnerCanDeleteProject():
+    void {
+        $otherUserId =
+            $this->createOtherUser();
+
+        $projectId =
+            $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+INSERT INTO project (
+    name,
+    description,
+    color
+)
+VALUES (
+    'Owner protected project',
+    '',
+    '#1A73E8'
+)
+RETURNING id
+SQL,
+                );
+
+        self::assertNotFalse(
+            $projectId,
+        );
+
+        $projectId =
+            (int) $projectId;
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $projectId,
+
+                'user_id' =>
+                    $otherUserId,
+
+                'role' =>
+                    'owner',
+            ],
+        );
+
+        $this->connection->insert(
+            'project_member',
+            [
+                'project_id' =>
+                    $projectId,
+
+                'user_id' =>
+                    $this->userId,
+
+                'role' =>
+                    'admin',
+            ],
+        );
+
+        $response =
+            $this->jsonRequest(
+                'DELETE',
+                sprintf(
+                    '/api/projects/%d',
+                    $projectId,
+                ),
+            );
+
+        self::assertSame(
+            403,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'PROJECT_OWNER_REQUIRED',
+            $response['code'],
+        );
+
+        self::assertSame(
+            1,
+            (int) $this->connection
+                ->fetchOne(
+                    'SELECT COUNT(*) '
+                    .'FROM project '
+                    .'WHERE id = :id',
+                    [
+                        'id' =>
+                            $projectId,
+                    ],
+                ),
+        );
+    }
+
     public function testProjectValidation():
     void {
         $invalidName =

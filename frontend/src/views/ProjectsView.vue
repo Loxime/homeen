@@ -4,6 +4,8 @@ import {
   ref,
 } from 'vue'
 
+import Swal from 'sweetalert2'
+
 import AppIcon from '../components/AppIcon.vue'
 import { api } from '../services/api'
 
@@ -532,6 +534,76 @@ async function removeMember(
   }
 }
 
+async function deleteProject(
+  project: Project,
+): Promise<void> {
+  if (
+    project.role !== 'owner'
+    || busyProjectId.value !== null
+  ) {
+    return
+  }
+
+  const result =
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Supprimer ce projet ?',
+      text:
+        `« ${project.name} » sera supprimé. `
+        + 'Ses tâches de projet seront supprimées, '
+        + 'mais ses notes resteront disponibles.',
+      showCancelButton: true,
+      confirmButtonText:
+        'Supprimer le projet',
+      cancelButtonText: 'Annuler',
+      focusCancel: true,
+    })
+
+  if (!result.isConfirmed) {
+    return
+  }
+
+  busyProjectId.value =
+    project.id
+
+  error.value = ''
+
+  try {
+    await api(
+      `/api/projects/${project.id}`,
+      {
+        method: 'DELETE',
+      },
+    )
+
+    projects.value =
+      projects.value.filter(
+        candidate =>
+          candidate.id !== project.id,
+      )
+
+    expandedProjectIds.value =
+      expandedProjectIds.value.filter(
+        id => id !== project.id,
+      )
+
+    const {
+      [project.id]: _removed,
+      ...remainingMembers
+    } = projectMembers.value
+
+    projectMembers.value =
+      remainingMembers
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de supprimer le projet.'
+  } finally {
+    busyProjectId.value = null
+  }
+}
+
 async function leaveProject(
   project: Project,
 ): Promise<void> {
@@ -1036,6 +1108,24 @@ onMounted(
           </button>
         </form>
 
+        <button
+          v-if="project.role === 'owner'"
+          class="
+            ui-button
+            ui-button--secondary
+            project-delete
+          "
+          type="button"
+          :disabled="
+            busyProjectId !== null
+          "
+          @click="
+            deleteProject(project)
+          "
+        >
+          Supprimer le projet
+        </button>
+
         <RouterLink
           class="ui-button ui-button--primary project-open"
           :to="
@@ -1149,6 +1239,14 @@ onMounted(
 .project-open {
   justify-self: start;
   text-decoration: none;
+}
+
+.project-delete {
+  justify-self: start;
+  color:
+    var(--danger, #b3261e);
+  border-color:
+    currentColor;
 }
 
 @media (max-width: 800px) {
