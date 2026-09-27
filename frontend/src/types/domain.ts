@@ -30,6 +30,7 @@ export interface ProjectTask {
   id: number
   noteId: null
   projectId: number
+  projectTaskNumber: number
   workflowStageId: number
   workflowStageName: string
   workflowStagePosition: number

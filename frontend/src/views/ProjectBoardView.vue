@@ -1046,6 +1046,10 @@ onMounted(
                   }}
                 </button>
 
+                <span class="project-task-number">
+                  #{{ task.projectTaskNumber }}
+                </span>
+
                 <p>
                   {{ task.content }}
                 </p>
@@ -1321,6 +1325,15 @@ onMounted(
 .project-task-heading p {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.project-task-number {
+  flex: 0 0 auto;
+  padding-top: 2px;
+  color:
+    var(--text-muted, #6b7280);
+  font-size: .76rem;
+  font-weight: 700;
 }
 
 .project-task-card--done

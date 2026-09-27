@@ -50,6 +50,8 @@ SELECT
     task.id,
     task.note_id AS "noteId",
     task.project_id AS "projectId",
+    task.project_task_number
+        AS "projectTaskNumber",
     task.workflow_stage_id
         AS "workflowStageId",
     stage.name
@@ -214,6 +216,34 @@ SQL,
                     $dueDate,
                     $completed,
                 ): array {
+                    $projectTaskNumber =
+                        $connection
+                            ->fetchOne(
+                                <<<'SQL'
+UPDATE project
+SET next_task_number =
+    next_task_number + 1
+WHERE id = :projectId
+RETURNING next_task_number - 1
+SQL,
+                                [
+                                    'projectId' =>
+                                        $projectId,
+                                ],
+                            );
+
+                    if (
+                        $projectTaskNumber
+                        === false
+                    ) {
+                        throw new \RuntimeException(
+                            'Unable to allocate project task number.'
+                        );
+                    }
+
+                    $projectTaskNumber =
+                        (int) $projectTaskNumber;
+
                     $taskId =
                         $connection
                             ->fetchOne(
@@ -221,6 +251,7 @@ SQL,
 INSERT INTO task (
     note_id,
     project_id,
+    project_task_number,
     workflow_stage_id,
     content,
     priority,
@@ -234,6 +265,7 @@ INSERT INTO task (
 VALUES (
     NULL,
     :projectId,
+    :projectTaskNumber,
     :workflowStageId,
     :content,
     :priority,
@@ -253,6 +285,9 @@ SQL,
                                 [
                                     'projectId' =>
                                         $projectId,
+
+                                    'projectTaskNumber' =>
+                                        $projectTaskNumber,
 
                                     'workflowStageId' =>
                                         $workflowStageId,
@@ -956,6 +991,8 @@ SELECT
     task.id,
     task.note_id AS "noteId",
     task.project_id AS "projectId",
+    task.project_task_number
+        AS "projectTaskNumber",
     task.workflow_stage_id
         AS "workflowStageId",
     stage.name
@@ -1300,6 +1337,11 @@ SQL,
 
         $row['projectId'] =
             (int) $row['projectId'];
+
+        $row['projectTaskNumber'] =
+            (int) $row[
+                'projectTaskNumber'
+            ];
 
         $row['workflowStageId'] =
             (int) $row[

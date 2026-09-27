@@ -2680,6 +2680,164 @@ SQL,
         );
     }
 
+    public function testProjectTaskNumbersAreStableAndPerProject():
+    void {
+        $firstProject =
+            $this->jsonRequest(
+                'POST',
+                '/api/projects',
+                [
+                    'name' =>
+                        'Numbered project A',
+                ],
+            );
+
+        $firstProjectId =
+            (int) $firstProject['id'];
+
+        $first =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/tasks',
+                    $firstProjectId,
+                ),
+                [
+                    'content' =>
+                        'First numbered task',
+                ],
+            );
+
+        $second =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/tasks',
+                    $firstProjectId,
+                ),
+                [
+                    'content' =>
+                        'Second numbered task',
+                ],
+            );
+
+        self::assertSame(
+            1,
+            $first['projectTaskNumber'],
+        );
+
+        self::assertSame(
+            2,
+            $second['projectTaskNumber'],
+        );
+
+        $this->jsonRequest(
+            'DELETE',
+            sprintf(
+                '/api/projects/%d/tasks/%d',
+                $firstProjectId,
+                (int) $first['id'],
+            ),
+        );
+
+        self::assertSame(
+            204,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        $third =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/tasks',
+                    $firstProjectId,
+                ),
+                [
+                    'content' =>
+                        'Third numbered task',
+                ],
+            );
+
+        /*
+         * #1 has been deleted. #2 keeps its
+         * identity and the next task becomes
+         * #3 rather than reusing #1.
+         */
+        self::assertSame(
+            3,
+            $third['projectTaskNumber'],
+        );
+
+        $listed =
+            $this->jsonRequest(
+                'GET',
+                sprintf(
+                    '/api/projects/%d/tasks',
+                    $firstProjectId,
+                ),
+            );
+
+        self::assertSame(
+            [2, 3],
+            array_column(
+                $listed['tasks'],
+                'projectTaskNumber',
+            ),
+        );
+
+        self::assertSame(
+            4,
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT next_task_number
+FROM project
+WHERE id = :projectId
+SQL,
+                    [
+                        'projectId' =>
+                            $firstProjectId,
+                    ],
+                ),
+        );
+
+        /*
+         * A separate Project has its own
+         * numbering and therefore starts at #1.
+         */
+        $secondProject =
+            $this->jsonRequest(
+                'POST',
+                '/api/projects',
+                [
+                    'name' =>
+                        'Numbered project B',
+                ],
+            );
+
+        $other =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/projects/%d/tasks',
+                    (int) $secondProject[
+                        'id'
+                    ],
+                ),
+                [
+                    'content' =>
+                        'Independent #1',
+                ],
+            );
+
+        self::assertSame(
+            1,
+            $other['projectTaskNumber'],
+        );
+    }
+
     public function testProjectTaskOrderAcrossWorkflowStages():
     void {
         $project =
