@@ -4,6 +4,7 @@ import {
 } from 'vue-router'
 
 import NotesView from '../views/NotesView.vue'
+import TagsView from '../views/TagsView.vue'
 import PomodoroView from '../views/PomodoroView.vue'
 import StatisticsView from '../views/StatisticsView.vue'
 import TaskView from '../views/TaskView.vue'
@@ -51,8 +52,13 @@ export const router = createRouter({
     },
 
     {
+      path: '/tags',
+      component: TagsView,
+    },
+
+    {
       path: '/labels',
-      redirect: '/notes',
+      redirect: '/tags',
     },
 
     {

@@ -9,7 +9,6 @@ import {
 } from 'vue-router'
 
 import AppIcon from './AppIcon.vue'
-import SidebarTags from './SidebarTags.vue'
 
 import {
   usePomodoro,
@@ -33,21 +32,6 @@ const {
 } = usePomodoro()
 
 const quickLoading = ref(false)
-
-const tagsOpen =
-  ref(false)
-
-function toggleTags(): void {
-  if (props.collapsed) {
-    emit('expand-sidebar')
-    tagsOpen.value = true
-
-    return
-  }
-
-  tagsOpen.value =
-    !tagsOpen.value
-}
 
 const quickLabel = computed(() => {
   if (store.active) {
@@ -153,38 +137,18 @@ async function quickFocus(): Promise<void> {
         </span>
       </RouterLink>
 
-      <div class="sidebar-label-section">
-        <button
-          class="sidebar-entry sidebar-label-toggle"
-          :class="{
-            active: tagsOpen,
-          }"
-          type="button"
-          :aria-expanded="
-            tagsOpen
-            && !collapsed
-          "
-          title="Gérer les tags"
-          @click="
-            toggleTags
-          "
-        >
-          <span class="sidebar-icon-slot">
-            <AppIcon name="tag" />
-          </span>
+      <RouterLink
+        class="sidebar-entry"
+        to="/tags"
+      >
+        <span class="sidebar-icon-slot">
+          <AppIcon name="tag" />
+        </span>
 
-          <span class="sidebar-label">
-            Tags
-          </span>
-        </button>
-
-        <SidebarTags
-          v-show="
-            tagsOpen
-            && !collapsed
-          "
-        />
-      </div>
+        <span class="sidebar-label">
+          Tags
+        </span>
+      </RouterLink>
 
       <RouterLink
         class="sidebar-entry"
