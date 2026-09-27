@@ -852,7 +852,10 @@ tag_occurrences AS (
         metadata->>'labelName'
             AS "tagName"
     FROM completed_events
-    WHERE NOT (metadata ? 'tags')
+    WHERE NOT jsonb_exists(
+        metadata,
+        'tags'
+    )
       AND NULLIF(
           metadata->>'labelName',
           ''
@@ -959,37 +962,20 @@ SQL,
         string $startDate,
         string $endDate,
     ): array {
-        if (
-            preg_match(
-                '/^\d{4}-\d{2}-\d{2}$/',
-                $startDate,
-            ) !== 1
-            || preg_match(
-                '/^\d{4}-\d{2}-\d{2}$/',
-                $endDate,
-            ) !== 1
-        ) {
-            throw new \InvalidArgumentException(
-                'Dates must use YYYY-MM-DD format.'
-            );
-        }
-
         $timezone =
             new \DateTimeZone(
                 $this->timezone
             );
 
         $start =
-            new \DateTimeImmutable(
-                $startDate
-                .' 00:00:00',
+            $this->calendarDate(
+                $startDate,
                 $timezone,
             );
 
         $inclusiveEnd =
-            new \DateTimeImmutable(
-                $endDate
-                .' 00:00:00',
+            $this->calendarDate(
+                $endDate,
                 $timezone,
             );
 
@@ -1018,6 +1004,40 @@ SQL,
             $start,
             $end,
         ];
+    }
+
+    private function calendarDate(
+        string $value,
+        \DateTimeZone $timezone,
+    ): \DateTimeImmutable {
+        $date =
+            \DateTimeImmutable::createFromFormat(
+                '!Y-m-d',
+                $value,
+                $timezone,
+            );
+
+        $errors =
+            \DateTimeImmutable::getLastErrors();
+
+        if (
+            $date === false
+            || $date->format('Y-m-d')
+                !== $value
+            || (
+                $errors !== false
+                && (
+                    $errors['warning_count'] > 0
+                    || $errors['error_count'] > 0
+                )
+            )
+        ) {
+            throw new \InvalidArgumentException(
+                'Dates must be valid calendar dates using YYYY-MM-DD format.'
+            );
+        }
+
+        return $date;
     }
 
     /**
