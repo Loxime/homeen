@@ -30,9 +30,7 @@ import {
 } from '../composables/useToast'
 
 import type {
-  ImageAsset,
   Note,
-  NoteCollection,
   NoteSummary,
   Project,
 } from '../types/domain'
@@ -60,14 +58,8 @@ const {
   load: loadTags,
 } = useTags()
 
-const collections =
-  ref<NoteCollection[]>([])
-
 const projects =
   ref<Project[]>([])
-
-const collectionFilter =
-  ref<number | null>(null)
 
 const loading = ref(true)
 const error = ref('')
@@ -137,18 +129,6 @@ const boardSeed =
     ),
   )
 
-const collectionFormOpen =
-  ref(false)
-
-const collectionName =
-  ref('')
-
-const collectionColor =
-  ref('#1A73E8')
-
-const creatingCollection =
-  ref(false)
-
 const title =
   computed(
     () =>
@@ -196,16 +176,6 @@ const activeProject =
         project =>
           project.id
           === projectId.value,
-      ) ?? null,
-  )
-
-const activeCollection =
-  computed(
-    () =>
-      collections.value.find(
-        collection =>
-          collection.id
-          === collectionFilter.value,
       ) ?? null,
   )
 
@@ -317,34 +287,16 @@ Promise<void> {
           projectId.value,
         ),
       )
-    } else if (
-      collectionFilter.value
-      !== null
-    ) {
-      params.set(
-        'collectionId',
-        String(
-          collectionFilter.value,
-        ),
-      )
     }
 
     const [
       noteResponse,
-      collectionResponse,
       projectResponse,
     ] = await Promise.all([
       api<{
         notes: NoteSummary[]
       }>(
         `/api/notes?${params}`,
-      ),
-
-      api<{
-        collections:
-          NoteCollection[]
-      }>(
-        '/api/collections',
       ),
 
       api<{
@@ -359,23 +311,8 @@ Promise<void> {
     notes.value =
       noteResponse.notes
 
-    collections.value =
-      collectionResponse.collections
-
     projects.value =
       projectResponse.projects
-
-    if (
-      collectionFilter.value
-      !== null
-      && !collections.value.some(
-        collection =>
-          collection.id
-          === collectionFilter.value,
-      )
-    ) {
-      collectionFilter.value = null
-    }
 
     boardSeed.value =
       Math.floor(
@@ -499,11 +436,6 @@ Promise<void> {
             title,
             content,
             tagIds: [],
-            collectionId:
-              projectId.value === null
-                ? collectionFilter.value
-                : null,
-
             projectId:
               projectId.value,
 
@@ -558,99 +490,6 @@ Promise<void> {
   }
 }
 
-async function createImageNote(
-  event: Event,
-): Promise<void> {
-  const input =
-    event.target as HTMLInputElement
-
-  const file =
-    input.files?.[0]
-
-  input.value = ''
-
-  if (
-    !file
-    || quickSaving.value
-  ) {
-    return
-  }
-
-  quickSaving.value = true
-  error.value = ''
-
-  try {
-    const form =
-      new FormData()
-
-    form.append(
-      'image',
-      file,
-    )
-
-    const image =
-      await api<ImageAsset>(
-        '/api/images',
-        {
-          method: 'POST',
-          body: form,
-        },
-      )
-
-    const note =
-      await api<Note>(
-        '/api/notes',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            title: '',
-            content: '',
-            tagIds: [],
-            collectionId:
-              projectId.value === null
-                ? collectionFilter.value
-                : null,
-
-            projectId:
-              projectId.value,
-
-            isPinned: false,
-            color: '#FFFFFF',
-          }),
-        },
-      )
-
-    await api(
-      `/api/images/${image.id}/notes/${note.id}`,
-      {
-        method: 'POST',
-      },
-    )
-
-    await load()
-
-    selected.value =
-      await api<Note>(
-        `/api/notes/${note.id}`,
-      )
-
-    modalOpen.value = true
-
-    showSuccess(
-      'Note avec image créée.',
-    )
-  } catch (exception) {
-    error.value =
-      exception instanceof Error
-        ? exception.message
-        : 'Impossible de créer la note avec image.'
-
-    await load()
-  } finally {
-    quickSaving.value = false
-  }
-}
-
 async function updateQuickAppearance(
   note: NoteSummary,
   changes: {
@@ -685,8 +524,6 @@ async function updateQuickAppearance(
               note.tags.map(
                 tag => tag.id,
               ),
-            collectionId:
-              note.collectionId,
             isPinned:
               changes.isPinned
               ?? note.isPinned,
@@ -824,102 +661,6 @@ async function quickArchive(
   }
 }
 
-async function createCollection():
-Promise<void> {
-  const name =
-    collectionName.value.trim()
-
-  if (
-    !name
-    || creatingCollection.value
-  ) {
-    return
-  }
-
-  creatingCollection.value = true
-  error.value = ''
-
-  try {
-    const collection =
-      await api<NoteCollection>(
-        '/api/collections',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            name,
-            color:
-              collectionColor.value,
-          }),
-        },
-      )
-
-    collectionName.value = ''
-    collectionFormOpen.value = false
-    collectionFilter.value =
-      collection.id
-
-    await load()
-
-    showSuccess(
-      'Collection créée.',
-    )
-  } catch (exception) {
-    error.value =
-      exception instanceof Error
-        ? exception.message
-        : 'Impossible de créer la collection.'
-  } finally {
-    creatingCollection.value = false
-  }
-}
-
-async function deleteCollection(
-  collection: NoteCollection,
-): Promise<void> {
-  const confirmed =
-    window.confirm(
-      `Supprimer la collection « ${collection.name} » ?\n\nLes notes resteront disponibles mais ne seront plus rangées dans cette collection.`,
-    )
-
-  if (!confirmed) {
-    return
-  }
-
-  await api(
-    `/api/collections/${collection.id}`,
-    {
-      method: 'DELETE',
-    },
-  )
-
-  if (
-    collectionFilter.value
-    === collection.id
-  ) {
-    collectionFilter.value = null
-  }
-
-  await load()
-
-  showSuccess(
-    'Collection supprimée.',
-  )
-}
-
-function selectCollection(
-  collectionId: number | null,
-): void {
-  if (
-    collectionFilter.value
-    === collectionId
-  ) {
-    return
-  }
-
-  collectionFilter.value =
-    collectionId
-}
-
 function boardPosition(
   note: NoteSummary,
   index: number,
@@ -1005,14 +746,8 @@ watch(
     route.query.projectId,
   ],
   () => {
-    collectionFilter.value = null
     void load()
   },
-)
-
-watch(
-  collectionFilter,
-  () => void load(),
 )
 
 onMounted(
@@ -1045,15 +780,6 @@ onMounted(
           {{ activeProject.name }}
         </p>
 
-        <p
-          v-else-if="
-            activeCollection
-          "
-          class="muted"
-        >
-          Collection :
-          {{ activeCollection.name }}
-        </p>
       </div>
 
       <div class="page-actions">
@@ -1113,148 +839,6 @@ onMounted(
       </div>
     </header>
 
-    <section
-      v-if="
-        scope === 'active'
-        && projectId === null
-      "
-      class="collection-shelf"
-    >
-      <div class="collection-shelf-header">
-        <div>
-          <h2>
-            Collections
-          </h2>
-
-          <p class="muted">
-            Regroupez vos notes
-            par thème ou par usage.
-          </p>
-        </div>
-
-        <button
-          class="ui-button ui-button--secondary collection-toggle-button"
-          type="button"
-          @click="
-            collectionFormOpen =
-              !collectionFormOpen
-          "
-        >
-          <AppIcon
-            name="plus"
-            :size="17"
-          />
-
-          Nouvelle collection
-        </button>
-      </div>
-
-      <form
-        v-if="collectionFormOpen"
-        class="collection-create-form"
-        @submit.prevent="createCollection"
-      >
-        <input
-          v-model.trim="collectionName"
-          maxlength="80"
-          placeholder="Nom de la collection"
-          autofocus
-          required
-        />
-
-        <input
-          v-model="collectionColor"
-          class="color-input"
-          type="color"
-          aria-label="Couleur de la collection"
-        />
-
-        <button
-          class="ui-button ui-button--primary collection-create-submit"
-          :disabled="
-            creatingCollection
-            || !collectionName
-          "
-        >
-          {{
-            creatingCollection
-              ? 'Création…'
-              : 'Créer'
-          }}
-        </button>
-      </form>
-
-      <div class="collection-chip-list">
-        <button
-          class="collection-chip"
-          :class="{
-            active:
-              collectionFilter
-              === null,
-          }"
-          type="button"
-          @click="
-            selectCollection(null)
-          "
-        >
-          Toutes
-        </button>
-
-        <div
-          v-for="collection in collections"
-          :key="collection.id"
-          class="collection-chip-wrap"
-        >
-          <button
-            class="collection-chip"
-            :class="{
-              active:
-                collectionFilter
-                === collection.id,
-            }"
-            type="button"
-            @click="
-              selectCollection(
-                collection.id,
-              )
-            "
-          >
-            <span
-              class="collection-dot"
-              :style="{
-                background:
-                  collection.color,
-              }"
-            />
-
-            <span>
-              {{ collection.name }}
-            </span>
-
-            <small>
-              {{ collection.noteCount }}
-            </small>
-          </button>
-
-          <button
-            class="collection-delete"
-            type="button"
-            :aria-label="
-              `Supprimer ${collection.name}`
-            "
-            title="Supprimer la collection"
-            @click="
-              deleteCollection(
-                collection,
-              )
-            "
-          >
-            ×
-          </button>
-        </div>
-      </div>
-    </section>
-
     <div
       v-if="
         scope === 'active'
@@ -1276,25 +860,6 @@ onMounted(
           Créer une note…
         </span>
       </button>
-
-      <label
-        class="keep-note-composer-shortcut"
-        title="Créer une note avec une image"
-        aria-label="Créer une note avec une image"
-      >
-        <AppIcon
-          name="image"
-          :size="20"
-        />
-
-        <input
-          class="image-file-input"
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          :disabled="quickSaving"
-          @change="createImageNote"
-        />
-      </label>
 
       <button
         class="keep-note-composer-shortcut"
@@ -1485,11 +1050,9 @@ onMounted(
         {{
           query
             ? 'Aucun résultat.'
-            : activeCollection
-              ? 'Cette collection est vide.'
-              : scope === 'trash'
-                ? 'La corbeille est vide.'
-                : 'Aucune note pour le moment.'
+            : scope === 'trash'
+              ? 'La corbeille est vide.'
+              : 'Aucune note pour le moment.'
         }}
       </strong>
 
@@ -1558,7 +1121,8 @@ onMounted(
 
             <div
               v-if="
-                scope === 'active'
+                !note.archivedAt
+                && !note.deletedAt
               "
               class="note-card-quick-actions"
               @click.stop
@@ -1923,17 +1487,11 @@ onMounted(
       <NoteEditor
         :key="
           selected?.id
-          ?? `new-note-${projectId ?? collectionFilter ?? 'all'}`
+          ?? `new-note-${projectId ?? 'all'}`
         "
         :note="selected"
         :tags="tags"
-        :collections="collections"
         :projects="projects"
-        :default-collection-id="
-          projectId === null
-            ? collectionFilter
-            : null
-        "
         :default-project-id="
           projectId
         "

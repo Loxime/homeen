@@ -23,14 +23,12 @@ import {
 
 import type {
   Note,
-  NoteCollection,
 } from '../types/domain'
 
 interface SearchNoteResult {
   id: number
   title: string
   content: string
-  collectionName: string | null
   archivedAt: string | null
   updatedAt: string
 }
@@ -72,9 +70,6 @@ const notes =
 
 const tasks =
   ref<SearchTaskResult[]>([])
-
-const collections =
-  ref<NoteCollection[]>([])
 
 const selectedNote =
   ref<Note | null>(null)
@@ -134,20 +129,7 @@ function priorityLabel(
 
 async function loadSupportData():
 Promise<void> {
-  const [
-    collectionResponse,
-  ] = await Promise.all([
-    api<{
-      collections:
-        NoteCollection[]
-    }>(
-      '/api/collections',
-    ),
-    loadTags(),
-  ])
-
-  collections.value =
-    collectionResponse.collections
+  await loadTags()
 }
 
 async function runSearch():
@@ -341,14 +323,6 @@ watch(
 
               <span class="search-result-meta">
                 <span
-                  v-if="note.collectionName"
-                >
-                  {{
-                    note.collectionName
-                  }}
-                </span>
-
-                <span
                   v-if="note.archivedAt"
                   class="search-archived-badge"
                 >
@@ -465,7 +439,6 @@ watch(
         :key="selectedNote.id"
         :note="selectedNote"
         :tags="tags"
-        :collections="collections"
         @saved="
           (note) => {
             selectedNote = note
