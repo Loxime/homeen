@@ -3129,3 +3129,54 @@ h3 { margin-bottom: .35rem; }
     right: 6px;
   }
 }
+
+/* Pre-mobile feedback — pinned note carousel and card hierarchy */
+
+.notes-grid--pinned {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns:
+    minmax(240px, 320px);
+  gap: 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 2px 12px;
+  columns: auto;
+  scroll-snap-type:
+    x proximity;
+  scrollbar-width: thin;
+}
+
+.notes-grid--pinned
+.note-card {
+  height: 100%;
+  margin: 0;
+  display: flex;
+  scroll-snap-align: start;
+}
+
+.note-card h2 {
+  margin-top: 0;
+  padding-right: 92px;
+}
+
+.note-card-meta {
+  margin-top: .85rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: .65rem;
+}
+
+.note-card-tags {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .35rem;
+}
+
+.project-chip {
+  gap: .3rem;
+}

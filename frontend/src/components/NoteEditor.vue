@@ -8,6 +8,11 @@ import {
 import AppIcon from './AppIcon.vue'
 import { api } from '../services/api'
 
+import {
+  isPinnedNoteLimitError,
+  showPinnedNoteLimitAlert,
+} from '../services/noteAlerts'
+
 import type {
   ImageAsset,
   Note,
@@ -283,6 +288,19 @@ Promise<Note | null> {
 
     return note
   } catch (exception) {
+    if (
+      isPinnedNoteLimitError(
+        exception,
+      )
+    ) {
+      await showPinnedNoteLimitAlert()
+      isPinned.value =
+        localNote.value?.isPinned
+        ?? false
+
+      return null
+    }
+
     error.value =
       exception instanceof Error
         ? exception.message

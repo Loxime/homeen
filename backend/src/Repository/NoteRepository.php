@@ -334,6 +334,10 @@ SQL,
         $userId =
             $this->currentUser->id();
 
+        if ($isPinned) {
+            $this->assertCanPin();
+        }
+
         return $this->connection
             ->transactional(
                 function () use (
@@ -508,6 +512,13 @@ SQL,
 
         $userId =
             $this->currentUser->id();
+
+        if (
+            $isPinned
+            && !(bool) $current['isPinned']
+        ) {
+            $this->assertCanPin();
+        }
 
         return $this->connection
             ->transactional(
@@ -1026,6 +1037,46 @@ SQL,
             ];
 
         return $row;
+    }
+
+    private function assertCanPin(): void
+    {
+        $count =
+            (int) $this->connection
+                ->fetchOne(
+                    <<<'SQL'
+SELECT COUNT(*)
+FROM note
+WHERE is_pinned = TRUE
+  AND archived_at IS NULL
+  AND deleted_at IS NULL
+  AND (
+      (
+          user_id = :userId
+          AND channel_id IS NULL
+      )
+      OR EXISTS (
+          SELECT 1
+          FROM project_member member
+          WHERE member.project_id =
+                    note.project_id
+            AND member.user_id =
+                    :userId
+      )
+  )
+SQL,
+                    [
+                        'userId' =>
+                            $this->currentUser
+                                ->id(),
+                    ],
+                );
+
+        if ($count >= 20) {
+            throw new \DomainException(
+                'Vous ne pouvez pas épingler plus de 20 notes. Désépinglez une autre note avant de continuer.'
+            );
+        }
     }
 
     private function validateTitle(

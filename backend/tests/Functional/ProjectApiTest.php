@@ -3854,6 +3854,135 @@ SQL,
         );
     }
 
+    public function testPinnedNotesAreLimitedToTwenty():
+    void {
+        $this->connection
+            ->executeStatement(
+                <<<'SQL'
+INSERT INTO note (
+    user_id,
+    title,
+    content,
+    is_pinned,
+    color
+)
+SELECT
+    :userId,
+    'Pinned note ' || series::text,
+    '',
+    TRUE,
+    '#FFFFFF'
+FROM generate_series(
+    1,
+    20
+) AS series
+SQL,
+                [
+                    'userId' =>
+                        $this->userId,
+                ],
+            );
+
+        $blocked =
+            $this->jsonRequest(
+                'POST',
+                '/api/notes',
+                [
+                    'title' =>
+                        'Pinned note 21',
+
+                    'content' =>
+                        '',
+
+                    'tagIds' =>
+                        [],
+
+                    'collectionId' =>
+                        null,
+
+                    'projectId' =>
+                        null,
+
+                    'isPinned' =>
+                        true,
+
+                    'color' =>
+                        '#FFFFFF',
+                ],
+            );
+
+        self::assertSame(
+            409,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'Vous ne pouvez pas épingler plus de 20 notes. Désépinglez une autre note avant de continuer.',
+            $blocked['error'],
+        );
+
+        $this->connection
+            ->executeStatement(
+                <<<'SQL'
+UPDATE note
+SET is_pinned = FALSE
+WHERE id = (
+    SELECT id
+    FROM note
+    WHERE user_id = :userId
+      AND is_pinned = TRUE
+    ORDER BY id
+    LIMIT 1
+)
+SQL,
+                [
+                    'userId' =>
+                        $this->userId,
+                ],
+            );
+
+        $created =
+            $this->jsonRequest(
+                'POST',
+                '/api/notes',
+                [
+                    'title' =>
+                        'Pinned note after slot freed',
+
+                    'content' =>
+                        '',
+
+                    'tagIds' =>
+                        [],
+
+                    'collectionId' =>
+                        null,
+
+                    'projectId' =>
+                        null,
+
+                    'isPinned' =>
+                        true,
+
+                    'color' =>
+                        '#FFFFFF',
+                ],
+            );
+
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        self::assertTrue(
+            $created['isPinned'],
+        );
+    }
+
     private function authenticate(): void
     {
         $this->client->request(

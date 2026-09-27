@@ -9,6 +9,11 @@ import {
 
 import { useRoute } from 'vue-router'
 
+import {
+  isPinnedNoteLimitError,
+  showPinnedNoteLimitAlert,
+} from '../services/noteAlerts'
+
 import BaseModal from '../components/BaseModal.vue'
 import AppIcon from '../components/AppIcon.vue'
 import NoteEditor from '../components/NoteEditor.vue'
@@ -733,6 +738,15 @@ async function updateQuickAppearance(
           },
         )
   } catch (exception) {
+    if (
+      isPinnedNoteLimitError(
+        exception,
+      )
+    ) {
+      await showPinnedNoteLimitAlert()
+      return
+    }
+
     error.value =
       exception instanceof Error
         ? exception.message
@@ -1509,7 +1523,13 @@ onMounted(
           {{ section.title }}
         </h2>
 
-        <div class="notes-grid">
+        <div
+          class="notes-grid"
+          :class="{
+            'notes-grid--pinned':
+              section.key === 'pinned',
+          }"
+        >
           <article
             v-for="note in section.notes"
             :key="note.id"
@@ -1628,21 +1648,46 @@ onMounted(
               </button>
             </div>
 
-            <div class="note-card-top">
-              <div class="note-card-tags">
+            <h2>
+              {{
+                note.title
+                || 'Sans titre'
+              }}
+            </h2>
+
+            <p class="note-excerpt">
+              {{ noteExcerpt(note) }}
+            </p>
+
+            <div class="note-card-meta">
+              <div
+                v-if="
+                  note.projectName
+                  || note.tags.length > 0
+                "
+                class="note-card-tags"
+              >
                 <span
                   v-if="
-                    note.collectionName
+                    note.projectName
                   "
-                  class="collection-label"
+                  class="
+                    label-chip
+                    project-chip
+                  "
                   :style="{
-                    '--collection':
-                      note.collectionColor
+                    '--label':
+                      note.projectColor
                       ?? '#1A73E8',
                   }"
                 >
+                  <AppIcon
+                    name="users"
+                    :size="12"
+                  />
+
                   {{
-                    note.collectionName
+                    note.projectName
                   }}
                 </span>
 
@@ -1682,17 +1727,6 @@ onMounted(
                 </span>
               </div>
             </div>
-
-            <h2>
-              {{
-                note.title
-                || 'Sans titre'
-              }}
-            </h2>
-
-            <p class="note-excerpt">
-              {{ noteExcerpt(note) }}
-            </p>
 
             <footer>
               <span>
@@ -1754,15 +1788,15 @@ onMounted(
         </div>
 
         <span
-          v-if="note.collectionName"
-          class="collection-label"
+          v-if="note.projectName"
+          class="label-chip"
           :style="{
-            '--collection':
-              note.collectionColor
+            '--label':
+              note.projectColor
               ?? '#1A73E8',
           }"
         >
-          {{ note.collectionName }}
+          {{ note.projectName }}
         </span>
 
         <span
