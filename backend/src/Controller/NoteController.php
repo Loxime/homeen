@@ -20,13 +20,6 @@ final readonly class NoteController
     #[Route('', name: 'api_notes_list', methods: ['GET'])]
     public function list(Request $request): JsonResponse
     {
-        $collectionId =
-            $request->query->has('collectionId')
-                ? $request->query->getInt(
-                    'collectionId'
-                )
-                : null;
-
         $projectId =
             $request->query->has('projectId')
                 ? $request->query->getInt(
@@ -42,10 +35,6 @@ final readonly class NoteController
                 ),
                 $request->query->getString('q') !== ''
                     ? $request->query->getString('q')
-                    : null,
-                $collectionId !== null
-                && $collectionId > 0
-                    ? $collectionId
                     : null,
                 $projectId !== null
                 && $projectId > 0
@@ -73,9 +62,6 @@ final readonly class NoteController
                 $this->tagIds(
                     $data['tagIds'] ?? [],
                 ),
-                isset($data['collectionId'])
-                    ? (int) $data['collectionId']
-                    : null,
                 array_key_exists(
                     'projectId',
                     $data,
@@ -115,9 +101,6 @@ final readonly class NoteController
                 $this->tagIds(
                     $data['tagIds'] ?? [],
                 ),
-                isset($data['collectionId'])
-                    ? (int) $data['collectionId']
-                    : null,
                 $projectProvided
                 && $data['projectId'] !== null
                     ? (int) $data['projectId']

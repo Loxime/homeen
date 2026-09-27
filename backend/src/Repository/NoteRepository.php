@@ -24,19 +24,9 @@ final readonly class NoteRepository
     public function list(
         string $scope = 'active',
         ?string $query = null,
-        ?int $collectionId = null,
         ?int $projectId = null,
     ): array {
         $userId = $this->currentUser->id();
-
-        if (
-            $collectionId !== null
-            && $projectId !== null
-        ) {
-            throw new \InvalidArgumentException(
-                'Use either collectionId or projectId when filtering notes.'
-            );
-        }
 
         if ($projectId !== null) {
             $this->validateProject(
@@ -80,18 +70,6 @@ final readonly class NoteRepository
                 $projectId;
         }
 
-        if ($collectionId !== null) {
-            $this->validateCollection(
-                $collectionId
-            );
-
-            $where .=
-                ' AND n.collection_id = :collectionId';
-
-            $params['collectionId'] =
-                $collectionId;
-        }
-
         if (
             $query !== null
             && trim($query) !== ''
@@ -130,24 +108,6 @@ SELECT
     n.content,
     n.is_pinned AS "isPinned",
     n.color,
-    (
-        SELECT
-            '/api/images/'
-            || preview_image.id::text
-            || '/content'
-        FROM note_image preview_link
-        INNER JOIN image_asset preview_image
-            ON preview_image.id =
-                preview_link.image_id
-        WHERE preview_link.note_id = n.id
-        ORDER BY
-            preview_link.created_at ASC,
-            preview_image.id ASC
-        LIMIT 1
-    ) AS "previewImageUrl",
-    n.collection_id AS "collectionId",
-    collection.name AS "collectionName",
-    collection.color AS "collectionColor",
     n.project_id AS "projectId",
     project.name AS "projectName",
     project.color AS "projectColor",
@@ -160,9 +120,6 @@ SELECT
         FILTER (WHERE t.is_completed = TRUE)
         AS "completedTaskCount"
 FROM note n
-LEFT JOIN note_collection collection
-    ON collection.id = n.collection_id
-   AND collection.user_id = :userId
 LEFT JOIN project
     ON project.id = n.project_id
 LEFT JOIN task t
@@ -170,7 +127,6 @@ LEFT JOIN task t
 WHERE $where
 GROUP BY
     n.id,
-    collection.id,
     project.id
 ORDER BY
     n.is_pinned DESC,
@@ -206,24 +162,6 @@ SELECT
     n.content,
     n.is_pinned AS "isPinned",
     n.color,
-    (
-        SELECT
-            '/api/images/'
-            || preview_image.id::text
-            || '/content'
-        FROM note_image preview_link
-        INNER JOIN image_asset preview_image
-            ON preview_image.id =
-                preview_link.image_id
-        WHERE preview_link.note_id = n.id
-        ORDER BY
-            preview_link.created_at ASC,
-            preview_image.id ASC
-        LIMIT 1
-    ) AS "previewImageUrl",
-    n.collection_id AS "collectionId",
-    collection.name AS "collectionName",
-    collection.color AS "collectionColor",
     n.project_id AS "projectId",
     project.name AS "projectName",
     project.color AS "projectColor",
@@ -232,9 +170,6 @@ SELECT
     n.archived_at AS "archivedAt",
     n.deleted_at AS "deletedAt"
 FROM note n
-LEFT JOIN note_collection collection
-    ON collection.id = n.collection_id
-   AND collection.user_id = :userId
 LEFT JOIN project
     ON project.id = n.project_id
 WHERE n.id = :id
@@ -277,11 +212,6 @@ SQL,
                 FILTER_VALIDATE_BOOLEAN,
             );
 
-        $note['collectionId'] =
-            $note['collectionId'] !== null
-                ? (int) $note['collectionId']
-                : null;
-
         $note['projectId'] =
             $note['projectId'] !== null
                 ? (int) $note['projectId']
@@ -299,20 +229,10 @@ SQL,
         string $title,
         string $content,
         array $tagIds,
-        ?int $collectionId,
         ?int $projectId,
         bool $isPinned,
         string $color,
     ): array {
-        if (
-            $collectionId !== null
-            && $projectId !== null
-        ) {
-            throw new \InvalidArgumentException(
-                'A note cannot belong to both a collection and a project.'
-            );
-        }
-
         $this->validateTitle($title);
 
         $color =
@@ -322,10 +242,6 @@ SQL,
 
         $tagIds =
             $this->validateTags($tagIds);
-
-        $this->validateCollection(
-            $collectionId
-        );
 
         $this->validateProject(
             $projectId
@@ -344,7 +260,6 @@ SQL,
                     $title,
                     $content,
                     $tagIds,
-                    $collectionId,
                     $projectId,
                     $isPinned,
                     $color,
@@ -358,7 +273,6 @@ INSERT INTO note (
     user_id,
     title,
     content,
-    collection_id,
     project_id,
     is_pinned,
     color
@@ -367,7 +281,6 @@ VALUES (
     :userId,
     :title,
     :content,
-    :collectionId,
     :projectId,
     :isPinned,
     :color
@@ -383,10 +296,6 @@ SQL,
 
                                     'content' =>
                                         $content,
-
-                                    'collectionId' =>
-                                        $collectionId,
-
                                     'projectId' =>
                                         $projectId,
 
@@ -423,10 +332,6 @@ SQL,
                         [
                             'tagIds' =>
                                 $tagIds,
-
-                            'collectionId' =>
-                                $collectionId,
-
                             'projectId' =>
                                 $projectId,
 
@@ -460,7 +365,6 @@ SQL,
         string $title,
         string $content,
         array $tagIds,
-        ?int $collectionId,
         ?int $projectId,
         bool $projectProvided,
         ?bool $isPinned,
@@ -506,10 +410,6 @@ SQL,
         $tagIds =
             $this->validateTags($tagIds);
 
-        $this->validateCollection(
-            $collectionId
-        );
-
         $userId =
             $this->currentUser->id();
 
@@ -527,7 +427,6 @@ SQL,
                     $title,
                     $content,
                     $tagIds,
-                    $collectionId,
                     $projectId,
                     $isPinned,
                     $color,
@@ -540,7 +439,6 @@ SQL,
 UPDATE note
 SET title = :title,
     content = :content,
-    collection_id = :collectionId,
     project_id = :projectId,
     is_pinned = :isPinned,
     color = :color,
@@ -571,10 +469,6 @@ SQL,
 
                                     'content' =>
                                         $content,
-
-                                    'collectionId' =>
-                                        $collectionId,
-
                                     'projectId' =>
                                         $projectId,
 
@@ -608,10 +502,6 @@ SQL,
                         [
                             'tagIds' =>
                                 $tagIds,
-
-                            'collectionId' =>
-                                $collectionId,
-
                             'projectId' =>
                                 $projectId,
 
@@ -656,7 +546,6 @@ INSERT INTO note (
     user_id,
     title,
     content,
-    collection_id,
     project_id,
     color
 )
@@ -664,7 +553,6 @@ VALUES (
     :userId,
     :title,
     :content,
-    :collectionId,
     :projectId,
     :color
 )
@@ -684,12 +572,6 @@ SQL,
 
                                 'content' =>
                                     (string) $original['content'],
-
-                                'collectionId' =>
-                                    $original['collectionId']
-                                        !== null
-                                            ? (int) $original['collectionId']
-                                            : null,
 
                                 'projectId' =>
                                     $original['projectId'] !== null
@@ -725,36 +607,6 @@ SQL,
                                 ],
                             );
                     }
-
-                    $this->connection
-                        ->executeStatement(
-                            <<<'SQL'
-INSERT INTO note_image (
-    note_id,
-    image_id,
-    created_at
-)
-SELECT
-    :newNoteId,
-    source_image.image_id,
-    source_image.created_at
-FROM note_image source_image
-INNER JOIN image_asset image
-    ON image.id = source_image.image_id
-WHERE source_image.note_id = :sourceNoteId
-  AND image.user_id = :userId
-SQL,
-                            [
-                                'newNoteId' =>
-                                    $newNoteId,
-
-                                'sourceNoteId' =>
-                                    $id,
-
-                                'userId' =>
-                                    $userId,
-                            ],
-                        );
 
                     foreach (
                         $original['tasks']
@@ -1018,11 +870,6 @@ SQL,
                 $row['id']
             );
 
-        $row['collectionId'] =
-            $row['collectionId'] !== null
-                ? (int) $row['collectionId']
-                : null;
-
         $row['projectId'] =
             $row['projectId'] !== null
                 ? (int) $row['projectId']
@@ -1159,35 +1006,6 @@ SQL,
                     'id' => $noteId,
                 ],
             ) !== false;
-    }
-
-    private function validateCollection(
-        ?int $collectionId,
-    ): void {
-        if ($collectionId === null) {
-            return;
-        }
-
-        $exists = $this->connection
-            ->fetchOne(
-                <<<'SQL'
-SELECT 1
-FROM note_collection
-WHERE id = :id
-  AND user_id = :userId
-SQL,
-                [
-                    'id' => $collectionId,
-                    'userId' =>
-                        $this->currentUser->id(),
-                ],
-            );
-
-        if ($exists === false) {
-            throw new \InvalidArgumentException(
-                'Selected collection does not exist.'
-            );
-        }
     }
 
     /**

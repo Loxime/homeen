@@ -2787,7 +2787,7 @@ h3 { margin-bottom: .35rem; }
   gap: 6px;
 }
 
-/* Sprint 2 — pinned sections and card previews */
+/* Sprint 2 — pinned sections */
 
 .keep-note-sections {
   display: grid;
@@ -2805,23 +2805,6 @@ h3 { margin-bottom: .35rem; }
   font-weight: 750;
   letter-spacing: .08em;
   text-transform: uppercase;
-}
-
-.note-card-preview {
-  width: calc(100% + 32px);
-  max-height: 220px;
-  margin:
-    -16px
-    -16px
-    12px;
-  display: block;
-  object-fit: cover;
-  border-radius:
-    11px
-    11px
-    0
-    0;
-  background: rgba(0,0,0,.04);
 }
 
 /* Sprint 2 — quick note composer */
@@ -3118,10 +3101,6 @@ h3 { margin-bottom: .35rem; }
 
   .keep-note-section-title {
     margin-left: 2px;
-  }
-
-  .note-card-preview {
-    max-height: 180px;
   }
 
   .note-card-quick-actions {

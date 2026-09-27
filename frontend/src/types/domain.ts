@@ -1,15 +1,3 @@
-export interface ImageAsset {
-  id: number
-  originalName: string
-  mimeType: string
-  sizeBytes: number
-  width: number | null
-  height: number | null
-  createdAt: string
-  noteCount: number
-  contentUrl: string
-}
-
 export type ProjectRole =
   | 'owner'
   | 'admin'
@@ -58,15 +46,6 @@ export interface ProjectTask {
   tags: Tag[]
 }
 
-export interface NoteCollection {
-  id: number
-  name: string
-  color: string
-  createdAt: string
-  updatedAt: string
-  noteCount: number
-}
-
 export type TaskPriority =
   | 'low'
   | 'normal'
@@ -110,11 +89,7 @@ export interface NoteSummary {
   content: string
   isPinned: boolean
   color: string
-  previewImageUrl: string | null
   tags: Tag[]
-  collectionId: number | null
-  collectionName: string | null
-  collectionColor: string | null
   projectId: number | null
   projectName: string | null
   projectColor: string | null

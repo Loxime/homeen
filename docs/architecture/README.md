@@ -7,14 +7,11 @@ Homeen is a private productivity application. It intentionally does not implemen
 ## Domain model
 
 - `tag`: user-owned reusable classification with a six-digit hexadecimal color.
-- `project`: shared workspace with metadata, archive state and optional provenance from a legacy collection or Channel.
+- `project`: shared workspace with metadata, archive state and optional provenance from a legacy Channel.
 - `project_member`: Project membership with exactly the application roles `owner`, `admin` and `member`; active Projects created by the application have one owner.
 - `project_invitation`: pending invitation to join a Project.
 - `project_workflow_stage`: ordered configurable workflow column belonging to one Project.
-- `note`: text note with archive/trash timestamps, Keep-style pin state and color, optional Project assignment, legacy collection/Channel compatibility fields, and zero or more tags through `note_tag`.
-- `note_collection`: legacy lightweight grouping retained temporarily for migration and API compatibility; Projects are the current richer organization model.
-- `image_asset`: private reusable image owned by one user. Project membership may grant read access when the image is attached to a shared Project note, while asset ownership remains private.
-- `note_image`: many-to-many attachment between notes and reusable image assets.
+- `note`: text note with archive/trash timestamps, Keep-style pin state and color, optional Project assignment, legacy Channel compatibility fields, and zero or more tags through `note_tag`.
 - `task`: has exactly one scope: either a note-bound task (`note_id`) or a native Project task (`project_id` + `workflow_stage_id`). It stores content up to 4000 characters, priority, status, position, optional start/due dates, completion state and zero or more tags through `task_tag`.
 - `pomodoro_preset`: unique work duration in minutes. Work duration is at least 5 minutes and has no application-defined upper bound.
 - `pomodoro_session`: one launch-to-stop interval. Only one session may run at once.
@@ -30,7 +27,7 @@ Legacy Channel tables and backend endpoints are also retained temporarily as a m
 
 `active -> archived -> active` and `active|archived -> trash -> active`. A daily scheduler permanently deletes notes that have remained in trash for at least 30 days. Tasks and `note_tag` associations cascade-delete only when the note is permanently purged. Deleting a tag removes its note/task associations without deleting either object.
 
-Duplicating a note copies title, content, color, collection, note tags, image attachments, task metadata, task dates and task tags. Image files are not duplicated: the copied note links to the same private `image_asset` records. The duplicated note is deliberately not pinned, and duplicated tasks are reset to `todo` and incomplete so the copy represents a new actionable note.
+Duplicating a note copies title, content, color, note tags, task metadata, task dates and task tags. The duplicated note is deliberately not pinned, and duplicated tasks are reset to `todo` and incomplete so the copy represents a new actionable note.
 
 ## Pomodoro semantics
 
@@ -62,4 +59,4 @@ Daily statistics use the timezone configured by `APP_TIMEZONE`.
 
 ## Search
 
-Scoped note search remains available through `GET /api/notes?q=...`, matching note title/content, note tags and task content. Global search uses `GET /api/search?q=...` and returns separate note/task results; it also matches collection names and reusable tags. Trashed notes are excluded from global search.
+Scoped note search remains available through `GET /api/notes?q=...`, matching note title/content, note tags and task content. Global search uses `GET /api/search?q=...` and returns separate note/task results; it also matches reusable tags. Trashed notes are excluded from global search.

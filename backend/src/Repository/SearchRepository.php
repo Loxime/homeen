@@ -52,20 +52,15 @@ SELECT
     n.id,
     n.title,
     n.content,
-    collection.name AS "collectionName",
     n.archived_at AS "archivedAt",
     n.updated_at AS "updatedAt"
 FROM note n
-LEFT JOIN note_collection collection
-    ON collection.id = n.collection_id
-   AND collection.user_id = :userId
 WHERE n.user_id = :userId
   AND n.channel_id IS NULL
   AND n.deleted_at IS NULL
   AND (
       n.title ILIKE :query
       OR n.content ILIKE :query
-      OR collection.name ILIKE :query
       OR EXISTS (
           SELECT 1
           FROM note_tag search_note_tag

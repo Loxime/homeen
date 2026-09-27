@@ -1107,18 +1107,6 @@ onMounted(
             }"
             @click="openNote(note)"
           >
-            <img
-              v-if="
-                note.previewImageUrl
-              "
-              class="note-card-preview"
-              :src="
-                note.previewImageUrl
-              "
-              alt=""
-              loading="lazy"
-            />
-
             <div
               v-if="
                 !note.archivedAt
@@ -1426,18 +1414,6 @@ onMounted(
           }"
           @click="openNote(note)"
         >
-          <span
-            v-if="note.collectionName"
-            class="collection-label"
-            :style="{
-              '--collection':
-                note.collectionColor
-                ?? '#1A73E8',
-            }"
-          >
-            {{ note.collectionName }}
-          </span>
-
           <strong>
             <AppIcon
               v-if="note.isPinned"

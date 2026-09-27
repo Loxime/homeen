@@ -1433,75 +1433,6 @@ SQL,
         );
     }
 
-    public function testNoteCannotTargetCollectionAndProjectTogether():
-    void {
-        $project =
-            $this->jsonRequest(
-                'POST',
-                '/api/projects',
-                [
-                    'name' =>
-                        'Project target',
-                ],
-            );
-
-        $collectionId =
-            $this->connection
-                ->fetchOne(
-                    <<<'SQL'
-INSERT INTO note_collection (
-    user_id,
-    name,
-    color
-)
-VALUES (
-    :userId,
-    'Legacy collection',
-    '#1A73E8'
-)
-RETURNING id
-SQL,
-                    [
-                        'userId' =>
-                            $this->userId,
-                    ],
-                );
-
-        self::assertNotFalse(
-            $collectionId,
-        );
-
-        $response =
-            $this->jsonRequest(
-                'POST',
-                '/api/notes',
-                [
-                    'title' =>
-                        'Ambiguous note',
-
-                    'tagIds' => [],
-
-                    'collectionId' =>
-                        (int) $collectionId,
-
-                    'projectId' =>
-                        (int) $project['id'],
-                ],
-            );
-
-        self::assertSame(
-            422,
-            $this->client
-                ->getResponse()
-                ->getStatusCode(),
-        );
-
-        self::assertSame(
-            'A note cannot belong to both a collection and a project.',
-            $response['error'],
-        );
-    }
-
     public function testProjectMembersCanManageSharedTasksWithoutRemovingForeignTags():
     void {
         $ownerUserId =
@@ -3452,9 +3383,6 @@ SQL,
                     'tagIds' =>
                         [],
 
-                    'collectionId' =>
-                        null,
-
                     'projectId' =>
                         null,
 
@@ -3511,9 +3439,6 @@ SQL,
 
                     'tagIds' =>
                         [],
-
-                    'collectionId' =>
-                        null,
 
                     'projectId' =>
                         null,

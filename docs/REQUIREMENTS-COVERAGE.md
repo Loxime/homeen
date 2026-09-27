@@ -12,10 +12,7 @@
 | Multiple tags per task | `task_tag` many-to-many relationship |
 | Pin / unpin note | Persistent `note.is_pinned` + pinned/other grid sections + quick card action |
 | Note color | Persistent validated `note.color` + editor palette + quick card color action |
-| Note image attachments | Private `image_asset` library + `note_image` many-to-many relationship |
-| Image preview on note card | First attached private image exposed as card preview |
 | Quick note creation | Inline Keep-style composer |
-| Quick image note | Image composer shortcut creates and attaches a private image |
 | Quick task list | List composer creates a note plus real task records |
 | Grid display | Notes grid |
 | List display | Notes list |
@@ -45,7 +42,7 @@
 | Global search | Top bar + `/api/search` note/task results + PostgreSQL ILIKE |
 | Projects | Member-based shared workspace with owner/admin/member roles |
 | Project invitations | Invite, accept, reject, role management, member removal and leave flows |
-| Shared Project notes | Project membership grants note access, lifecycle actions and shared image visibility |
+| Shared Project notes | Project membership grants note access and lifecycle actions |
 | Project workflow | Up to 20 ordered configurable stages per Project |
 | Legacy Channels | Frontend retired; backend/tables retained temporarily as migration compatibility |
 | Dockerized | PHP, PostgreSQL, Vite, Nginx, scheduler services |
