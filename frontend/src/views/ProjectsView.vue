@@ -49,12 +49,6 @@ const projectMembers =
     Record<number, ProjectMember[]>
   >({})
 
-const expandedProjectIds =
-  ref<number[]>([])
-
-const membersLoadingProjectId =
-  ref<number | null>(null)
-
 const memberActionBusy =
   ref<string | null>(null)
 
@@ -278,13 +272,6 @@ async function rejectInvitation(
   }
 }
 
-function membersExpanded(
-  projectId: number,
-): boolean {
-  return expandedProjectIds.value
-    .includes(projectId)
-}
-
 function membersFor(
   projectId: number,
 ): ProjectMember[] {
@@ -356,10 +343,7 @@ function canRemoveMember(
 
 async function loadMembers(
   projectId: number,
-): Promise<void> {
-  membersLoadingProjectId.value =
-    projectId
-
+): Promise<boolean> {
   error.value = ''
 
   try {
@@ -376,44 +360,372 @@ async function loadMembers(
       [projectId]:
         response.members,
     }
+
+    return true
   } catch (exception) {
     error.value =
       exception instanceof Error
         ? exception.message
         : 'Impossible de charger les membres.'
-  } finally {
-    membersLoadingProjectId.value =
-      null
+
+    return false
   }
 }
 
-async function toggleMembers(
+function renderMembersModal(
+  project: Project,
+  container: HTMLElement,
+): void {
+  container.replaceChildren()
+
+  container.style.display = 'grid'
+  container.style.gap = '0.75rem'
+  container.style.textAlign = 'left'
+
+  const summary =
+    document.createElement('p')
+
+  summary.textContent =
+    `${project.memberCount} membre`
+    + (
+      project.memberCount > 1
+        ? 's'
+        : ''
+    )
+
+  summary.style.margin = '0'
+  summary.style.opacity = '0.72'
+
+  container.appendChild(
+    summary,
+  )
+
+  if (error.value !== '') {
+    const errorMessage =
+      document.createElement('p')
+
+    errorMessage.textContent =
+      error.value
+
+    errorMessage.style.margin = '0'
+    errorMessage.style.color =
+      'var(--danger, #b3261e)'
+
+    container.appendChild(
+      errorMessage,
+    )
+  }
+
+  for (
+    const member
+    of membersFor(project.id)
+  ) {
+    const row =
+      document.createElement('div')
+
+    row.style.display = 'grid'
+    row.style.gridTemplateColumns =
+      'minmax(0, 1fr) auto auto'
+    row.style.gap = '0.65rem'
+    row.style.alignItems = 'center'
+    row.style.padding = '0.75rem'
+    row.style.border =
+      '1px solid var(--border-color, #dadce0)'
+    row.style.borderRadius = '10px'
+
+    const identity =
+      document.createElement('div')
+
+    identity.style.display = 'grid'
+    identity.style.gap = '0.15rem'
+    identity.style.minWidth = '0'
+
+    const email =
+      document.createElement('strong')
+
+    email.textContent =
+      member.email
+
+    email.style.overflowWrap =
+      'anywhere'
+
+    identity.appendChild(
+      email,
+    )
+
+    if (
+      isCurrentMember(
+        member,
+      )
+    ) {
+      const current =
+        document.createElement('small')
+
+      current.textContent = 'Vous'
+      current.style.opacity = '0.7'
+
+      identity.appendChild(
+        current,
+      )
+    }
+
+    row.appendChild(
+      identity,
+    )
+
+    if (
+      canChangeRole(
+        project,
+        member,
+      )
+    ) {
+      const select =
+        document.createElement(
+          'select',
+        )
+
+      select.setAttribute(
+        'aria-label',
+        `Rôle de ${member.email}`,
+      )
+
+      for (
+        const [
+          value,
+          label,
+        ] of [
+          [
+            'admin',
+            'Administrateur',
+          ],
+          [
+            'member',
+            'Membre',
+          ],
+        ] as const
+      ) {
+        const option =
+          document.createElement(
+            'option',
+          )
+
+        option.value = value
+        option.textContent = label
+
+        select.appendChild(
+          option,
+        )
+      }
+
+      select.value =
+        member.role
+
+      select.disabled =
+        memberActionBusy.value
+        === memberBusyKey(
+          project,
+          member,
+        )
+
+      select.addEventListener(
+        'change',
+        async event => {
+          select.disabled = true
+
+          await changeMemberRole(
+            project,
+            member,
+            event,
+          )
+
+          renderMembersModal(
+            project,
+            container,
+          )
+        },
+      )
+
+      row.appendChild(
+        select,
+      )
+    } else {
+      const role =
+        document.createElement('span')
+
+      role.textContent =
+        roleLabel(member.role)
+
+      role.style.fontSize =
+        '0.82rem'
+
+      row.appendChild(
+        role,
+      )
+    }
+
+    if (
+      canRemoveMember(
+        project,
+        member,
+      )
+    ) {
+      const remove =
+        document.createElement(
+          'button',
+        )
+
+      remove.type = 'button'
+      remove.textContent = 'Retirer'
+
+      remove.style.border =
+        '1px solid currentColor'
+      remove.style.borderRadius =
+        '8px'
+      remove.style.padding =
+        '0.45rem 0.65rem'
+      remove.style.background =
+        'transparent'
+      remove.style.color =
+        'var(--danger, #b3261e)'
+      remove.style.cursor =
+        'pointer'
+
+      remove.addEventListener(
+        'click',
+        async () => {
+          remove.disabled = true
+
+          await removeMember(
+            project,
+            member,
+          )
+
+          renderMembersModal(
+            project,
+            container,
+          )
+        },
+      )
+
+      row.appendChild(
+        remove,
+      )
+    } else {
+      const spacer =
+        document.createElement('span')
+
+      row.appendChild(
+        spacer,
+      )
+    }
+
+    container.appendChild(
+      row,
+    )
+  }
+
+  if (
+    project.role !== 'owner'
+  ) {
+    const leave =
+      document.createElement(
+        'button',
+      )
+
+    leave.type = 'button'
+    leave.textContent =
+      'Quitter ce projet'
+
+    leave.style.justifySelf =
+      'start'
+    leave.style.border =
+      '1px solid currentColor'
+    leave.style.borderRadius =
+      '8px'
+    leave.style.padding =
+      '0.55rem 0.75rem'
+    leave.style.background =
+      'transparent'
+    leave.style.color =
+      'var(--danger, #b3261e)'
+    leave.style.cursor =
+      'pointer'
+
+    leave.addEventListener(
+      'click',
+      async () => {
+        await leaveProject(
+          project,
+        )
+
+        if (
+          !projects.value.some(
+            candidate =>
+              candidate.id
+              === project.id,
+          )
+        ) {
+          Swal.close()
+        }
+      },
+    )
+
+    container.appendChild(
+      leave,
+    )
+  }
+}
+
+async function showMembers(
   project: Project,
 ): Promise<void> {
   if (
-    membersExpanded(project.id)
+    memberActionBusy.value
+    !== null
   ) {
-    expandedProjectIds.value =
-      expandedProjectIds.value.filter(
-        id => id !== project.id,
-      )
-
     return
   }
 
-  expandedProjectIds.value = [
-    ...expandedProjectIds.value,
-    project.id,
-  ]
+  error.value = ''
 
-  if (
-    !Object.prototype.hasOwnProperty.call(
-      projectMembers.value,
+  void Swal.fire({
+    title: `Membres · ${project.name}`,
+    text: 'Chargement des membres…',
+    showConfirmButton: false,
+    allowOutsideClick: false,
+
+    didOpen: () => {
+      Swal.showLoading()
+    },
+  })
+
+  const loaded =
+    await loadMembers(
       project.id,
     )
-  ) {
-    await loadMembers(project.id)
+
+  if (!loaded) {
+    Swal.close()
+    return
   }
+
+  const container =
+    document.createElement(
+      'div',
+    )
+
+  renderMembersModal(
+    project,
+    container,
+  )
+
+  await Swal.fire({
+    title: `Membres · ${project.name}`,
+    html: container,
+    showConfirmButton: false,
+    showCloseButton: true,
+    width: 680,
+  })
 }
 
 async function changeMemberRole(
@@ -582,11 +894,6 @@ async function deleteProject(
           candidate.id !== project.id,
       )
 
-    expandedProjectIds.value =
-      expandedProjectIds.value.filter(
-        id => id !== project.id,
-      )
-
     const {
       [project.id]: _removed,
       ...remainingMembers
@@ -640,11 +947,6 @@ async function leaveProject(
       projects.value.filter(
         candidate =>
           candidate.id !== project.id,
-      )
-
-    expandedProjectIds.value =
-      expandedProjectIds.value.filter(
-        id => id !== project.id,
       )
 
     const {
@@ -925,7 +1227,7 @@ onMounted(
           class="ui-button ui-button--secondary project-members-toggle"
           type="button"
           @click="
-            toggleMembers(project)
+            showMembers(project)
           "
         >
           <AppIcon
@@ -933,151 +1235,8 @@ onMounted(
             :size="17"
           />
 
-          {{
-            membersExpanded(project.id)
-              ? 'Masquer les membres'
-              : 'Voir les membres'
-          }}
+          Voir les membres
         </button>
-
-        <section
-          v-if="
-            membersExpanded(project.id)
-          "
-          class="project-members-panel"
-        >
-          <div class="project-members-heading">
-            <strong>
-              Membres
-            </strong>
-
-            <small class="muted">
-              {{ project.memberCount }}
-              au total
-            </small>
-          </div>
-
-          <p
-            v-if="
-              membersLoadingProjectId
-              === project.id
-            "
-            class="muted"
-          >
-            Chargement des membres…
-          </p>
-
-          <div
-            v-else
-            class="project-member-list"
-          >
-            <div
-              v-for="
-                member
-                in membersFor(project.id)
-              "
-              :key="member.userId"
-              class="project-member-row"
-            >
-              <div class="project-member-identity">
-                <strong>
-                  {{ member.email }}
-                </strong>
-
-                <small
-                  v-if="
-                    isCurrentMember(member)
-                  "
-                  class="muted"
-                >
-                  Vous
-                </small>
-              </div>
-
-              <select
-                v-if="
-                  canChangeRole(
-                    project,
-                    member,
-                  )
-                "
-                class="project-member-role"
-                :value="member.role"
-                :disabled="
-                  memberActionBusy
-                  === memberBusyKey(
-                    project,
-                    member,
-                  )
-                "
-                @change="
-                  changeMemberRole(
-                    project,
-                    member,
-                    $event,
-                  )
-                "
-              >
-                <option value="admin">
-                  Administrateur
-                </option>
-
-                <option value="member">
-                  Membre
-                </option>
-              </select>
-
-              <span
-                v-else
-                class="project-member-role-label"
-              >
-                {{ roleLabel(member.role) }}
-              </span>
-
-              <button
-                v-if="
-                  canRemoveMember(
-                    project,
-                    member,
-                  )
-                "
-                class="project-member-remove"
-                type="button"
-                :disabled="
-                  memberActionBusy
-                  === memberBusyKey(
-                    project,
-                    member,
-                  )
-                "
-                @click="
-                  removeMember(
-                    project,
-                    member,
-                  )
-                "
-              >
-                Retirer
-              </button>
-            </div>
-          </div>
-
-          <button
-            v-if="
-              project.role !== 'owner'
-            "
-            class="project-leave"
-            type="button"
-            :disabled="
-              busyProjectId !== null
-            "
-            @click="
-              leaveProject(project)
-            "
-          >
-            Quitter ce projet
-          </button>
-        </section>
 
         <form
           v-if="
