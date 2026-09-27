@@ -87,9 +87,21 @@ final readonly class PomodoroController
         );
     }
 
-    #[Route('/history', name: 'api_pomodoro_history', methods: ['GET'])]
-    public function history(Request $request): JsonResponse
-    {
-        return new JsonResponse(['sessions' => $this->pomodoro->history($request->query->getInt('limit', 50))]);
+    #[Route(
+        '/history',
+        name: 'api_pomodoro_history',
+        methods: ['GET'],
+    )]
+    public function history(
+        Request $request,
+    ): JsonResponse {
+        return new JsonResponse(
+            $this->pomodoro->history(
+                $request->query->getInt(
+                    'page',
+                    1,
+                ),
+            ),
+        );
     }
 }

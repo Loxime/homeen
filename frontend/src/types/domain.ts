@@ -134,6 +134,15 @@ export interface PomodoroSession {
   isActive?: boolean
 }
 
+export interface PomodoroHistoryPagination {
+  page: number
+  limit: number
+  total: number
+  pageCount: number
+  hasPrevious: boolean
+  hasNext: boolean
+}
+
 export interface PomodoroInsights {
   totalFocusSeconds: number
   totalFocusMinutes: number

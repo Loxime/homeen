@@ -888,6 +888,37 @@ select:focus {
   font-size: 1.25rem;
 }
 
+.history-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.history-heading p {
+  margin:
+    4px
+    0
+    0;
+}
+
+.history-pagination {
+  margin-top: 16px;
+  padding-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  border-top: 1px solid var(--g-border);
+}
+
+.history-pagination > span {
+  min-width: 92px;
+  color: var(--g-muted);
+  font-size: .82rem;
+  text-align: center;
+}
+
 @media (max-width: 720px) {
   .focus-garden-visual,
   .ideal-duration {

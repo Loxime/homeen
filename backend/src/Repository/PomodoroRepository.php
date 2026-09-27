@@ -10,15 +10,19 @@ use App\Service\PomodoroCalculator;
 use App\Service\PomodoroInsightCalculator;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Knp\Component\Pager\PaginatorInterface;
 
 final readonly class PomodoroRepository
 {
+    private const HISTORY_PAGE_SIZE = 20;
+
     public function __construct(
         private Connection $connection,
         private ActivityLogger $logger,
         private PomodoroCalculator $calculator,
         private PomodoroInsightCalculator $insightCalculator,
         private CurrentUser $currentUser,
+        private PaginatorInterface $paginator,
     ) {
     }
 
@@ -536,42 +540,125 @@ SQL,
         );
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * @return array{
+     *     sessions: list<array<string, mixed>>,
+     *     pagination: array{
+     *         page: int,
+     *         limit: int,
+     *         total: int,
+     *         pageCount: int,
+     *         hasPrevious: bool,
+     *         hasNext: bool
+     *     }
+     * }
+     */
     public function history(
-        int $limit = 50,
+        int $page = 1,
     ): array {
-        $limit = max(
+        $page = max(
             1,
-            min(200, $limit),
+            $page,
         );
 
-        $rows = $this->connection
-            ->fetchAllAssociative(
-                <<<SQL
-SELECT
-    id,
-    work_minutes_snapshot AS "workMinutes",
-    started_at AS "startedAt",
-    stopped_at AS "stoppedAt",
-    focus_seconds AS "focusSeconds",
-    break_seconds AS "breakSeconds",
-    focus_rating AS "focusRating",
-    rated_at AS "ratedAt"
-FROM pomodoro_session
-WHERE user_id = :userId
-ORDER BY started_at DESC
-LIMIT $limit
-SQL,
+        $query = $this->connection
+            ->createQueryBuilder()
+            ->select(
+                'p.id',
+                'p.work_minutes_snapshot AS "workMinutes"',
+                'p.started_at AS "startedAt"',
+                'p.stopped_at AS "stoppedAt"',
+                'p.focus_seconds AS "focusSeconds"',
+                'p.break_seconds AS "breakSeconds"',
+                'p.focus_rating AS "focusRating"',
+                'p.rated_at AS "ratedAt"',
+            )
+            ->from(
+                'pomodoro_session',
+                'p',
+            )
+            ->where(
+                'p.user_id = :userId',
+            )
+            ->setParameter(
+                'userId',
+                $this->currentUser->id(),
+            )
+            ->orderBy(
+                'p.started_at',
+                'DESC',
+            )
+            ->addOrderBy(
+                'p.id',
+                'DESC',
+            );
+
+        $pagination =
+            $this->paginator->paginate(
+                $query,
+                $page,
+                self::HISTORY_PAGE_SIZE,
                 [
-                    'userId' =>
-                        $this->currentUser->id(),
+                    PaginatorInterface::PAGE_OUT_OF_RANGE =>
+                        PaginatorInterface::PAGE_OUT_OF_RANGE_FIX,
                 ],
             );
 
-        return array_map(
-            $this->normalizeSession(...),
-            $rows,
+        $sessions = [];
+
+        foreach (
+            $pagination->getItems()
+            as $row
+        ) {
+            if (!is_array($row)) {
+                throw new \LogicException(
+                    'Unexpected Pomodoro pagination row.',
+                );
+            }
+
+            $sessions[] =
+                $this->normalizeSession(
+                    $row,
+                );
+        }
+
+        $total =
+            $pagination
+                ->getTotalItemCount();
+
+        $pageCount = max(
+            1,
+            (int) ceil(
+                $total
+                / self::HISTORY_PAGE_SIZE,
+            ),
         );
+
+        $currentPage =
+            $total === 0
+                ? 1
+                : $pagination
+                    ->getCurrentPageNumber();
+
+        return [
+            'sessions' => $sessions,
+
+            'pagination' => [
+                'page' => $currentPage,
+                'limit' =>
+                    self::HISTORY_PAGE_SIZE,
+                'total' => $total,
+                'pageCount' => $pageCount,
+
+                'hasPrevious' =>
+                    $currentPage > 1,
+
+                'hasNext' =>
+                    $total > 0
+                    && $currentPage
+                        < $pageCount,
+            ],
+        ];
     }
 
     /**

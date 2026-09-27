@@ -18,6 +18,7 @@ import {
 } from '../services/format'
 
 import type {
+  PomodoroHistoryPagination,
   PomodoroInsights,
   PomodoroSession,
 } from '../types/domain'
@@ -35,6 +36,19 @@ const error = ref('')
 
 const history =
   ref<PomodoroSession[]>([])
+
+const historyPagination =
+  ref<PomodoroHistoryPagination>({
+    page: 1,
+    limit: 20,
+    total: 0,
+    pageCount: 1,
+    hasPrevious: false,
+    hasNext: false,
+  })
+
+const historyLoading =
+  ref(false)
 
 const insights =
   ref<PomodoroInsights | null>(
@@ -93,18 +107,57 @@ function ratingSymbol(
   return '—'
 }
 
-async function loadHistory():
-Promise<void> {
-  const response =
-    await api<{
-      sessions:
-        PomodoroSession[]
-    }>(
-      '/api/pomodoro/history?limit=30',
-    )
+async function loadHistory(
+  page =
+    historyPagination.value.page,
+): Promise<void> {
+  historyLoading.value = true
 
-  history.value =
-    response.sessions
+  try {
+    const response =
+      await api<{
+        sessions:
+          PomodoroSession[]
+
+        pagination:
+          PomodoroHistoryPagination
+      }>(
+        `/api/pomodoro/history?page=${page}`,
+      )
+
+    history.value =
+      response.sessions
+
+    historyPagination.value =
+      response.pagination
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+async function changeHistoryPage(
+  page: number,
+): Promise<void> {
+  if (
+    historyLoading.value
+    || page < 1
+    || page
+      > historyPagination.value
+        .pageCount
+  ) {
+    return
+  }
+
+  error.value = ''
+
+  try {
+    await loadHistory(page)
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de charger cette page de sessions.'
+  }
 }
 
 async function loadInsights():
@@ -632,10 +685,33 @@ onMounted(async () => {
     </div>
 
     <section class="panel history-panel">
-      <div>
-        <h2>
-          Sessions récentes
-        </h2>
+      <div class="history-heading">
+        <div>
+          <h2>
+            Sessions récentes
+          </h2>
+
+          <p
+            v-if="
+              historyPagination.total > 0
+            "
+            class="muted"
+          >
+            {{
+              historyPagination.total
+            }}
+            session{{
+              historyPagination.total > 1
+                ? 's'
+                : ''
+            }}
+            enregistrée{{
+              historyPagination.total > 1
+                ? 's'
+                : ''
+            }}
+          </p>
+        </div>
       </div>
 
       <div class="session-table">
@@ -719,6 +795,66 @@ onMounted(async () => {
           Aucune session Pomodoro
           pour le moment.
         </div>
+      </div>
+
+      <div
+        v-if="
+          historyPagination.total > 0
+        "
+        class="history-pagination"
+      >
+        <button
+          type="button"
+          class="
+            ui-button
+            ui-button--secondary
+            ui-button--compact
+          "
+          :disabled="
+            historyLoading
+            || !historyPagination
+              .hasPrevious
+          "
+          @click="
+            changeHistoryPage(
+              historyPagination.page
+              - 1,
+            )
+          "
+        >
+          Précédent
+        </button>
+
+        <span>
+          Page
+          {{ historyPagination.page }}
+          sur
+          {{
+            historyPagination.pageCount
+          }}
+        </span>
+
+        <button
+          type="button"
+          class="
+            ui-button
+            ui-button--secondary
+            ui-button--compact
+          "
+          :disabled="
+            historyLoading
+            || !historyPagination
+              .hasNext
+          "
+          @click="
+            changeHistoryPage(
+              historyPagination.page
+              + 1,
+            )
+          "
+        >
+          Suivant
+        </button>
       </div>
     </section>
   </section>
