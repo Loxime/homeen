@@ -2180,3 +2180,77 @@ button:not(:disabled):hover {
     flex-direction: column;
   }
 }
+
+
+/* === Statistics Chart.js comparison === */
+
+.stats-page .stats-split {
+  grid-template-columns: 1fr;
+}
+
+.comparison-chart-panel {
+  min-width: 0;
+}
+
+.comparison-chart-wrap {
+  position: relative;
+  height: 340px;
+  min-height: 260px;
+  margin-top: 14px;
+}
+
+.comparison-chart-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.comparison-summary {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns:
+    repeat(
+      4,
+      minmax(0, 1fr)
+    );
+  gap: 8px;
+}
+
+.comparison-summary > div {
+  min-width: 0;
+  padding: 10px 12px;
+  display: grid;
+  gap: 3px;
+  border-radius: 12px;
+  background: var(--g-surface-alt);
+}
+
+.comparison-summary span {
+  color: var(--g-muted);
+  font-size: .72rem;
+}
+
+.comparison-summary strong {
+  overflow-wrap: anywhere;
+  color: var(--g-text);
+  font-size: .88rem;
+}
+
+@media (max-width: 820px) {
+  .comparison-summary {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+}
+
+@media (max-width: 520px) {
+  .comparison-chart-wrap {
+    height: 280px;
+  }
+
+  .comparison-summary {
+    grid-template-columns: 1fr;
+  }
+}

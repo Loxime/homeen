@@ -190,6 +190,12 @@ final readonly class StatisticsRepository
                     $end,
                 ),
 
+            'comparisonDays' =>
+                $this->daily(
+                    $compareStart,
+                    $compareEnd,
+                ),
+
             'mostCompletedTag' =>
                 $this->mostCompletedTag(
                     $start,

@@ -257,6 +257,13 @@ SQL,
             $response['days'],
         );
 
+        self::assertCount(
+            3,
+            $response[
+                'comparisonDays'
+            ],
+        );
+
         self::assertSame(
             '2026-09-01',
             $response['days'][0]['date'],

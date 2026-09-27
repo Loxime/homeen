@@ -192,6 +192,7 @@ export interface StatisticsResponse {
   comparison: StatisticSummary
   changes: Record<string, number | null>
   days: DailyStatistic[]
+  comparisonDays: DailyStatistic[]
   mostCompletedTag: {
     tagName: string
     count: number

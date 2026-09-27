@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import {
   computed,
+  nextTick,
+  onBeforeUnmount,
   onMounted,
   ref,
 } from 'vue'
+
+import Chart from 'chart.js/auto'
 
 import { api } from '../services/api'
 
@@ -106,6 +110,14 @@ const data =
 const loading = ref(false)
 const error = ref('')
 
+const comparisonCanvas =
+  ref<HTMLCanvasElement | null>(
+    null,
+  )
+
+let comparisonChart:
+  Chart | null = null
+
 const series =
   computed(
     () =>
@@ -138,6 +150,182 @@ const seriesGranularity =
         ? 'mensuelle'
         : 'quotidienne',
   )
+
+const comparisonSeries =
+  computed(
+    () =>
+      data.value
+        ? buildStatisticsSeries(
+            data.value.comparisonDays,
+          )
+        : [],
+  )
+
+function renderComparisonChart():
+void {
+  comparisonChart?.destroy()
+  comparisonChart = null
+
+  if (
+    !comparisonCanvas.value
+    || !data.value
+  ) {
+    return
+  }
+
+  const current =
+    series.value
+
+  const comparison =
+    comparisonSeries.value
+
+  const pointCount =
+    Math.max(
+      current.length,
+      comparison.length,
+    )
+
+  comparisonChart =
+    new Chart(
+      comparisonCanvas.value,
+      {
+        type: 'line',
+
+        data: {
+          labels:
+            Array.from(
+              {
+                length: pointCount,
+              },
+              (_, index) =>
+                `${index + 1}`,
+            ),
+
+          datasets: [
+            {
+              label: 'Période A',
+
+              data:
+                current.map(
+                  point =>
+                    Math.round(
+                      point.focusSeconds
+                      / 60,
+                    ),
+                ),
+
+              borderWidth: 2,
+              tension: 0.28,
+              pointRadius: 2,
+              pointHoverRadius: 5,
+            },
+
+            {
+              label: 'Période B',
+
+              data:
+                comparison.map(
+                  point =>
+                    Math.round(
+                      point.focusSeconds
+                      / 60,
+                    ),
+                ),
+
+              borderWidth: 2,
+              tension: 0.28,
+              pointRadius: 2,
+              pointHoverRadius: 5,
+            },
+          ],
+        },
+
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+
+          interaction: {
+            intersect: false,
+            mode: 'index',
+          },
+
+          plugins: {
+            legend: {
+              position: 'bottom',
+            },
+
+            tooltip: {
+              callbacks: {
+                title: items => {
+                  const index =
+                    items[0]?.dataIndex
+                    ?? 0
+
+                  const currentPoint =
+                    current[index]
+
+                  const comparisonPoint =
+                    comparison[index]
+
+                  return [
+                    currentPoint
+                      ? `A · ${currentPoint.label}`
+                      : null,
+
+                    comparisonPoint
+                      ? `B · ${comparisonPoint.label}`
+                      : null,
+                  ].filter(
+                    (
+                      value,
+                    ): value is string =>
+                      value !== null,
+                  )
+                },
+
+                label: context =>
+                  `${
+                    context.dataset.label
+                    ?? ''
+                  } : ${
+                    context.parsed.y
+                    ?? 0
+                  } min`,
+              },
+            },
+          },
+
+          scales: {
+            x: {
+              title: {
+                display: true,
+
+                text:
+                  seriesGranularity.value
+                  === 'mensuelle'
+                    ? 'Mois relatifs'
+                    : 'Jours relatifs',
+              },
+
+              grid: {
+                display: false,
+              },
+            },
+
+            y: {
+              beginAtZero: true,
+
+              title: {
+                display: true,
+                text:
+                  'Concentration (minutes)',
+              },
+            },
+          },
+        },
+      },
+    )
+}
 
 async function load():
 Promise<void> {
@@ -175,6 +363,9 @@ Promise<void> {
       await api<StatisticsResponse>(
         `/api/statistics?${params}`,
       )
+
+    await nextTick()
+    renderComparisonChart()
   } catch (exception) {
     error.value =
       exception instanceof Error
@@ -290,6 +481,11 @@ function readableRange(
 onMounted(
   () => void load(),
 )
+
+onBeforeUnmount(() => {
+  comparisonChart?.destroy()
+  comparisonChart = null
+})
 </script>
 
 <template>
@@ -700,71 +896,95 @@ onMounted(
           </div>
         </section>
 
-        <section class="panel insight-panel">
-          <h2>
-            Comparaison
-          </h2>
+        <section
+          class="
+            panel
+            insight-panel
+            comparison-chart-panel
+          "
+        >
+          <div class="panel-heading">
+            <div>
+              <h2>
+                Comparaison
+              </h2>
 
-          <div class="insight-row">
-            <span>
-              Concentration A
-            </span>
+              <p class="muted">
+                Concentration de la période A
+                face à la période B.
+              </p>
+            </div>
+          </div>
 
-            <strong>
-              {{
-                formatDuration(
+          <div class="comparison-chart-wrap">
+            <canvas
+              ref="comparisonCanvas"
+              aria-label="Comparaison des périodes A et B"
+            />
+          </div>
+
+          <div class="comparison-summary">
+            <div>
+              <span>
+                Concentration A
+              </span>
+
+              <strong>
+                {{
+                  formatDuration(
+                    data.summary
+                      .focusSeconds,
+                  )
+                }}
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Concentration B
+              </span>
+
+              <strong>
+                {{
+                  formatDuration(
+                    data.comparison
+                      .focusSeconds,
+                  )
+                }}
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Tâches A / B
+              </span>
+
+              <strong>
+                {{
                   data.summary
-                    .focusSeconds,
-                )
-              }}
-            </strong>
-          </div>
-
-          <div class="insight-row">
-            <span>
-              Concentration B
-            </span>
-
-            <strong>
-              {{
-                formatDuration(
+                    .tasksCompleted
+                }}
+                /
+                {{
                   data.comparison
-                    .focusSeconds,
-                )
-              }}
-            </strong>
-          </div>
+                    .tasksCompleted
+                }}
+              </strong>
+            </div>
 
-          <div class="insight-row">
-            <span>
-              Tâches A / B
-            </span>
+            <div>
+              <span>
+                Tag le plus terminé
+              </span>
 
-            <strong>
-              {{
-                data.summary
-                  .tasksCompleted
-              }}
-              /
-              {{
-                data.comparison
-                  .tasksCompleted
-              }}
-            </strong>
-          </div>
-
-          <div class="insight-row">
-            <span>
-              Tag le plus terminé
-            </span>
-
-            <strong>
-              {{
-                data.mostCompletedTag
-                  ? `${data.mostCompletedTag.tagName} (${data.mostCompletedTag.count})`
-                  : '—'
-              }}
-            </strong>
+              <strong>
+                {{
+                  data.mostCompletedTag
+                    ? `${data.mostCompletedTag.tagName} (${data.mostCompletedTag.count})`
+                    : '—'
+                }}
+              </strong>
+            </div>
           </div>
         </section>
       </div>
