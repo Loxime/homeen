@@ -88,6 +88,38 @@ const noteColors = [
 const selectedNoteTagIds =
   ref<number[]>([])
 
+const noteTagQuery =
+  ref('')
+
+const selectedNoteTags =
+  computed(
+    () =>
+      props.tags.filter(
+        tag =>
+          selectedNoteTagIds.value
+            .includes(tag.id),
+      ),
+  )
+
+const filteredNoteTags =
+  computed(() => {
+    const query =
+      noteTagQuery.value
+        .trim()
+        .toLocaleLowerCase()
+
+    if (!query) {
+      return props.tags
+    }
+
+    return props.tags.filter(
+      tag =>
+        tag.name
+          .toLocaleLowerCase()
+          .includes(query),
+    )
+  })
+
 const projectId =
   ref<number | null>(null)
 
@@ -177,6 +209,8 @@ watch(
       value?.tags.map(
         tag => tag.id,
       ) ?? []
+
+    noteTagQuery.value = ''
 
     projectId.value =
       value?.projectId
@@ -287,21 +321,18 @@ function isNoteTagged(
 
 function toggleNoteTag(
   tagId: number,
-  event: Event,
 ): void {
-  const input =
-    event.target as HTMLInputElement
-
   selectedNoteTagIds.value =
-    input.checked
-      ? Array.from(
+    isNoteTagged(tagId)
+      ? selectedNoteTagIds.value
+          .filter(
+            id => id !== tagId,
+          )
+      : Array.from(
           new Set([
             ...selectedNoteTagIds.value,
             tagId,
           ]),
-        )
-      : selectedNoteTagIds.value.filter(
-          id => id !== tagId,
         )
 }
 
@@ -736,53 +767,153 @@ async function restore(): Promise<void> {
             </span>
 
             <div
-              v-if="tags.length > 0"
-              class="note-tag-picker"
+              v-if="
+                selectedNoteTags.length > 0
+              "
+              class="note-selected-tags"
             >
-              <label
-                v-for="tag in tags"
+              <span
+                v-for="tag in selectedNoteTags"
                 :key="tag.id"
-                class="task-tag-option"
-                :class="{
-                  active:
-                    isNoteTagged(tag.id),
+                class="label-chip note-selected-tag"
+                :style="{
+                  '--label':
+                    tag.color,
                 }"
               >
-                <input
-                  type="checkbox"
-                  :checked="
-                    isNoteTagged(
-                      tag.id,
-                    )
+                {{ tag.name }}
+
+                <button
+                  type="button"
+                  class="note-selected-tag-remove"
+                  :aria-label="
+                    `Retirer le tag ${tag.name}`
                   "
-                  @change="
+                  @click="
                     toggleNoteTag(
                       tag.id,
-                      $event,
                     )
                   "
-                />
+                >
+                  ×
+                </button>
+              </span>
+            </div>
 
-                <span
-                  class="task-tag-dot"
-                  :style="{
-                    background:
-                      tag.color,
-                  }"
+            <details
+              v-if="tags.length > 0"
+              class="note-tag-selector"
+            >
+              <summary
+                class="note-tag-trigger"
+              >
+                <AppIcon
+                  name="tag"
+                  :size="16"
                 />
 
                 <span>
-                  {{ tag.name }}
+                  {{
+                    selectedNoteTags.length > 0
+                      ? `${selectedNoteTags.length} tag${selectedNoteTags.length > 1 ? 's' : ''} sélectionné${selectedNoteTags.length > 1 ? 's' : ''}`
+                      : 'Sélectionner des tags'
+                  }}
                 </span>
-              </label>
-            </div>
+              </summary>
 
-            <span
+              <div
+                class="note-tag-popover"
+                @click.stop
+              >
+                <input
+                  v-model="noteTagQuery"
+                  class="note-tag-search"
+                  type="search"
+                  placeholder="Rechercher un tag…"
+                  aria-label="Rechercher un tag"
+                  autocomplete="off"
+                />
+
+                <div
+                  v-if="
+                    filteredNoteTags.length > 0
+                  "
+                  class="note-tag-options"
+                >
+                  <label
+                    v-for="tag in filteredNoteTags"
+                    :key="tag.id"
+                    class="note-tag-option"
+                    :class="{
+                      active:
+                        isNoteTagged(
+                          tag.id,
+                        ),
+                    }"
+                  >
+                    <input
+                      type="checkbox"
+                      :checked="
+                        isNoteTagged(
+                          tag.id,
+                        )
+                      "
+                      @change="
+                        toggleNoteTag(
+                          tag.id,
+                        )
+                      "
+                    />
+
+                    <span
+                      class="note-tag-option-dot"
+                      :style="{
+                        background:
+                          tag.color,
+                      }"
+                    />
+
+                    <span
+                      class="note-tag-option-name"
+                    >
+                      {{ tag.name }}
+                    </span>
+
+                    <AppIcon
+                      v-if="
+                        isNoteTagged(
+                          tag.id,
+                        )
+                      "
+                      name="check"
+                      :size="15"
+                    />
+                  </label>
+                </div>
+
+                <div
+                  v-else
+                  class="note-tag-search-empty"
+                >
+                  Aucun tag correspondant.
+                </div>
+
+                <RouterLink
+                  class="note-tag-manage-link"
+                  to="/tags"
+                >
+                  Gérer les tags
+                </RouterLink>
+              </div>
+            </details>
+
+            <RouterLink
               v-else
-              class="muted"
+              class="note-tag-empty-link"
+              to="/tags"
             >
-              Aucun tag disponible.
-            </span>
+              Créer un premier tag
+            </RouterLink>
           </div>
         </div>
 
