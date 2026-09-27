@@ -72,6 +72,63 @@ const phaseLabel =
         : 'Travail',
   )
 
+const phaseDurationSeconds =
+  computed(() => {
+    if (
+      !store.active
+      || !store.live
+    ) {
+      return 1
+    }
+
+    return store.live.phase === 'break'
+      ? 5 * 60
+      : store.active.workMinutes * 60
+  })
+
+const phaseProgress =
+  computed(() => {
+    if (!store.live) {
+      return 0
+    }
+
+    const total =
+      phaseDurationSeconds.value
+
+    const remaining =
+      Math.min(
+        total,
+        Math.max(
+          0,
+          store.live.remainingSeconds,
+        ),
+      )
+
+    return Math.min(
+      100,
+      Math.max(
+        0,
+        Math.round(
+          (
+            (
+              total
+              - remaining
+            )
+            / total
+          )
+          * 100,
+        ),
+      ),
+    )
+  })
+
+const phaseProgressDegrees =
+  computed(
+    () =>
+      phaseProgress.value
+      * 3.6,
+  )
+
 const ratingsNeeded =
   computed(
     () =>
@@ -357,92 +414,6 @@ onMounted(async () => {
     </p>
 
     <section
-      v-if="insights"
-      class="focus-garden panel"
-    >
-      <div class="ideal-duration">
-        <div>
-          <span class="focus-garden-kicker">
-            Concentration cumulée
-          </span>
-
-          <strong>
-            {{
-              formatDuration(
-                insights.totalFocusSeconds,
-              )
-            }}
-          </strong>
-
-          <p class="muted">
-            Temps total enregistré dans
-            vos sessions Pomodoro.
-          </p>
-        </div>
-      </div>
-
-      <div class="ideal-duration">
-        <div>
-          <span class="focus-garden-kicker">
-            Durée idéale estimée
-          </span>
-
-          <strong
-            v-if="
-              insights.recommendedMinutes
-              !== null
-            "
-          >
-            {{
-              insights.recommendedMinutes
-            }}
-            min
-          </strong>
-
-          <strong v-else>
-            En apprentissage
-          </strong>
-
-          <p class="muted">
-            <template
-              v-if="
-                insights.recommendedMinutes
-                !== null
-              "
-            >
-              Calculée à partir de vos
-              derniers ressentis.
-            </template>
-
-            <template v-else>
-              Notez encore
-              {{ ratingsNeeded }}
-              session{{
-                ratingsNeeded > 1
-                  ? 's'
-                  : ''
-              }}
-              pour obtenir une recommandation.
-            </template>
-          </p>
-        </div>
-
-        <button
-          v-if="
-            insights.recommendedMinutes
-            !== null
-            && !store.active
-          "
-          class="ui-button ui-button--secondary"
-          type="button"
-          @click="useRecommendation"
-        >
-          Utiliser cette durée
-        </button>
-      </div>
-    </section>
-
-    <section
       v-if="completedSession"
       class="session-feedback panel"
     >
@@ -502,48 +473,97 @@ onMounted(async () => {
         store.active
         && store.live
       "
-      class="focus-stage"
+      class="
+        focus-stage
+        focus-stage-refresh
+      "
       :class="
         store.live.phase
       "
     >
-      <div class="focus-status">
-        <span
-          class="pulse-dot active"
-        />
+      <div class="focus-stage-main">
+        <div
+          class="focus-timer-ring"
+          :style="{
+            '--focus-progress':
+              `${phaseProgressDegrees}deg`,
+          }"
+        >
+          <div class="focus-timer-core">
+            <span class="focus-timer-phase">
+              {{ phaseLabel }}
+            </span>
 
-        {{ phaseLabel }}
+            <strong class="focus-clock">
+              {{
+                formatClock(
+                  store.live
+                    .remainingSeconds,
+                )
+              }}
+            </strong>
+
+            <small>
+              {{ phaseProgress }} %
+              du bloc
+            </small>
+          </div>
+        </div>
+
+        <div class="focus-stage-copy">
+          <div class="focus-status">
+            <span
+              class="pulse-dot active"
+            />
+
+            {{ phaseLabel }}
+          </div>
+
+          <h2>
+            Une seule chose à la fois.
+          </h2>
+
+          <p>
+            {{
+              store.active.workMinutes
+            }}
+            min de travail ·
+            5 min de pause
+          </p>
+
+          <button
+            class="stop-button"
+            :disabled="stopping"
+            @click="end"
+          >
+            {{
+              stopping
+                ? 'Arrêt…'
+                : 'Arrêter la session'
+            }}
+          </button>
+        </div>
       </div>
-
-      <div class="focus-clock">
-        {{
-          formatClock(
-            store.live
-              .remainingSeconds,
-          )
-        }}
-      </div>
-
-      <p>
-        {{ store.active.workMinutes }}
-        min de travail · 5 min de pause
-      </p>
 
       <div class="focus-metrics">
         <div>
+          <span>
+            Cycles terminés
+          </span>
+
           <strong>
             {{
               store.live
                 .completedWorkCycles
             }}
           </strong>
-
-          <span>
-            cycles terminés
-          </span>
         </div>
 
         <div>
+          <span>
+            Concentration
+          </span>
+
           <strong>
             {{
               formatDuration(
@@ -552,13 +572,13 @@ onMounted(async () => {
               )
             }}
           </strong>
-
-          <span>
-            concentration
-          </span>
         </div>
 
         <div>
+          <span>
+            Pause
+          </span>
+
           <strong>
             {{
               formatDuration(
@@ -567,40 +587,68 @@ onMounted(async () => {
               )
             }}
           </strong>
-
-          <span>
-            pause
-          </span>
         </div>
       </div>
-
-      <button
-        class="stop-button"
-        :disabled="stopping"
-        @click="end"
-      >
-        {{
-          stopping
-            ? 'Arrêt…'
-            : 'Arrêter la session'
-        }}
-      </button>
     </div>
 
     <div
       v-else
-      class="pomodoro-start-grid"
+      class="
+        pomodoro-start-grid
+        pomodoro-start-grid-refresh
+      "
     >
-      <section class="panel session-builder">
+      <section
+        class="
+          panel
+          session-builder
+          pomodoro-launch-card
+        "
+      >
+        <span class="pomodoro-kicker">
+          Nouvelle session
+        </span>
         <h2>
           Durée de travail
         </h2>
 
         <p class="muted">
-          Minimum 5 minutes.
-          Ajustez la durée ou utilisez
-          la recommandation calculée.
+          Choisissez votre durée,
+          lancez le minuteur et restez
+          sur un seul objectif.
         </p>
+
+        <div
+          v-if="
+            insights?.recommendedMinutes
+          "
+          class="pomodoro-recommendation"
+        >
+          <div>
+            <span>
+              Durée suggérée
+            </span>
+
+            <strong>
+              {{
+                insights.recommendedMinutes
+              }}
+              min
+            </strong>
+          </div>
+
+          <button
+            type="button"
+            class="
+              ui-button
+              ui-button--secondary
+              ui-button--compact
+            "
+            @click="useRecommendation"
+          >
+            Utiliser
+          </button>
+        </div>
 
         <form
           @submit.prevent="begin()"
@@ -634,7 +682,16 @@ onMounted(async () => {
         </form>
       </section>
 
-      <section class="panel presets-panel">
+      <section
+        class="
+          panel
+          presets-panel
+          pomodoro-presets-card
+        "
+      >
+        <span class="pomodoro-kicker">
+          Raccourcis
+        </span>
         <h2>
           Durées récentes
         </h2>
@@ -855,6 +912,162 @@ onMounted(async () => {
         >
           Suivant
         </button>
+      </div>
+    </section>
+
+    <section
+      v-if="insights"
+      class="focus-insights"
+    >
+      <header class="focus-insights-heading">
+        <div>
+          <span class="pomodoro-kicker">
+            Concentration
+          </span>
+
+          <h2>
+            Vos repères
+          </h2>
+
+          <p class="muted">
+            Votre progression et la durée
+            qui semble vous convenir.
+          </p>
+        </div>
+      </header>
+
+      <div class="focus-insight-grid">
+        <article
+          class="
+            panel
+            focus-insight-card
+          "
+        >
+          <span class="focus-insight-label">
+            Concentration cumulée
+          </span>
+
+          <strong>
+            {{
+              formatDuration(
+                insights.totalFocusSeconds,
+              )
+            }}
+          </strong>
+
+          <p class="muted">
+            Temps total enregistré
+            dans vos sessions.
+          </p>
+        </article>
+
+        <article
+          class="
+            panel
+            focus-insight-card
+          "
+        >
+          <span class="focus-insight-label">
+            Durée idéale estimée
+          </span>
+
+          <strong
+            v-if="
+              insights.recommendedMinutes
+              !== null
+            "
+          >
+            {{
+              insights.recommendedMinutes
+            }}
+            min
+          </strong>
+
+          <strong v-else>
+            En apprentissage
+          </strong>
+
+          <p class="muted">
+            <template
+              v-if="
+                insights.recommendedMinutes
+                !== null
+              "
+            >
+              Calculée à partir de vos
+              derniers ressentis.
+            </template>
+
+            <template v-else>
+              Encore
+              {{ ratingsNeeded }}
+              session{{
+                ratingsNeeded > 1
+                  ? 's'
+                  : ''
+              }}
+              à noter.
+            </template>
+          </p>
+
+          <button
+            v-if="
+              insights.recommendedMinutes
+              !== null
+              && !store.active
+            "
+            type="button"
+            class="
+              ui-button
+              ui-button--secondary
+              ui-button--compact
+              focus-insight-action
+            "
+            @click="useRecommendation"
+          >
+            Utiliser cette durée
+          </button>
+        </article>
+
+        <article
+          class="
+            panel
+            focus-insight-card
+          "
+        >
+          <span class="focus-insight-label">
+            Progression
+          </span>
+
+          <strong>
+            {{ insights.stageLabel }}
+          </strong>
+
+          <div
+            class="focus-insight-progress"
+            role="progressbar"
+            aria-label="Progression de concentration"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-valuenow="
+              insights.progressPercent
+            "
+          >
+            <span
+              :style="{
+                width:
+                  `${insights.progressPercent}%`,
+              }"
+            />
+          </div>
+
+          <p class="muted">
+            {{
+              insights.progressPercent
+            }}
+            % vers le prochain palier.
+          </p>
+        </article>
       </div>
     </section>
   </section>
