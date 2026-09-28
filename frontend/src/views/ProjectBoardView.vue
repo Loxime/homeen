@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import {
+  watchErrorToast,
+} from '../composables/useErrorToast'
+
+import {
   computed,
   onMounted,
   ref,
@@ -33,6 +37,8 @@ const tasks =
 
 const loading = ref(true)
 const error = ref('')
+
+watchErrorToast(error)
 
 const taskContents =
   ref<Record<number, string>>({})

@@ -1,3 +1,7 @@
+import {
+  useToast,
+} from '../composables/useToast'
+
 let csrfToken: string | null = null
 
 export class ApiError extends Error {
@@ -66,14 +70,30 @@ export async function api<T>(
     )
   }
 
-  const response = await fetch(
-    path,
-    {
-      ...init,
-      headers,
-      credentials: 'same-origin',
-    },
-  )
+  let response: Response
+
+  try {
+    response =
+      await fetch(
+        path,
+        {
+          ...init,
+          headers,
+          credentials: 'same-origin',
+        },
+      )
+  } catch {
+    const message =
+      'Impossible de contacter le serveur.'
+
+    useToast().error(
+      message,
+    )
+
+    throw new Error(
+      message,
+    )
+  }
 
   if (response.status === 204) {
     return undefined as T
@@ -99,12 +119,19 @@ export async function api<T>(
       )
     }
 
-    throw new ApiError(
-      data.error
-        ?? `Request failed with HTTP ${response.status}.`,
-      response.status,
-      data.code ?? null,
+    const error =
+      new ApiError(
+        data.error
+          ?? `Request failed with HTTP ${response.status}.`,
+        response.status,
+        data.code ?? null,
+      )
+
+    useToast().error(
+      error.message,
     )
+
+    throw error
   }
 
   return data

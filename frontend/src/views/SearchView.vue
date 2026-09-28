@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import {
+  watchErrorToast,
+} from '../composables/useErrorToast'
+
+import {
   computed,
   ref,
   watch,
@@ -77,6 +81,8 @@ const selectedNote =
 const modalOpen = ref(false)
 const loading = ref(false)
 const error = ref('')
+
+watchErrorToast(error)
 
 const query = computed(
   () =>

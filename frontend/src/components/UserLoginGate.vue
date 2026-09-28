@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import {
+  watchErrorToast,
+} from '../composables/useErrorToast'
+
 import { ref } from 'vue'
 import { useAccess } from '../composables/useAccess'
 
@@ -7,6 +11,8 @@ const { loginUser } = useAccess()
 const email = ref('')
 const password = ref('')
 const error = ref('')
+
+watchErrorToast(error)
 const submitting = ref(false)
 
 async function submit(): Promise<void> {

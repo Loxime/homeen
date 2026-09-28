@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import {
+  watchErrorToast,
+} from '../composables/useErrorToast'
+
 import { computed, ref } from 'vue'
 import { useAccess } from '../composables/useAccess'
 
@@ -10,6 +14,8 @@ const {
 const password = ref('')
 const confirmation = ref('')
 const error = ref('')
+
+watchErrorToast(error)
 const submitting = ref(false)
 
 const passwordsMatch = computed(

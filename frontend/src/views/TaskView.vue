@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import {
+  watchErrorToast,
+} from '../composables/useErrorToast'
+
+import {
   computed,
   onMounted,
   ref,
@@ -78,6 +82,8 @@ const loading = ref(true)
 const saving = ref(false)
 const deleting = ref(false)
 const error = ref('')
+
+watchErrorToast(error)
 
 const taskId = computed(
   () => Number(route.params.id),

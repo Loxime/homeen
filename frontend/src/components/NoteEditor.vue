@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import {
+  watchErrorToast,
+} from '../composables/useErrorToast'
+
+import {
   computed,
   ref,
   watch,
@@ -126,6 +130,8 @@ const projectId =
 const taskText = ref('')
 const saving = ref(false)
 const error = ref('')
+
+watchErrorToast(error)
 const localNote = ref<Note | null>(null)
 
 const projectName =

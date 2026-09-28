@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import {
+  watchErrorToast,
+} from '../composables/useErrorToast'
+
 import { onMounted, ref } from 'vue'
 import { api } from '../services/api'
 import { useAccess } from '../composables/useAccess'
@@ -40,6 +44,8 @@ const {
 const profile = ref<Profile | null>(null)
 const loading = ref(true)
 const error = ref('')
+
+watchErrorToast(error)
 const success = ref('')
 
 const deletePassword = ref('')

@@ -39,6 +39,16 @@ function show(
   kind: ToastKind = 'info',
   duration = 2800,
 ): void {
+  if (
+    toast.value.visible
+    && toast.value.message
+      === message
+    && toast.value.kind
+      === kind
+  ) {
+    return
+  }
+
   if (timer !== null) {
     clearTimeout(timer)
   }

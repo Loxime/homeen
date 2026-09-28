@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import {
+  watchErrorToast,
+} from '../composables/useErrorToast'
+
+import {
   onMounted,
   ref,
 } from 'vue'
@@ -78,6 +82,8 @@ const memberActionBusy =
 
 const loading = ref(true)
 const error = ref('')
+
+watchErrorToast(error)
 
 const creating = ref(false)
 

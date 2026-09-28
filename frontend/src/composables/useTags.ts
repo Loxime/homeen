@@ -1,4 +1,8 @@
 import {
+  watchErrorToast,
+} from './useErrorToast'
+
+import {
   ref,
 } from 'vue'
 
@@ -21,6 +25,8 @@ const loaded =
 
 const error =
   ref('')
+
+watchErrorToast(error)
 
 let loadingPromise:
   Promise<void>

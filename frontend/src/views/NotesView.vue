@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import {
+  watchErrorToast,
+} from '../composables/useErrorToast'
+
+import {
   computed,
   nextTick,
   onMounted,
@@ -60,6 +64,8 @@ const projects =
 
 const loading = ref(true)
 const error = ref('')
+
+watchErrorToast(error)
 
 const quickComposerOpen =
   ref(false)

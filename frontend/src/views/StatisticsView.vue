@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import {
+  watchErrorToast,
+} from '../composables/useErrorToast'
+
+import {
   computed,
   nextTick,
   onBeforeUnmount,
@@ -118,6 +122,8 @@ const data =
 
 const loading = ref(false)
 const error = ref('')
+
+watchErrorToast(error)
 
 const comparisonCanvas =
   ref<HTMLCanvasElement | null>(
