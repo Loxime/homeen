@@ -55,6 +55,12 @@ const dragOverStageId =
 const dragOverTaskId =
   ref<number | null>(null)
 
+const draggedStageId =
+  ref<number | null>(null)
+
+const dragOverStageOrderId =
+  ref<number | null>(null)
+
 const stageName = ref('')
 const creatingStage = ref(false)
 
@@ -443,6 +449,9 @@ function startTaskDrag(
   task: ProjectTask,
   event: DragEvent,
 ): void {
+  draggedStageId.value = null
+  dragOverStageOrderId.value = null
+
   draggedTaskId.value =
     task.id
 
@@ -467,6 +476,13 @@ function markTaskDropTarget(
   stageId: number,
   taskId: number | null,
 ): void {
+  if (
+    draggedStageId.value
+    !== null
+  ) {
+    return
+  }
+
   dragOverStageId.value =
     stageId
 
@@ -593,6 +609,190 @@ async function dropTask(
   } finally {
     busyTaskId.value = null
     endTaskDrag()
+  }
+}
+
+function startStageDrag(
+  stage: ProjectWorkflowStage,
+  event: DragEvent,
+): void {
+  if (
+    !canManageWorkflow.value
+    || busyStageId.value
+      !== null
+  ) {
+    event.preventDefault()
+    return
+  }
+
+  draggedTaskId.value = null
+  dragOverStageId.value = null
+  dragOverTaskId.value = null
+
+  draggedStageId.value =
+    stage.id
+
+  dragOverStageOrderId.value =
+    null
+
+  event.dataTransfer?.setData(
+    'text/plain',
+    `stage:${stage.id}`,
+  )
+
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed =
+      'move'
+  }
+}
+
+function markStageDropTarget(
+  stageId: number,
+): void {
+  if (
+    draggedStageId.value
+      === null
+    || draggedStageId.value
+      === stageId
+  ) {
+    return
+  }
+
+  dragOverStageOrderId.value =
+    stageId
+}
+
+function endStageDrag(): void {
+  draggedStageId.value = null
+  dragOverStageOrderId.value = null
+}
+
+async function dropStage(
+  targetStage:
+    ProjectWorkflowStage,
+  event: DragEvent,
+): Promise<void> {
+  const stageId =
+    draggedStageId.value
+
+  if (
+    stageId === null
+    || busyStageId.value
+      !== null
+  ) {
+    return
+  }
+
+  const sourceStage =
+    stages.value.find(
+      stage =>
+        stage.id === stageId,
+    )
+
+  if (
+    sourceStage === undefined
+    || sourceStage.id
+      === targetStage.id
+  ) {
+    endStageDrag()
+    return
+  }
+
+  const element =
+    event.currentTarget as HTMLElement
+
+  const rectangle =
+    element.getBoundingClientRect()
+
+  const placeAfter =
+    event.clientX
+    > rectangle.left
+      + rectangle.width / 2
+
+  const ordered =
+    stages.value.filter(
+      stage =>
+        stage.id !== stageId,
+    )
+
+  const targetIndex =
+    ordered.findIndex(
+      stage =>
+        stage.id
+        === targetStage.id,
+    )
+
+  if (targetIndex < 0) {
+    endStageDrag()
+    return
+  }
+
+  ordered.splice(
+    targetIndex
+      + (
+        placeAfter
+          ? 1
+          : 0
+      ),
+    0,
+    sourceStage,
+  )
+
+  const currentIds =
+    stages.value.map(
+      stage => stage.id,
+    )
+
+  const orderedIds =
+    ordered.map(
+      stage => stage.id,
+    )
+
+  if (
+    currentIds.every(
+      (
+        id,
+        index,
+      ) =>
+        id === orderedIds[index],
+    )
+  ) {
+    endStageDrag()
+    return
+  }
+
+  busyStageId.value =
+    stageId
+
+  error.value = ''
+
+  try {
+    const response =
+      await api<{
+        stages:
+          ProjectWorkflowStage[]
+      }>(
+        `/api/projects/${projectId.value}/workflow/order`,
+        {
+          method: 'PUT',
+
+          body: JSON.stringify({
+            stageIds:
+              orderedIds,
+          }),
+        },
+      )
+
+    stages.value =
+      response.stages
+  } catch (exception) {
+    error.value =
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de déplacer la colonne.'
+  } finally {
+    busyStageId.value = null
+    endStageDrag()
   }
 }
 
@@ -951,6 +1151,23 @@ onMounted(
     </div>
 
     <template v-else-if="project">
+      <nav
+        class="project-breadcrumb"
+        aria-label="Fil d’Ariane"
+      >
+        <RouterLink to="/projects">
+          Projets
+        </RouterLink>
+
+        <span aria-hidden="true">
+          ›
+        </span>
+
+        <strong>
+          {{ project.name }}
+        </strong>
+      </nav>
+
       <header
         class="project-board-header"
         :style="{
@@ -959,13 +1176,6 @@ onMounted(
         }"
       >
         <div class="project-board-main">
-          <RouterLink
-            class="project-back-link"
-            to="/projects"
-          >
-            ← Projets
-          </RouterLink>
-
           <template v-if="!editingProject">
             <div class="project-title-row">
               <span
@@ -1086,7 +1296,10 @@ onMounted(
       </p>
 
       <form
-        v-if="canManageWorkflow"
+        v-if="
+          canManageWorkflow
+          && stages.length < 20
+        "
         class="workflow-create-form"
         @submit.prevent="createStage"
       >
@@ -1115,6 +1328,19 @@ onMounted(
         </small>
       </form>
 
+      <p
+        v-if="
+          canManageWorkflow
+          && stages.length >= 20
+        "
+        class="
+          muted
+          workflow-limit
+        "
+      >
+        Limite de 20 colonnes atteinte.
+      </p>
+
       <div
         v-if="stages.length === 0"
         class="empty-state"
@@ -1133,6 +1359,26 @@ onMounted(
           ) in stages"
           :key="stage.id"
           class="project-column"
+          :class="{
+            'project-column--dragging':
+              draggedStageId
+                === stage.id,
+
+            'project-column--stage-over':
+              dragOverStageOrderId
+                === stage.id,
+          }"
+          @dragover.prevent="
+            markStageDropTarget(
+              stage.id,
+            )
+          "
+          @drop.prevent="
+            dropStage(
+              stage,
+              $event,
+            )
+          "
         >
           <header class="project-column-header">
             <div>
@@ -1160,6 +1406,27 @@ onMounted(
               v-if="canManageWorkflow"
               class="workflow-actions"
             >
+              <button
+                type="button"
+                class="project-column-drag-handle"
+                draggable="true"
+                title="Glisser pour déplacer la colonne"
+                aria-label="Déplacer la colonne par glisser-déposer"
+                :disabled="
+                  busyStageId !== null
+                "
+                @dragstart="
+                  startStageDrag(
+                    stage,
+                    $event,
+                  )
+                "
+                @dragend="
+                  endStageDrag
+                "
+              >
+                ⋮⋮
+              </button>
               <button
                 type="button"
                 title="Déplacer à gauche"
@@ -1226,13 +1493,13 @@ onMounted(
                 && dragOverTaskId
                   === null,
             }"
-            @dragover.prevent="
+            @dragover.self.prevent="
               markTaskDropTarget(
                 stage.id,
                 null,
               )
             "
-            @drop.prevent="
+            @drop.self.prevent="
               dropTask(
                 stage,
                 null,
@@ -1272,13 +1539,13 @@ onMounted(
               @dragend="
                 endTaskDrag
               "
-              @dragover.stop.prevent="
+              @dragover.prevent="
                 markTaskDropTarget(
                   stage.id,
                   task.id,
                 )
               "
-              @drop.stop.prevent="
+              @drop.prevent="
                 dropTask(
                   stage,
                   task,
@@ -1464,6 +1731,34 @@ onMounted(
   gap: 1.25rem;
 }
 
+.project-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color:
+    var(--g-muted);
+  font-size: 0.9rem;
+}
+
+.project-breadcrumb a {
+  color:
+    var(--g-blue-strong);
+  text-decoration: none;
+}
+
+.project-breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.project-breadcrumb strong {
+  min-width: 0;
+  overflow: hidden;
+  color:
+    var(--g-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .project-board-header {
   padding: 1rem;
   display: flex;
@@ -1563,6 +1858,32 @@ onMounted(
   overflow-x: auto;
   align-items: start;
   padding-bottom: 0.75rem;
+}
+
+.project-column--dragging {
+  opacity: 0.55;
+}
+
+.project-column--stage-over {
+  outline:
+    2px dashed
+    var(--g-blue);
+  outline-offset: 3px;
+}
+
+.project-column-drag-handle {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.project-column-drag-handle:active {
+  cursor: grabbing;
+}
+
+.workflow-limit {
+  margin: 0;
+  font-weight: 600;
 }
 
 .project-column {
