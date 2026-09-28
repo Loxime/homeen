@@ -3,19 +3,72 @@ import {
   createWebHistory,
 } from 'vue-router'
 
-import NotesView from '../views/NotesView.vue'
-import NoteView from '../views/NoteView.vue'
-import TagsView from '../views/TagsView.vue'
-import PomodoroView from '../views/PomodoroView.vue'
-import StatisticsView from '../views/StatisticsView.vue'
-import TaskView from '../views/TaskView.vue'
-import SearchView from '../views/SearchView.vue'
-import ProfileView from '../views/ProfileView.vue'
-import ProjectsView from '../views/ProjectsView.vue'
-import ProjectBoardView from '../views/ProjectBoardView.vue'
+const NotesView =
+  () => import(
+    '../views/NotesView.vue'
+  )
+
+const NoteView =
+  () => import(
+    '../views/NoteView.vue'
+  )
+
+const TagsView =
+  () => import(
+    '../views/TagsView.vue'
+  )
+
+const PomodoroView =
+  () => import(
+    '../views/PomodoroView.vue'
+  )
+
+const StatisticsView =
+  () => import(
+    '../views/StatisticsView.vue'
+  )
+
+const TaskView =
+  () => import(
+    '../views/TaskView.vue'
+  )
+
+const SearchView =
+  () => import(
+    '../views/SearchView.vue'
+  )
+
+const ProfileView =
+  () => import(
+    '../views/ProfileView.vue'
+  )
+
+const ProjectsView =
+  () => import(
+    '../views/ProjectsView.vue'
+  )
+
+const ProjectBoardView =
+  () => import(
+    '../views/ProjectBoardView.vue'
+  )
 
 export const router = createRouter({
   history: createWebHistory(),
+
+  scrollBehavior(
+    _to,
+    _from,
+    savedPosition,
+  ) {
+    if (savedPosition) {
+      return savedPosition
+    }
+
+    return {
+      top: 0,
+    }
+  },
 
   routes: [
     {
