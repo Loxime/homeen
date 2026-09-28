@@ -11,6 +11,7 @@ export class ApiError extends Error {
     public readonly code: string | null = null,
   ) {
     super(message)
+    this.name = 'ApiError'
   }
 }
 
@@ -24,6 +25,49 @@ export function getCsrfToken(): string | null {
   return csrfToken
 }
 
+function showAndThrow(
+  error: ApiError,
+): never {
+  useToast().error(
+    error.message,
+  )
+
+  throw error
+}
+
+function errorPayload(
+  value: unknown,
+): {
+  error?: string
+  code?: string
+} {
+  if (
+    value === null
+    || typeof value !== 'object'
+    || Array.isArray(value)
+  ) {
+    return {}
+  }
+
+  const record =
+    value as Record<
+      string,
+      unknown
+    >
+
+  return {
+    error:
+      typeof record.error === 'string'
+        ? record.error
+        : undefined,
+
+    code:
+      typeof record.code === 'string'
+        ? record.code
+        : undefined,
+  }
+}
+
 export async function api<T>(
   path: string,
   init: RequestInit = {},
@@ -32,9 +76,10 @@ export async function api<T>(
     init.method ?? 'GET'
   ).toUpperCase()
 
-  const headers = new Headers(
-    init.headers,
-  )
+  const headers =
+    new Headers(
+      init.headers,
+    )
 
   headers.set(
     'Accept',
@@ -83,15 +128,12 @@ export async function api<T>(
         },
       )
   } catch {
-    const message =
-      'Impossible de contacter le serveur.'
-
-    useToast().error(
-      message,
-    )
-
-    throw new Error(
-      message,
+    return showAndThrow(
+      new ApiError(
+        'Impossible de contacter le serveur.',
+        0,
+        'NETWORK_ERROR',
+      ),
     )
   }
 
@@ -99,18 +141,35 @@ export async function api<T>(
     return undefined as T
   }
 
-  const data = (
-    await response
-      .json()
-      .catch(() => ({}))
-  ) as {
-    error?: string
-    code?: string
-  } & T
+  let data: unknown
+
+  try {
+    data =
+      await response.json()
+  } catch {
+    if (response.ok) {
+      return showAndThrow(
+        new ApiError(
+          'Le serveur a renvoyé une réponse invalide.',
+          response.status,
+          'INVALID_API_RESPONSE',
+        ),
+      )
+    }
+
+    data = {}
+  }
 
   if (!response.ok) {
+    const payload =
+      errorPayload(
+        data,
+      )
+
     if (
-      data.code === 'USER_AUTH_REQUIRED'
+      payload.code
+      === 'USER_AUTH_REQUIRED'
+      && typeof window !== 'undefined'
     ) {
       window.dispatchEvent(
         new CustomEvent(
@@ -119,20 +178,15 @@ export async function api<T>(
       )
     }
 
-    const error =
+    return showAndThrow(
       new ApiError(
-        data.error
+        payload.error
           ?? `Request failed with HTTP ${response.status}.`,
         response.status,
-        data.code ?? null,
-      )
-
-    useToast().error(
-      error.message,
+        payload.code ?? null,
+      ),
     )
-
-    throw error
   }
 
-  return data
+  return data as T
 }

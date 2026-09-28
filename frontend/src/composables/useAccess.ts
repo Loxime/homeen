@@ -1,10 +1,6 @@
 import { reactive } from 'vue'
 
 import {
-  useToast,
-} from './useToast'
-
-import {
   api,
   getCsrfToken,
   setCsrfToken,
@@ -120,10 +116,6 @@ export function useAccess() {
         error instanceof Error
           ? error.message
           : 'Impossible de vérifier la session.'
-
-      useToast().error(
-        state.error,
-      )
 
       resetUser()
       initialized = false
