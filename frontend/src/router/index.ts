@@ -4,6 +4,7 @@ import {
 } from 'vue-router'
 
 import NotesView from '../views/NotesView.vue'
+import NoteView from '../views/NoteView.vue'
 import TagsView from '../views/TagsView.vue'
 import PomodoroView from '../views/PomodoroView.vue'
 import StatisticsView from '../views/StatisticsView.vue'
@@ -28,6 +29,11 @@ export const router = createRouter({
       props: {
         scope: 'active',
       },
+    },
+
+    {
+      path: '/notes/:id(\\d+)',
+      component: NoteView,
     },
 
     {

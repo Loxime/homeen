@@ -7,7 +7,10 @@ import {
   watch,
 } from 'vue'
 
-import { useRoute } from 'vue-router'
+import {
+  useRoute,
+  useRouter,
+} from 'vue-router'
 
 import {
   isPinnedNoteLimitError,
@@ -16,14 +19,9 @@ import {
 
 import BaseModal from '../components/BaseModal.vue'
 import AppIcon from '../components/AppIcon.vue'
-import NoteEditor from '../components/NoteEditor.vue'
 
 import { api } from '../services/api'
 import { formatDate } from '../services/format'
-
-import {
-  useTags,
-} from '../composables/useTags'
 
 import {
   useToast,
@@ -44,6 +42,7 @@ const props =
   }>()
 
 const route = useRoute()
+const router = useRouter()
 
 const {
   success:
@@ -55,11 +54,6 @@ const {
 
 const notes =
   ref<NoteSummary[]>([])
-
-const {
-  tags,
-  load: loadTags,
-} = useTags()
 
 const projects =
   ref<Project[]>([])
@@ -118,11 +112,6 @@ const display =
       ? savedDisplay
       : 'grid',
   )
-
-const modalOpen = ref(false)
-
-const selected =
-  ref<Note | null>(null)
 
 const boardSeed =
   ref(
@@ -307,8 +296,6 @@ Promise<void> {
       }>(
         '/api/projects',
       ),
-
-      loadTags(),
     ])
 
     notes.value =
@@ -332,15 +319,12 @@ Promise<void> {
   }
 }
 
-async function openNote(
+function openNote(
   summary: NoteSummary,
-): Promise<void> {
-  selected.value =
-    await api<Note>(
-      `/api/notes/${summary.id}`,
-    )
-
-  modalOpen.value = true
+): void {
+  void router.push(
+    `/notes/${summary.id}`,
+  )
 }
 
 async function openQuickComposer():
@@ -1481,42 +1465,5 @@ onMounted(
       </form>
     </BaseModal>
 
-    <BaseModal
-      :open="modalOpen"
-      :title="
-        selected
-          ? (
-              selected.title
-              || 'Note sans titre'
-            )
-          : 'Nouvelle note'
-      "
-      @close="
-        modalOpen = false
-      "
-    >
-      <NoteEditor
-        :key="
-          selected?.id
-          ?? `new-note-${projectId ?? 'all'}`
-        "
-        :note="selected"
-        :tags="tags"
-        :projects="projects"
-        :default-project-id="
-          projectId
-        "
-        @saved="
-          (note) => {
-            selected = note
-            void load()
-          }
-        "
-        @changed="load"
-        @closed="
-          modalOpen = false
-        "
-      />
-    </BaseModal>
   </section>
 </template>
