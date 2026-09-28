@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Dto\Input\TaskCompletionInput;
+use App\Dto\Input\TaskCreateInput;
+use App\Dto\Input\TaskUpdateInput;
 use App\Repository\TaskRepository;
 use App\Service\JsonInput;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,38 +30,24 @@ final readonly class TaskController
         int $noteId,
         Request $request,
     ): JsonResponse {
-        $data = $this->input->read($request);
-
-        $this->assertNoNoteTaskTags(
-            $data
-        );
+        $input =
+            TaskCreateInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
+            );
 
         return new JsonResponse(
             $this->tasks->create(
                 $noteId,
-                (string) (
-                    $data['title']
-                    ?? $data['content']
-                    ?? ''
-                ),
-                (string) (
-                    $data['description']
-                    ?? ''
-                ),
-                (string) ($data['priority'] ?? 'normal'),
-                (string) ($data['status'] ?? 'todo'),
-                isset($data['position'])
-                    ? (int) $data['position']
-                    : null,
-                $this->tagIds(
-                    $data['tagIds'] ?? [],
-                ),
-                $this->dateValue(
-                    $data['startDate'] ?? null,
-                ),
-                $this->dateValue(
-                    $data['dueDate'] ?? null,
-                ),
+                $input->title,
+                $input->description,
+                $input->priority,
+                $input->status,
+                $input->position,
+                $input->tagIds,
+                $input->startDate,
+                $input->dueDate,
             ),
             201,
         );
@@ -69,10 +58,13 @@ final readonly class TaskController
         name: 'api_tasks_get',
         methods: ['GET'],
     )]
-    public function get(int $id): JsonResponse
-    {
+    public function get(
+        int $id,
+    ): JsonResponse {
         return new JsonResponse(
-            $this->tasks->get($id),
+            $this->tasks->get(
+                $id,
+            ),
         );
     }
 
@@ -85,71 +77,66 @@ final readonly class TaskController
         int $id,
         Request $request,
     ): JsonResponse {
-        $data = $this->input->read($request);
+        $input =
+            TaskUpdateInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
+            );
 
-        $this->assertNoNoteTaskTags(
-            $data
-        );
-
-        $current = $this->tasks->get($id);
+        $current =
+            $this->tasks->get(
+                $id,
+            );
 
         return new JsonResponse(
             $this->tasks->update(
                 $id,
-                (string) (
-                    $data['title']
-                    ?? $data['content']
-                    ?? $current['title']
-                    ?? $current['content']
-                ),
-                (string) (
-                    $data['description']
-                    ?? $current['description']
-                    ?? ''
-                ),
-                (string) (
-                    $data['priority']
-                    ?? $current['priority']
-                ),
-                (string) (
-                    $data['status']
-                    ?? $current['status']
-                ),
-                isset($data['position'])
-                    ? (int) $data['position']
-                    : (int) $current['position'],
-                array_key_exists(
-                    'tagIds',
-                    $data,
-                )
-                    ? $this->tagIds(
-                        $data['tagIds'],
-                    )
-                    : $this->currentTagIds(
+                $input->title
+                    ?? (string) (
+                        $current['title']
+                        ?? $current['content']
+                    ),
+                $input->description
+                    ?? (string) (
+                        $current[
+                            'description'
+                        ] ?? ''
+                    ),
+                $input->priority
+                    ?? (string) $current[
+                        'priority'
+                    ],
+                $input->status
+                    ?? (string) $current[
+                        'status'
+                    ],
+                $input->position
+                    ?? (int) $current[
+                        'position'
+                    ],
+                $input->tagIds
+                    ?? $this->currentTagIds(
                         $current,
                     ),
-                array_key_exists(
-                    'startDate',
-                    $data,
-                )
-                    ? $this->dateValue(
-                        $data['startDate'],
-                    )
+                $input->startDateProvided
+                    ? $input->startDate
                     : (
-                        $current['startDate'] !== null
-                            ? (string) $current['startDate']
+                        $current['startDate']
+                        !== null
+                            ? (string) $current[
+                                'startDate'
+                            ]
                             : null
                     ),
-                array_key_exists(
-                    'dueDate',
-                    $data,
-                )
-                    ? $this->dateValue(
-                        $data['dueDate'],
-                    )
+                $input->dueDateProvided
+                    ? $input->dueDate
                     : (
-                        $current['dueDate'] !== null
-                            ? (string) $current['dueDate']
+                        $current['dueDate']
+                        !== null
+                            ? (string) $current[
+                                'dueDate'
+                            ]
                             : null
                     ),
             ),
@@ -165,15 +152,17 @@ final readonly class TaskController
         int $id,
         Request $request,
     ): JsonResponse {
-        $data = $this->input->read($request);
+        $input =
+            TaskCompletionInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
+            );
 
         return new JsonResponse(
             $this->tasks->setCompleted(
                 $id,
-                (bool) (
-                    $data['completed']
-                    ?? false
-                ),
+                $input->completed,
             ),
         );
     }
@@ -186,92 +175,13 @@ final readonly class TaskController
     public function delete(
         int $id,
     ): JsonResponse {
-        $this->tasks->delete($id);
+        $this->tasks->delete(
+            $id,
+        );
 
         return new JsonResponse(
             null,
             204,
-        );
-    }
-
-    /**
-     * @param array<string, mixed> $data
-     */
-    private function assertNoNoteTaskTags(
-        array $data,
-    ): void {
-        if (
-            !array_key_exists(
-                'tagIds',
-                $data,
-            )
-        ) {
-            return;
-        }
-
-        $tagIds =
-            $this->tagIds(
-                $data['tagIds']
-            );
-
-        if ($tagIds !== []) {
-            throw new \InvalidArgumentException(
-                'Tags cannot be added to note tasks.'
-            );
-        }
-    }
-
-    private function dateValue(
-        mixed $value,
-    ): ?string {
-        if ($value === null) {
-            return null;
-        }
-
-        if (!is_string($value)) {
-            throw new \InvalidArgumentException(
-                'Task dates must be strings or null.'
-            );
-        }
-
-        $value = trim($value);
-
-        return $value === ''
-            ? null
-            : $value;
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function tagIds(mixed $value): array
-    {
-        if (!is_array($value)) {
-            throw new \InvalidArgumentException(
-                'tagIds must be an array.'
-            );
-        }
-
-        $ids = [];
-
-        foreach ($value as $item) {
-            if (
-                !is_int($item)
-                && !(
-                    is_string($item)
-                    && ctype_digit($item)
-                )
-            ) {
-                throw new \InvalidArgumentException(
-                    'Tag identifiers must be integers.'
-                );
-            }
-
-            $ids[] = (int) $item;
-        }
-
-        return array_values(
-            array_unique($ids),
         );
     }
 
@@ -283,7 +193,9 @@ final readonly class TaskController
     private function currentTagIds(
         array $task,
     ): array {
-        $tags = $task['tags'] ?? [];
+        $tags =
+            $task['tags']
+            ?? [];
 
         if (!is_array($tags)) {
             return [];
@@ -296,7 +208,8 @@ final readonly class TaskController
                 is_array($tag)
                 && isset($tag['id'])
             ) {
-                $ids[] = (int) $tag['id'];
+                $ids[] =
+                    (int) $tag['id'];
             }
         }
 
