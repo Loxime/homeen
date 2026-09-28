@@ -1294,12 +1294,7 @@ onMounted(
         </div>
       </header>
 
-      <p
-        v-if="error"
-        class="form-error"
-      >
-        {{ error }}
-      </p>
+
 
       <form
         v-if="
@@ -1722,12 +1717,18 @@ onMounted(
       </div>
     </template>
 
-    <p
-      v-else-if="error"
-      class="form-error"
+    <div
+      v-else
+      class="empty-state"
     >
-      {{ error }}
-    </p>
+      <strong>
+        Projet indisponible.
+      </strong>
+
+      <p class="muted">
+        Revenez aux projets pour réessayer.
+      </p>
+    </div>
   </section>
 </template>
 

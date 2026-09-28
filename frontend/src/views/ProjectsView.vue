@@ -234,9 +234,8 @@ Promise<void> {
           ?? ''
 
         if (projectName === '') {
-          Swal.showValidationMessage(
-            'Le nom du projet est obligatoire.',
-          )
+          error.value =
+            'Le nom du projet est obligatoire.'
 
           return false
         }
@@ -588,22 +587,6 @@ function renderMembersModal(
   container.appendChild(
     summary,
   )
-
-  if (error.value !== '') {
-    const errorMessage =
-      document.createElement('p')
-
-    errorMessage.textContent =
-      error.value
-
-    errorMessage.style.margin = '0'
-    errorMessage.style.color =
-      'var(--danger, #b3261e)'
-
-    container.appendChild(
-      errorMessage,
-    )
-  }
 
   for (
     const member
@@ -1308,12 +1291,7 @@ onMounted(
       </div>
     </section>
 
-    <p
-      v-if="error"
-      class="form-error"
-    >
-      {{ error }}
-    </p>
+
 
     <div
       v-if="loading"

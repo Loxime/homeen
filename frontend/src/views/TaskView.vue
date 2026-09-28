@@ -477,11 +477,8 @@ onMounted(
       v-else-if="!task"
       class="task-page-error"
     >
-      <p class="form-error">
-        {{
-          error
-          || 'Tâche introuvable.'
-        }}
+      <p class="muted">
+        Tâche introuvable.
       </p>
 
       <button
@@ -582,12 +579,7 @@ onMounted(
         </div>
       </header>
 
-      <p
-        v-if="error"
-        class="form-error"
-      >
-        {{ error }}
-      </p>
+
 
       <div class="task-detail-layout">
         <main class="task-detail-main">

@@ -81,12 +81,7 @@ async function submit(): Promise<void> {
           required
         />
 
-        <p
-          v-if="error"
-          class="form-error"
-        >
-          {{ error }}
-        </p>
+
 
         <button
           class="primary wide"

@@ -136,22 +136,7 @@ async function submit(): Promise<void> {
           De 12 à 72 caractères.
         </p>
 
-        <p
-          v-if="
-            confirmation
-            && !passwordsMatch
-          "
-          class="form-error"
-        >
-          Les mots de passe ne correspondent pas.
-        </p>
 
-        <p
-          v-if="error"
-          class="form-error"
-        >
-          {{ error }}
-        </p>
 
         <button
           class="primary wide"

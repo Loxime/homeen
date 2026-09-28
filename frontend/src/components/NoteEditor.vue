@@ -880,12 +880,7 @@ async function restore(): Promise<void> {
           </div>
         </div>
 
-        <p
-          v-if="error"
-          class="form-error"
-        >
-          {{ error }}
-        </p>
+
 
         <section
           v-if="

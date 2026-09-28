@@ -306,12 +306,7 @@ onMounted(() => void load())
       </div>
     </header>
 
-    <p
-      v-if="error"
-      class="form-error"
-    >
-      {{ error }}
-    </p>
+
 
     <p
       v-if="success"

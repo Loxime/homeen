@@ -412,12 +412,7 @@ onMounted(async () => {
       </div>
     </header>
 
-    <p
-      v-if="error"
-      class="form-error"
-    >
-      {{ error }}
-    </p>
+
 
     <section
       v-if="completedSession"

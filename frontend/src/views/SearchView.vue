@@ -245,12 +245,7 @@ watch(
       </div>
     </header>
 
-    <p
-      v-if="error"
-      class="form-error"
-    >
-      {{ error }}
-    </p>
+
 
     <div
       v-if="loading"

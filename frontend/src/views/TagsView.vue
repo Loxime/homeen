@@ -23,7 +23,6 @@ import type {
 const {
   tags,
   loading,
-  error,
   load,
   create,
   update,
@@ -245,12 +244,7 @@ onMounted(
       </button>
     </form>
 
-    <p
-      v-if="error"
-      class="form-error"
-    >
-      {{ error }}
-    </p>
+
 
     <div
       v-if="
