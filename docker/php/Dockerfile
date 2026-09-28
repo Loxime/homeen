@@ -18,6 +18,13 @@ RUN apk add --no-cache \
         xmlwriter \
         zip
 
+RUN apk add --no-cache \
+        --virtual .pcov-build-deps \
+        $PHPIZE_DEPS \
+    && pecl install pcov \
+    && docker-php-ext-enable pcov \
+    && apk del .pcov-build-deps
+
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 COPY docker/php/uploads.ini \
