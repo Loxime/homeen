@@ -58,6 +58,8 @@ SELECT
         AS "workflowStageName",
     stage.position
         AS "workflowStagePosition",
+    task.title,
+    task.description,
     task.content,
     task.priority,
     task.status,
@@ -129,7 +131,8 @@ SQL,
      */
     public function create(
         int $projectId,
-        string $content,
+        string $title,
+        string $description = '',
         string $priority = 'normal',
         string $status = 'todo',
         ?int $workflowStageId = null,
@@ -142,9 +145,14 @@ SQL,
             $projectId
         );
 
-        $content =
-            $this->validateContent(
-                $content
+        $title =
+            $this->validateTitle(
+                $title
+            );
+
+        $description =
+            $this->validateDescription(
+                $description
             );
 
         $priority =
@@ -206,7 +214,8 @@ SQL,
                     Connection $connection,
                 ) use (
                     $projectId,
-                    $content,
+                    $title,
+                    $description,
                     $priority,
                     $status,
                     $workflowStageId,
@@ -253,6 +262,8 @@ INSERT INTO task (
     project_id,
     project_task_number,
     workflow_stage_id,
+    title,
+    description,
     content,
     priority,
     status,
@@ -267,7 +278,9 @@ VALUES (
     :projectId,
     :projectTaskNumber,
     :workflowStageId,
-    :content,
+    :title,
+    :description,
+    :title,
     :priority,
     :status,
     :position,
@@ -292,8 +305,11 @@ SQL,
                                     'workflowStageId' =>
                                         $workflowStageId,
 
-                                    'content' =>
-                                        $content,
+                                    'title' =>
+                                        $title,
+
+                                    'description' =>
+                                        $description,
 
                                     'priority' =>
                                         $priority,
@@ -372,7 +388,8 @@ SQL,
     public function update(
         int $projectId,
         int $taskId,
-        string $content,
+        string $title,
+        string $description,
         string $priority,
         string $status,
         int $workflowStageId,
@@ -387,9 +404,14 @@ SQL,
                 $taskId,
             );
 
-        $content =
-            $this->validateContent(
-                $content
+        $title =
+            $this->validateTitle(
+                $title
+            );
+
+        $description =
+            $this->validateDescription(
+                $description
             );
 
         $priority =
@@ -467,7 +489,8 @@ SQL,
                 ) use (
                     $projectId,
                     $taskId,
-                    $content,
+                    $title,
+                    $description,
                     $priority,
                     $status,
                     $workflowStageId,
@@ -484,7 +507,9 @@ SQL,
                                 <<<'SQL'
 UPDATE task
 SET
-    content = :content,
+    title = :title,
+    description = :description,
+    content = :title,
     priority = :priority,
     status = :status,
     workflow_stage_id =
@@ -513,8 +538,11 @@ SQL,
                                     'projectId' =>
                                         $projectId,
 
-                                    'content' =>
-                                        $content,
+                                    'title' =>
+                                        $title,
+
+                                    'description' =>
+                                        $description,
 
                                     'priority' =>
                                         $priority,
@@ -999,6 +1027,8 @@ SELECT
         AS "workflowStageName",
     stage.position
         AS "workflowStagePosition",
+    task.title,
+    task.description,
     task.content,
     task.priority,
     task.status,
@@ -1400,21 +1430,38 @@ SQL,
         return $row;
     }
 
-    private function validateContent(
-        string $content,
+    private function validateTitle(
+        string $title,
     ): string {
-        $content = trim($content);
+        $title = trim($title);
 
         if (
-            $content === ''
-            || mb_strlen($content) > 4000
+            $title === ''
+            || mb_strlen($title) > 255
         ) {
             throw new \InvalidArgumentException(
-                'Task content must contain between 1 and 4000 characters.'
+                'Task title must contain between 1 and 255 characters.'
             );
         }
 
-        return $content;
+        return $title;
+    }
+
+    private function validateDescription(
+        string $description,
+    ): string {
+        $description = trim($description);
+
+        if (
+            mb_strlen($description)
+            > 20000
+        ) {
+            throw new \InvalidArgumentException(
+                'Task description cannot exceed 20000 characters.'
+            );
+        }
+
+        return $description;
     }
 
     private function validatePriority(

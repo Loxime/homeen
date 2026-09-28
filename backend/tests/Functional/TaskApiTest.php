@@ -147,7 +147,11 @@ SQL,
                 $this->noteId,
             ),
             [
-                'content' => 'Default task',
+                'title' =>
+                    'Default task',
+
+                'description' =>
+                    "First line\n\n**important**",
             ],
         );
 
@@ -156,6 +160,25 @@ SQL,
             $this->client
                 ->getResponse()
                 ->getStatusCode(),
+        );
+
+        self::assertSame(
+            'Default task',
+            $defaultTask['title'],
+        );
+
+        self::assertSame(
+            "First line\n\n**important**",
+            $defaultTask['description'],
+        );
+
+        /*
+         * Temporary compatibility alias while
+         * older frontend calls are migrated.
+         */
+        self::assertSame(
+            'Default task',
+            $defaultTask['content'],
         );
 
         self::assertSame(

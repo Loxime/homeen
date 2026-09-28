@@ -32,7 +32,15 @@ final readonly class TaskController
         return new JsonResponse(
             $this->tasks->create(
                 $noteId,
-                (string) ($data['content'] ?? ''),
+                (string) (
+                    $data['title']
+                    ?? $data['content']
+                    ?? ''
+                ),
+                (string) (
+                    $data['description']
+                    ?? ''
+                ),
                 (string) ($data['priority'] ?? 'normal'),
                 (string) ($data['status'] ?? 'todo'),
                 isset($data['position'])
@@ -81,8 +89,15 @@ final readonly class TaskController
             $this->tasks->update(
                 $id,
                 (string) (
-                    $data['content']
+                    $data['title']
+                    ?? $data['content']
+                    ?? $current['title']
                     ?? $current['content']
+                ),
+                (string) (
+                    $data['description']
+                    ?? $current['description']
+                    ?? ''
                 ),
                 (string) (
                     $data['priority']

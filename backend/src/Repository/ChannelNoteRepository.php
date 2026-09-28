@@ -73,7 +73,11 @@ final readonly class ChannelNoteRepository
         SELECT 1
         FROM task search_task
         WHERE search_task.note_id = n.id
-          AND search_task.content ILIKE :query
+          AND (
+              search_task.title ILIKE :query
+              OR search_task.description ILIKE :query
+              OR search_task.content ILIKE :query
+          )
     )
  )
 SQL;
@@ -191,6 +195,8 @@ SQL,
                 <<<'SQL'
 SELECT
     id,
+    title,
+    description,
     content,
     is_completed
         AS "isCompleted",

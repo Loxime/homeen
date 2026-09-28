@@ -37,6 +37,8 @@ SELECT
         AS "noteId",
     n.title
         AS "noteTitle",
+    t.title,
+    t.description,
     t.content,
     t.is_completed
         AS "isCompleted",
@@ -146,14 +148,20 @@ SQL,
                 <<<'SQL'
 INSERT INTO task (
     note_id,
+    title,
+    description,
     content
 )
 VALUES (
     :noteId,
+    :title,
+    '',
     :content
 )
 RETURNING
     id,
+    title,
+    description,
     content,
     is_completed
         AS "isCompleted",
@@ -167,6 +175,13 @@ SQL,
                 [
                     'noteId' =>
                         $noteId,
+
+                    'title' =>
+                        mb_substr(
+                            $content,
+                            0,
+                            255,
+                        ),
 
                     'content' =>
                         $content,
@@ -261,6 +276,8 @@ WHERE id = :taskId
   AND note_id = :noteId
 RETURNING
     id,
+    title,
+    description,
     content,
     is_completed
         AS "isCompleted",
@@ -280,6 +297,8 @@ WHERE id = :taskId
   AND note_id = :noteId
 RETURNING
     id,
+    title,
+    description,
     content,
     is_completed
         AS "isCompleted",

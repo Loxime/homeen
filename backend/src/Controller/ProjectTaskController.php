@@ -55,7 +55,12 @@ final readonly class ProjectTaskController
             $this->tasks->create(
                 $projectId,
                 (string) (
-                    $data['content']
+                    $data['title']
+                    ?? $data['content']
+                    ?? ''
+                ),
+                (string) (
+                    $data['description']
                     ?? ''
                 ),
                 (string) (
@@ -145,8 +150,15 @@ final readonly class ProjectTaskController
                 $projectId,
                 $taskId,
                 (string) (
-                    $data['content']
+                    $data['title']
+                    ?? $data['content']
+                    ?? $current['title']
                     ?? $current['content']
+                ),
+                (string) (
+                    $data['description']
+                    ?? $current['description']
+                    ?? ''
                 ),
                 (string) (
                     $data['priority']

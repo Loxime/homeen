@@ -97,7 +97,11 @@ final readonly class NoteRepository
         SELECT 1
         FROM task search_task
         WHERE search_task.note_id = n.id
-          AND search_task.content ILIKE :query
+          AND (
+              search_task.title ILIKE :query
+              OR search_task.description ILIKE :query
+              OR search_task.content ILIKE :query
+          )
     )
  )
 SQL;
@@ -648,6 +652,8 @@ SQL,
                                     <<<'SQL'
 INSERT INTO task (
     note_id,
+    title,
+    description,
     content,
     priority,
     status,
@@ -658,7 +664,9 @@ INSERT INTO task (
 )
 VALUES (
     :noteId,
-    :content,
+    :title,
+    :description,
+    :title,
     :priority,
     'todo',
     :position,
@@ -672,8 +680,17 @@ SQL,
                                         'noteId' =>
                                             $newNoteId,
 
-                                        'content' =>
-                                            (string) $task['content'],
+                                        'title' =>
+                                            (string) (
+                                                $task['title']
+                                                ?? $task['content']
+                                            ),
+
+                                        'description' =>
+                                            (string) (
+                                                $task['description']
+                                                ?? ''
+                                            ),
 
                                         'priority' =>
                                             (string) $task['priority'],

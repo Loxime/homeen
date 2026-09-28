@@ -72,6 +72,8 @@ SQL,
 SELECT
     t.id,
     t.note_id AS "noteId",
+    t.title,
+    t.description,
     t.content,
     t.priority,
     t.status,
@@ -122,7 +124,8 @@ SQL,
      */
     public function create(
         int $noteId,
-        string $content,
+        string $title,
+        string $description = '',
         string $priority = 'normal',
         string $status = 'todo',
         ?int $position = null,
@@ -130,7 +133,12 @@ SQL,
         ?string $startDate = null,
         ?string $dueDate = null,
     ): array {
-        $content = $this->validateContent($content);
+        $title = $this->validateTitle($title);
+        $description =
+            $this->validateDescription(
+                $description
+            );
+
         $priority = $this->validatePriority($priority);
         $status = $this->validateStatus($status);
         $tagIds = $this->validateTagIds($tagIds);
@@ -208,7 +216,8 @@ SQL,
         return $this->connection->transactional(
             function () use (
                 $noteId,
-                $content,
+                $title,
+                $description,
                 $priority,
                 $status,
                 $position,
@@ -223,6 +232,8 @@ SQL,
                     <<<'SQL'
 INSERT INTO task (
     note_id,
+    title,
+    description,
     content,
     priority,
     status,
@@ -234,7 +245,9 @@ INSERT INTO task (
 )
 VALUES (
     :noteId,
-    :content,
+    :title,
+    :description,
+    :title,
     :priority,
     :status,
     :position,
@@ -251,7 +264,8 @@ RETURNING id
 SQL,
                     [
                         'noteId' => $noteId,
-                        'content' => $content,
+                        'title' => $title,
+                        'description' => $description,
                         'priority' => $priority,
                         'status' => $status,
                         'position' => $position,
@@ -306,7 +320,8 @@ SQL,
      */
     public function update(
         int $id,
-        string $content,
+        string $title,
+        string $description,
         string $priority,
         string $status,
         int $position,
@@ -314,7 +329,12 @@ SQL,
         ?string $startDate,
         ?string $dueDate,
     ): array {
-        $content = $this->validateContent($content);
+        $title = $this->validateTitle($title);
+        $description =
+            $this->validateDescription(
+                $description
+            );
+
         $priority = $this->validatePriority($priority);
         $status = $this->validateStatus($status);
         $this->validatePosition($position);
@@ -351,7 +371,8 @@ SQL,
         return $this->connection->transactional(
             function () use (
                 $id,
-                $content,
+                $title,
+                $description,
                 $priority,
                 $status,
                 $position,
@@ -366,7 +387,9 @@ SQL,
                     ->executeStatement(
                         <<<'SQL'
 UPDATE task
-SET content = :content,
+SET title = :title,
+    description = :description,
+    content = :title,
     priority = :priority,
     status = :status,
     position = :position,
@@ -388,7 +411,8 @@ SQL,
                         [
                             'id' => $id,
                             'noteId' => $noteId,
-                            'content' => $content,
+                            'title' => $title,
+                            'description' => $description,
                             'priority' => $priority,
                             'status' => $status,
                             'position' => $position,
@@ -573,6 +597,8 @@ SQL,
 SELECT
     t.id,
     t.note_id AS "noteId",
+    t.title,
+    t.description,
     t.content,
     t.priority,
     t.status,
@@ -850,21 +876,38 @@ SQL,
         return $row;
     }
 
-    private function validateContent(
-        string $content,
+    private function validateTitle(
+        string $title,
     ): string {
-        $content = trim($content);
+        $title = trim($title);
 
         if (
-            $content === ''
-            || mb_strlen($content) > 4000
+            $title === ''
+            || mb_strlen($title) > 255
         ) {
             throw new \InvalidArgumentException(
-                'Task content must contain between 1 and 4000 characters.'
+                'Task title must contain between 1 and 255 characters.'
             );
         }
 
-        return $content;
+        return $title;
+    }
+
+    private function validateDescription(
+        string $description,
+    ): string {
+        $description = trim($description);
+
+        if (
+            mb_strlen($description)
+            > 20000
+        ) {
+            throw new \InvalidArgumentException(
+                'Task description cannot exceed 20000 characters.'
+            );
+        }
+
+        return $description;
     }
 
     private function validatePriority(
