@@ -14,7 +14,21 @@ import {
 
 import Swal from 'sweetalert2'
 
-import { api } from '../services/api'
+import {
+  createProjectTask,
+  createWorkflowStage,
+  deleteProjectTask,
+  deleteWorkflowStage,
+  getProject,
+  getProjectTasks,
+  getProjectWorkflow,
+  renameWorkflowStage,
+  reorderProjectTasks,
+  reorderProjectWorkflow,
+  setProjectTaskCompleted,
+  updateProject,
+  updateProjectTask,
+} from '../services/projectApi'
 
 import type {
   Project,
@@ -178,21 +192,14 @@ async function load(): Promise<void> {
       workflowResponse,
       taskResponse,
     ] = await Promise.all([
-      api<Project>(
-        `/api/projects/${projectId.value}`,
+      getProject(
+        projectId.value,
       ),
-
-      api<{
-        stages:
-          ProjectWorkflowStage[]
-      }>(
-        `/api/projects/${projectId.value}/workflow`,
+      getProjectWorkflow(
+        projectId.value,
       ),
-
-      api<{
-        tasks: ProjectTask[]
-      }>(
-        `/api/projects/${projectId.value}/tasks`,
+      getProjectTasks(
+        projectId.value,
       ),
     ])
 
@@ -204,10 +211,10 @@ async function load(): Promise<void> {
     )
 
     stages.value =
-      workflowResponse.stages
+      workflowResponse
 
     tasks.value =
-      taskResponse.tasks
+      taskResponse
   } catch (exception) {
     error.value =
       exception instanceof Error
@@ -270,18 +277,14 @@ Promise<void> {
 
   try {
     const updated =
-      await api<Project>(
-        `/api/projects/${projectId.value}`,
+      await updateProject(
+        projectId.value,
         {
-          method: 'PUT',
-
-          body: JSON.stringify({
-            name,
-            description:
-              projectDescription.value,
-            color:
-              projectColor.value,
-          }),
+          name,
+          description:
+            projectDescription.value,
+          color:
+            projectColor.value,
         },
       )
 
@@ -307,16 +310,10 @@ Promise<void> {
 
 async function reloadWorkflow():
 Promise<void> {
-  const response =
-    await api<{
-      stages:
-        ProjectWorkflowStage[]
-    }>(
-      `/api/projects/${projectId.value}/workflow`,
-    )
-
   stages.value =
-    response.stages
+    await getProjectWorkflow(
+      projectId.value,
+    )
 }
 
 async function createTask(
@@ -351,18 +348,14 @@ async function createTask(
 
   try {
     const created =
-      await api<ProjectTask>(
-        `/api/projects/${projectId.value}/tasks`,
+      await createProjectTask(
+        projectId.value,
         {
-          method: 'POST',
+          title,
+          description,
 
-          body: JSON.stringify({
-            title,
-            description,
-
-            workflowStageId:
-              stage.id,
-          }),
+          workflowStageId:
+            stage.id,
         },
       )
 
@@ -418,14 +411,11 @@ async function changeTaskStage(
 
   try {
     const updated =
-      await api<ProjectTask>(
-        `/api/projects/${projectId.value}/tasks/${task.id}`,
+      await updateProjectTask(
+        projectId.value,
+        task.id,
         {
-          method: 'PUT',
-
-          body: JSON.stringify({
-            workflowStageId,
-          }),
+          workflowStageId,
         },
       )
 
@@ -591,22 +581,11 @@ async function dropTask(
   error.value = ''
 
   try {
-    const response =
-      await api<{
-        tasks: ProjectTask[]
-      }>(
-        `/api/projects/${projectId.value}/tasks/order`,
-        {
-          method: 'PUT',
-
-          body: JSON.stringify({
-            columns,
-          }),
-        },
-      )
-
     tasks.value =
-      response.tasks
+      await reorderProjectTasks(
+        projectId.value,
+        columns,
+      )
   } catch (exception) {
     error.value =
       exception instanceof Error
@@ -773,24 +752,11 @@ async function dropStage(
   error.value = ''
 
   try {
-    const response =
-      await api<{
-        stages:
-          ProjectWorkflowStage[]
-      }>(
-        `/api/projects/${projectId.value}/workflow/order`,
-        {
-          method: 'PUT',
-
-          body: JSON.stringify({
-            stageIds:
-              orderedIds,
-          }),
-        },
-      )
-
     stages.value =
-      response.stages
+      await reorderProjectWorkflow(
+        projectId.value,
+        orderedIds,
+      )
   } catch (exception) {
     error.value =
       exception instanceof Error
@@ -816,16 +782,10 @@ async function toggleTask(
 
   try {
     const updated =
-      await api<ProjectTask>(
-        `/api/projects/${projectId.value}/tasks/${task.id}/completed`,
-        {
-          method: 'PUT',
-
-          body: JSON.stringify({
-            completed:
-              !task.isCompleted,
-          }),
-        },
+      await setProjectTaskCompleted(
+        projectId.value,
+        task.id,
+        !task.isCompleted,
       )
 
     tasks.value =
@@ -874,11 +834,9 @@ async function deleteTask(
   error.value = ''
 
   try {
-    await api(
-      `/api/projects/${projectId.value}/tasks/${task.id}`,
-      {
-        method: 'DELETE',
-      },
+    await deleteProjectTask(
+      projectId.value,
+      task.id,
     )
 
     tasks.value =
@@ -913,15 +871,9 @@ Promise<void> {
   error.value = ''
 
   try {
-    await api(
-      `/api/projects/${projectId.value}/workflow/stages`,
-      {
-        method: 'POST',
-
-        body: JSON.stringify({
-          name,
-        }),
-      },
+    await createWorkflowStage(
+      projectId.value,
+      name,
     )
 
     stageName.value = ''
@@ -983,15 +935,10 @@ async function renameStage(
   error.value = ''
 
   try {
-    await api(
-      `/api/projects/${projectId.value}/workflow/stages/${stage.id}`,
-      {
-        method: 'PUT',
-
-        body: JSON.stringify({
-          name,
-        }),
-      },
+    await renameWorkflowStage(
+      projectId.value,
+      stage.id,
+      name,
     )
 
     await reloadWorkflow()
@@ -1038,11 +985,9 @@ async function deleteStage(
   error.value = ''
 
   try {
-    await api(
-      `/api/projects/${projectId.value}/workflow/stages/${stage.id}`,
-      {
-        method: 'DELETE',
-      },
+    await deleteWorkflowStage(
+      projectId.value,
+      stage.id,
     )
 
     await reloadWorkflow()
@@ -1111,27 +1056,14 @@ async function moveStage(
   error.value = ''
 
   try {
-    const response =
-      await api<{
-        stages:
-          ProjectWorkflowStage[]
-      }>(
-        `/api/projects/${projectId.value}/workflow/order`,
-        {
-          method: 'PUT',
-
-          body: JSON.stringify({
-            stageIds:
-              ordered.map(
-                candidate =>
-                  candidate.id,
-              ),
-          }),
-        },
-      )
-
     stages.value =
-      response.stages
+      await reorderProjectWorkflow(
+        projectId.value,
+        ordered.map(
+          candidate =>
+            candidate.id,
+        ),
+      )
   } catch (exception) {
     error.value =
       exception instanceof Error
