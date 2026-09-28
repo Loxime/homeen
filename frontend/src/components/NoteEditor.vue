@@ -368,7 +368,6 @@ async function updateTask(
   payload: {
     priority?: TaskPriority
     status?: TaskStatus
-    tagIds?: number[]
   },
 ): Promise<void> {
   error.value = ''
@@ -427,50 +426,6 @@ async function setTaskStatus(
     {
       status:
         select.value as TaskStatus,
-    },
-  )
-}
-
-function isTaskTagged(
-  task: Task,
-  tagId: number,
-): boolean {
-  return task.tags.some(
-    tag =>
-      tag.id === tagId,
-  )
-}
-
-async function toggleTaskTag(
-  task: Task,
-  tagId: number,
-  event: Event,
-): Promise<void> {
-  const input =
-    event.target as HTMLInputElement
-
-  const currentIds =
-    task.tags.map(
-      tag => tag.id,
-    )
-
-  const tagIds =
-    input.checked
-      ? Array.from(
-          new Set([
-            ...currentIds,
-            tagId,
-          ]),
-        )
-      : currentIds.filter(
-          id =>
-            id !== tagId,
-        )
-
-  await updateTask(
-    task,
-    {
-      tagIds,
     },
   )
 }
@@ -1057,56 +1012,6 @@ async function restore(): Promise<void> {
                     </select>
                   </label>
 
-                  <div
-                    v-if="tags.length > 0"
-                    class="task-tags"
-                  >
-                    <span class="task-tags-label">
-                      Tags
-                    </span>
-
-                    <label
-                      v-for="tag in tags"
-                      :key="tag.id"
-                      class="task-tag-option"
-                      :class="{
-                        active:
-                          isTaskTagged(
-                            task,
-                            tag.id,
-                          ),
-                      }"
-                    >
-                      <input
-                        type="checkbox"
-                        :checked="
-                          isTaskTagged(
-                            task,
-                            tag.id,
-                          )
-                        "
-                        @change="
-                          toggleTaskTag(
-                            task,
-                            tag.id,
-                            $event,
-                          )
-                        "
-                      />
-
-                      <span
-                        class="task-tag-dot"
-                        :style="{
-                          background:
-                            tag.color,
-                        }"
-                      />
-
-                      <span>
-                        {{ tag.name }}
-                      </span>
-                    </label>
-                  </div>
                 </div>
               </div>
 

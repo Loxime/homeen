@@ -392,7 +392,11 @@ onMounted(
           <div class="tag-row-actions">
             <button
               type="button"
-              class="secondary"
+              class="tag-icon-action"
+              title="Modifier"
+              :aria-label="
+                `Modifier le tag ${tag.name}`
+              "
               :disabled="
                 busyId !== null
               "
@@ -400,12 +404,21 @@ onMounted(
                 beginEdit(tag)
               "
             >
-              Modifier
+              <span aria-hidden="true">
+                ✏️
+              </span>
             </button>
 
             <button
               type="button"
-              class="tag-delete-button"
+              class="
+                tag-icon-action
+                tag-icon-action--danger
+              "
+              title="Supprimer"
+              :aria-label="
+                `Supprimer le tag ${tag.name}`
+              "
               :disabled="
                 busyId !== null
               "
@@ -413,12 +426,9 @@ onMounted(
                 deleteTag(tag)
               "
             >
-              <AppIcon
-                name="trash"
-                :size="16"
-              />
-
-              Supprimer
+              <span aria-hidden="true">
+                🗑️
+              </span>
             </button>
           </div>
         </template>
@@ -542,6 +552,28 @@ onMounted(
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.tag-icon-action {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--g-border);
+  border-radius: 10px;
+  background: transparent;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.tag-icon-action:hover:not(:disabled) {
+  background: var(--g-surface-alt);
+}
+
+.tag-icon-action--danger:hover:not(:disabled) {
+  background: var(--g-red-soft);
 }
 
 .tag-delete-button {

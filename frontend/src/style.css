@@ -1206,7 +1206,11 @@ h3 { margin-bottom: .35rem; }
   font-weight: 700;
 }
 
-.positive { color: var(--success); }
+.positive {
+  color: inherit;
+  font-weight: 800;
+}
+
 .negative { color: #b33b46; }
 .neutral { color: #8a94a5; }
 

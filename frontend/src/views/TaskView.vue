@@ -208,14 +208,10 @@ async function load(): Promise<void> {
 
       note.value = null
     } else {
-      const [
-        loadedTask,
-      ] = await Promise.all([
-        api<Task>(
+      const loadedTask =
+        await api<Task>(
           taskEndpoint.value,
-        ),
-        loadTags(),
-      ])
+        )
 
       applyTask(
         loadedTask,
@@ -309,9 +305,6 @@ async function save(): Promise<void> {
 
       dueDate:
         dueDate.value || null,
-
-      tagIds:
-        selectedTagIds.value,
     }
 
     if (
@@ -319,6 +312,9 @@ async function save(): Promise<void> {
       && selectedWorkflowStageId.value
         !== null
     ) {
+      body.tagIds =
+        selectedTagIds.value
+
       body.workflowStageId =
         selectedWorkflowStageId.value
     }
@@ -708,7 +704,10 @@ onMounted(
             </label>
           </section>
 
-          <section class="task-detail-card">
+          <section
+            v-if="isProjectTask"
+            class="task-detail-card"
+          >
             <h2>
               Tags
             </h2>

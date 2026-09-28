@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { calculatePomodoroState } from '../pomodoroMath'
+
+import {
+  calculatePomodoroState,
+  calculatePomodoroStateFromElapsed,
+} from '../pomodoroMath'
 
 describe('calculatePomodoroState', () => {
   const start = '2026-09-02T10:00:00.000Z'
@@ -9,6 +13,27 @@ describe('calculatePomodoroState', () => {
     expect(state.phase).toBe('work')
     expect(state.remainingSeconds).toBe(1500)
   })
+
+  it(
+    'anchors a fresh timer to server elapsed time',
+    () => {
+      const state =
+        calculatePomodoroStateFromElapsed(
+          20,
+          2,
+        )
+
+      expect(
+        state.phase,
+      ).toBe('work')
+
+      expect(
+        state.remainingSeconds,
+      ).toBe(
+        19 * 60 + 58,
+      )
+    },
+  )
 
   it('uses an immutable five minute break', () => {
     const state = calculatePomodoroState(start, 25, Date.parse(start) + 25 * 60 * 1000)

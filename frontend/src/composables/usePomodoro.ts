@@ -1,6 +1,10 @@
 import { computed, reactive } from 'vue'
 import { api } from '../services/api'
-import { calculatePomodoroState, type PomodoroLiveState } from '../services/pomodoroMath'
+import {
+  calculatePomodoroState,
+  calculatePomodoroStateFromElapsed,
+  type PomodoroLiveState,
+} from '../services/pomodoroMath'
 import type { PomodoroPreset, PomodoroSession } from '../types/domain'
 
 interface PomodoroStore {
@@ -16,6 +20,52 @@ let timer: number | null = null
 let audioContext: AudioContext | null = null
 let previousPhase: 'work' | 'break' | null = null
 let channelListening = false
+
+interface PomodoroLiveAnchor {
+  sessionId: number
+  elapsedSeconds: number
+  capturedAtMs: number
+}
+
+let liveAnchor:
+  PomodoroLiveAnchor | null =
+    null
+
+function monotonicNow(): number {
+  return typeof performance
+    !== 'undefined'
+    ? performance.now()
+    : Date.now()
+}
+
+function syncLiveAnchor(
+  session: PomodoroSession | null,
+): void {
+  if (
+    !session
+    || session.stoppedAt !== null
+  ) {
+    liveAnchor = null
+    return
+  }
+
+  liveAnchor = {
+    sessionId:
+      session.id,
+
+    elapsedSeconds:
+      Math.max(
+        0,
+        Math.floor(
+          session.focusSeconds
+          + session.breakSeconds,
+        ),
+      ),
+
+    capturedAtMs:
+      monotonicNow(),
+  }
+}
 
 function enableAudio(): void {
   if (!audioContext) audioContext = new AudioContext()
@@ -114,7 +164,28 @@ function tick(): void {
     return
   }
 
-  const next = calculatePomodoroState(store.active.startedAt, store.active.workMinutes)
+  const next =
+    liveAnchor?.sessionId
+      === store.active.id
+      ? calculatePomodoroStateFromElapsed(
+          store.active.workMinutes,
+
+          liveAnchor.elapsedSeconds
+          + Math.max(
+            0,
+            Math.floor(
+              (
+                monotonicNow()
+                - liveAnchor.capturedAtMs
+              )
+              / 1000,
+            ),
+          ),
+        )
+      : calculatePomodoroState(
+          store.active.startedAt,
+          store.active.workMinutes,
+        )
   if (
     previousPhase
     && next.phase !== previousPhase
@@ -131,6 +202,11 @@ function tick(): void {
 async function loadActive(): Promise<void> {
   const response = await api<{ session: PomodoroSession | null }>('/api/pomodoro/active')
   store.active = response.session
+
+  syncLiveAnchor(
+    store.active,
+  )
+
   tick()
 }
 
@@ -152,6 +228,10 @@ async function start(workMinutes: number): Promise<void> {
         }),
       },
     )
+
+  syncLiveAnchor(
+    store.active,
+  )
 
   previousPhase = 'work'
 
@@ -188,6 +268,7 @@ async function stop(): Promise<PomodoroSession | null> {
 
   store.active = null
   store.live = null
+  liveAnchor = null
   previousPhase = null
   document.title = 'Notes'
 
@@ -217,6 +298,7 @@ function stopGlobalTimer(): void {
   }
   store.active = null
   store.live = null
+  liveAnchor = null
   previousPhase = null
   document.title = 'Notes'
 }

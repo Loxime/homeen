@@ -542,53 +542,20 @@ select:focus {
   padding: 20px;
 }
 
-.metric-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 4px;
-}
-
 .metric-card:nth-child(1) {
   background: #f5f8ff;
-}
-
-.metric-card:nth-child(1)::before {
-  background: var(--g-blue);
 }
 
 .metric-card:nth-child(2) {
   background: #f4fbf6;
 }
 
-.metric-card:nth-child(2)::before {
-  background: var(--g-green);
-}
-
 .metric-card:nth-child(3) {
   background: #fffaf0;
 }
 
-.metric-card:nth-child(3)::before {
-  background: var(--g-yellow);
-}
-
 .metric-card:nth-child(4) {
   background: #fff7f6;
-}
-
-.metric-card:nth-child(4)::before {
-  background: var(--g-red);
-}
-
-.metric-card:nth-child(5)::before {
-  background: #9334e6;
-}
-
-.metric-card:nth-child(6)::before {
-  background: var(--g-blue);
 }
 
 .metric-card > span {
