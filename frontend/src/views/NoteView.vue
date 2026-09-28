@@ -13,8 +13,12 @@ import {
 import NoteEditor from '../components/NoteEditor.vue'
 
 import {
-  api,
-} from '../services/api'
+  getNote,
+} from '../services/noteApi'
+
+import {
+  getProjects,
+} from '../services/projectApi'
 
 import {
   useTags,
@@ -122,15 +126,11 @@ Promise<void> {
       loadedNote,
       projectResponse,
     ] = await Promise.all([
-      api<Note>(
-        `/api/notes/${noteId.value}`,
+      getNote(
+        noteId.value,
       ),
 
-      api<{
-        projects: Project[]
-      }>(
-        '/api/projects',
-      ),
+      getProjects(),
 
       loadTags(),
     ])
@@ -139,7 +139,7 @@ Promise<void> {
       loadedNote
 
     projects.value =
-      projectResponse.projects
+      projectResponse
   } catch (exception) {
     unavailable.value = true
 
@@ -166,8 +166,8 @@ Promise<void> {
 
   try {
     note.value =
-      await api<Note>(
-        `/api/notes/${noteId.value}`,
+      await getNote(
+        noteId.value,
       )
   } catch (exception) {
     showError(

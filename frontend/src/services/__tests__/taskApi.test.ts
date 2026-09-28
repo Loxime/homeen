@@ -19,6 +19,7 @@ vi.mock(
 )
 
 import {
+  createNoteTask,
   deleteTask,
   getTask,
   setTaskCompleted,
@@ -28,6 +29,33 @@ import {
 describe('taskApi', () => {
   beforeEach(() => {
     mocks.api.mockReset()
+  })
+
+  it('creates a note task', async () => {
+    mocks.api.mockResolvedValue({
+      id: 6,
+    })
+
+    await createNoteTask(
+      3,
+      {
+        title: 'Sous-tâche',
+        description: '',
+      },
+    )
+
+    expect(
+      mocks.api,
+    ).toHaveBeenCalledWith(
+      '/api/notes/3/tasks',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          title: 'Sous-tâche',
+          description: '',
+        }),
+      },
+    )
   })
 
   it('loads and updates a task', async () => {

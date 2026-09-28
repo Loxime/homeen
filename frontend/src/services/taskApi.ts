@@ -17,6 +17,24 @@ export interface TaskUpdateInput {
   dueDate?: string | null
 }
 
+export interface NoteTaskCreateInput {
+  title: string
+  description: string
+}
+
+export async function createNoteTask(
+  noteId: number,
+  input: NoteTaskCreateInput,
+): Promise<Task> {
+  return api<Task>(
+    `/api/notes/${noteId}/tasks`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  )
+}
+
 export async function getTask(
   taskId: number,
 ): Promise<Task> {

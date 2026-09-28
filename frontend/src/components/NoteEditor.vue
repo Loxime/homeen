@@ -10,7 +10,23 @@ import {
 } from 'vue'
 
 import AppIcon from './AppIcon.vue'
-import { api } from '../services/api'
+
+import {
+  archiveNote,
+  createNote,
+  deleteNote,
+  duplicateNote,
+  restoreNote,
+  unarchiveNote,
+  updateNote,
+} from '../services/noteApi'
+
+import {
+  createNoteTask,
+  deleteTask as deleteTaskRequest,
+  setTaskCompleted,
+  updateTask as updateTaskRequest,
+} from '../services/taskApi'
 
 import {
   isPinnedNoteLimitError,
@@ -240,38 +256,30 @@ Promise<Note | null> {
   error.value = ''
 
   try {
-    const payload =
-      JSON.stringify({
-        title: title.value,
-        content:
-          localNote.value?.noteType === 'list'
-            ? ''
-            : content.value,
-        isPinned:
-          isPinned.value,
-        color:
-          noteColor.value,
-        tagIds:
-          selectedNoteTagIds.value,
-        projectId:
-          projectId.value,
-      })
+    const payload = {
+      title: title.value,
+      content:
+        localNote.value?.noteType === 'list'
+          ? ''
+          : content.value,
+      isPinned:
+        isPinned.value,
+      color:
+        noteColor.value,
+      tagIds:
+        selectedNoteTagIds.value,
+      projectId:
+        projectId.value,
+    }
 
     const note =
       isNew.value
-        ? await api<Note>(
-            '/api/notes',
-            {
-              method: 'POST',
-              body: payload,
-            },
+        ? await createNote(
+            payload,
           )
-        : await api<Note>(
-            `/api/notes/${localNote.value!.id}`,
-            {
-              method: 'PUT',
-              body: payload,
-            },
+        : await updateNote(
+            localNote.value!.id,
+            payload,
           )
 
     localNote.value = note
@@ -352,16 +360,13 @@ async function addTask(): Promise<void> {
   }
 
   const task =
-    await api<Task>(
-      `/api/notes/${localNote.value.id}/tasks`,
+    await createNoteTask(
+      localNote.value.id,
       {
-        method: 'POST',
-        body: JSON.stringify({
-          title:
-            taskText.value.trim(),
+        title:
+          taskText.value.trim(),
 
-          description: '',
-        }),
+        description: '',
       },
     )
 
@@ -382,14 +387,9 @@ async function updateTask(
 
   try {
     const updated =
-      await api<Task>(
-        `/api/tasks/${task.id}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(
-            payload,
-          ),
-        },
+      await updateTaskRequest(
+        task.id,
+        payload,
       )
 
     Object.assign(
@@ -442,15 +442,9 @@ async function toggleTask(
   task: Task,
 ): Promise<void> {
   const updated =
-    await api<Task>(
-      `/api/tasks/${task.id}/completed`,
-      {
-        method: 'PUT',
-        body: JSON.stringify({
-          completed:
-            !task.isCompleted,
-        }),
-      },
+    await setTaskCompleted(
+      task.id,
+      !task.isCompleted,
     )
 
   Object.assign(
@@ -468,11 +462,8 @@ async function deleteTask(
     return
   }
 
-  await api(
-    `/api/tasks/${task.id}`,
-    {
-      method: 'DELETE',
-    },
+  await deleteTaskRequest(
+    task.id,
   )
 
   localNote.value.tasks =
@@ -490,11 +481,8 @@ async function duplicate(): Promise<void> {
   }
 
   const duplicated =
-    await api<Note>(
-      `/api/notes/${localNote.value.id}/duplicate`,
-      {
-        method: 'POST',
-      },
+    await duplicateNote(
+      localNote.value.id,
     )
 
   emit(
@@ -512,16 +500,15 @@ async function setArchive(
     return
   }
 
-  await api<Note>(
-    `/api/notes/${localNote.value.id}/${
-      archive
-        ? 'archive'
-        : 'unarchive'
-    }`,
-    {
-      method: 'POST',
-    },
-  )
+  if (archive) {
+    await archiveNote(
+      localNote.value.id,
+    )
+  } else {
+    await unarchiveNote(
+      localNote.value.id,
+    )
+  }
 
   emit('changed')
   emit('closed')
@@ -532,11 +519,8 @@ async function trash(): Promise<void> {
     return
   }
 
-  await api(
-    `/api/notes/${localNote.value.id}`,
-    {
-      method: 'DELETE',
-    },
+  await deleteNote(
+    localNote.value.id,
   )
 
   emit('changed')
@@ -548,11 +532,8 @@ async function restore(): Promise<void> {
     return
   }
 
-  await api<Note>(
-    `/api/notes/${localNote.value.id}/restore`,
-    {
-      method: 'POST',
-    },
+  await restoreNote(
+    localNote.value.id,
   )
 
   emit('changed')

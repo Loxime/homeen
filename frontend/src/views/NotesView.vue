@@ -24,7 +24,20 @@ import {
 import BaseModal from '../components/BaseModal.vue'
 import AppIcon from '../components/AppIcon.vue'
 
-import { api } from '../services/api'
+import {
+  archiveNote,
+  createNote,
+  getNotes,
+  updateNote,
+} from '../services/noteApi'
+
+import {
+  createNoteTask,
+} from '../services/taskApi'
+
+import {
+  getProjects,
+} from '../services/projectApi'
 import { formatDate } from '../services/format'
 
 import {
@@ -263,52 +276,25 @@ Promise<void> {
   error.value = ''
 
   try {
-    const params =
-      new URLSearchParams({
-        scope: props.scope,
-      })
-
-    if (query.value.trim()) {
-      params.set(
-        'q',
-        query.value.trim(),
-      )
-    }
-
-    if (
-      projectId.value
-      !== null
-    ) {
-      params.set(
-        'projectId',
-        String(
-          projectId.value,
-        ),
-      )
-    }
-
     const [
       noteResponse,
       projectResponse,
     ] = await Promise.all([
-      api<{
-        notes: NoteSummary[]
-      }>(
-        `/api/notes?${params}`,
-      ),
+      getNotes({
+        scope: props.scope,
+        q: query.value,
+        projectId:
+          projectId.value,
+      }),
 
-      api<{
-        projects: Project[]
-      }>(
-        '/api/projects',
-      ),
+      getProjects(),
     ])
 
     notes.value =
-      noteResponse.notes
+      noteResponse
 
     projects.value =
-      projectResponse.projects
+      projectResponse
 
     boardSeed.value =
       Math.floor(
@@ -421,26 +407,20 @@ Promise<void> {
 
   try {
     const note =
-      await api<Note>(
-        '/api/notes',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            title,
-            content,
-            noteType:
-              quickMode.value === 'list'
-                ? 'list'
-                : 'text',
-            tagIds: [],
-            projectId:
-              projectId.value,
+      await createNote({
+        title,
+        content,
+        noteType:
+          quickMode.value === 'list'
+            ? 'list'
+            : 'text',
+        tagIds: [],
+        projectId:
+          projectId.value,
 
-            isPinned: false,
-            color: '#FFFFFF',
-          }),
-        },
-      )
+        isPinned: false,
+        color: '#FFFFFF',
+      })
 
     if (
       quickMode.value === 'list'
@@ -449,14 +429,11 @@ Promise<void> {
         const task
         of tasks
       ) {
-        await api(
-          `/api/notes/${note.id}/tasks`,
+        await createNoteTask(
+          note.id,
           {
-            method: 'POST',
-            body: JSON.stringify({
-              title: task,
-              description: '',
-            }),
+            title: task,
+            description: '',
           },
         )
       }
@@ -513,26 +490,23 @@ async function updateQuickAppearance(
 
   try {
     const updated =
-      await api<Note>(
-        `/api/notes/${note.id}`,
+      await updateNote(
+        note.id,
         {
-          method: 'PUT',
-          body: JSON.stringify({
-            title:
-              note.title,
-            content:
-              note.content,
-            tagIds:
-              note.tags.map(
-                tag => tag.id,
-              ),
-            isPinned:
-              changes.isPinned
-              ?? note.isPinned,
-            color:
-              changes.color
-              ?? note.color,
-          }),
+          title:
+            note.title,
+          content:
+            note.content,
+          tagIds:
+            note.tags.map(
+              tag => tag.id,
+            ),
+          isPinned:
+            changes.isPinned
+            ?? note.isPinned,
+          color:
+            changes.color
+            ?? note.color,
         },
       )
 
@@ -640,11 +614,8 @@ async function quickArchive(
   error.value = ''
 
   try {
-    await api<Note>(
-      `/api/notes/${note.id}/archive`,
-      {
-        method: 'POST',
-      },
+    await archiveNote(
+      note.id,
     )
 
     await load()
