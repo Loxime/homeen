@@ -128,16 +128,11 @@ SQL,
         parent::tearDown();
     }
 
-    public function testTaskDefaultsAndMultipleTags(): void
+    public function testTaskDefaultsAndRejectsTags(): void
     {
-        $firstTag = $this->createTag(
+        $tag = $this->createTag(
             'Backend',
             '#3366FF',
-        );
-
-        $secondTag = $this->createTag(
-            'Important',
-            '#FF6600',
         );
 
         $defaultTask = $this->jsonRequest(
@@ -173,8 +168,8 @@ SQL,
         );
 
         /*
-         * Temporary compatibility alias while
-         * older frontend calls are migrated.
+         * Legacy alias retained while old clients
+         * are still supported.
          */
         self::assertSame(
             'Default task',
@@ -217,87 +212,41 @@ SQL,
             $defaultTask['tags'],
         );
 
-        $taggedTask = $this->jsonRequest(
-            'POST',
-            sprintf(
-                '/api/notes/%d/tasks',
-                $this->noteId,
-            ),
-            [
-                'content' =>
-                    'Tagged task',
+        $rejected =
+            $this->jsonRequest(
+                'POST',
+                sprintf(
+                    '/api/notes/%d/tasks',
+                    $this->noteId,
+                ),
+                [
+                    'title' =>
+                        'Tagged task',
 
-                'priority' =>
-                    'high',
+                    'description' =>
+                        '',
 
-                'status' =>
-                    'in_progress',
-
-                'tagIds' => [
-                    $firstTag['id'],
-                    $secondTag['id'],
+                    'tagIds' => [
+                        $tag['id'],
+                    ],
                 ],
-            ],
-        );
+            );
 
         self::assertSame(
-            201,
+            422,
             $this->client
                 ->getResponse()
                 ->getStatusCode(),
         );
 
         self::assertSame(
-            'high',
-            $taggedTask['priority'],
-        );
-
-        self::assertSame(
-            'in_progress',
-            $taggedTask['status'],
-        );
-
-        self::assertSame(
-            1,
-            $taggedTask['position'],
-        );
-
-        self::assertFalse(
-            $taggedTask['isCompleted'],
-        );
-
-        self::assertCount(
-            2,
-            $taggedTask['tags'],
-        );
-
-        $tagIds = array_column(
-            $taggedTask['tags'],
-            'id',
-        );
-
-        sort($tagIds);
-
-        $expected = [
-            $firstTag['id'],
-            $secondTag['id'],
-        ];
-
-        sort($expected);
-
-        self::assertSame(
-            $expected,
-            $tagIds,
+            'Tags cannot be added to note tasks.',
+            $rejected['error'],
         );
     }
 
     public function testUpdateSynchronizesStatusAndCompletedState(): void
     {
-        $tag = $this->createTag(
-            'Focus',
-            '#22AA88',
-        );
-
         $task = $this->jsonRequest(
             'POST',
             sprintf(
@@ -305,18 +254,17 @@ SQL,
                 $this->noteId,
             ),
             [
-                'content' =>
+                'title' =>
                     'Finish API',
+
+                'description' =>
+                    'Initial description',
 
                 'priority' =>
                     'urgent',
 
                 'status' =>
                     'in_progress',
-
-                'tagIds' => [
-                    $tag['id'],
-                ],
             ],
         );
 
@@ -328,6 +276,9 @@ SQL,
             ),
             [
                 'status' => 'done',
+
+                'description' =>
+                    'Updated **Markdown** description',
             ],
         );
 
@@ -358,17 +309,22 @@ SQL,
 
         self::assertSame(
             'Finish API',
-            $updated['content'],
-        );
-
-        self::assertCount(
-            1,
-            $updated['tags'],
+            $updated['title'],
         );
 
         self::assertSame(
-            $tag['id'],
-            $updated['tags'][0]['id'],
+            'Finish API',
+            $updated['content'],
+        );
+
+        self::assertSame(
+            'Updated **Markdown** description',
+            $updated['description'],
+        );
+
+        self::assertSame(
+            [],
+            $updated['tags'],
         );
 
         $legacyUpdated = $this->jsonRequest(
@@ -401,53 +357,46 @@ SQL,
         );
 
         self::assertSame(
-            $tag['id'],
-            $legacyUpdated['tags'][0]['id'],
+            [],
+            $legacyUpdated['tags'],
         );
     }
 
-    public function testTaskRejectsAnotherUsersTag(): void
+    public function testTaskUpdateRejectsTags(): void
     {
-        $otherUserId =
-            $this->createOtherUser();
-
-        $foreignTagId =
-            $this->connection->fetchOne(
-                <<<'SQL'
-INSERT INTO tag (
-    user_id,
-    name,
-    color
-)
-VALUES (
-    :userId,
-    'Foreign',
-    '#123456'
-)
-RETURNING id
-SQL,
-                [
-                    'userId' =>
-                        $otherUserId,
-                ],
-            );
-
-        self::assertNotFalse(
-            $foreignTagId,
+        $tag = $this->createTag(
+            'Focus',
+            '#22AA88',
         );
 
-        $response = $this->jsonRequest(
+        $task = $this->jsonRequest(
             'POST',
             sprintf(
                 '/api/notes/%d/tasks',
                 $this->noteId,
             ),
             [
-                'content' =>
-                    'Forbidden foreign tag',
+                'title' =>
+                    'No tags here',
+            ],
+        );
 
+        self::assertSame(
+            201,
+            $this->client
+                ->getResponse()
+                ->getStatusCode(),
+        );
+
+        $response = $this->jsonRequest(
+            'PUT',
+            sprintf(
+                '/api/tasks/%d',
+                $task['id'],
+            ),
+            [
                 'tagIds' => [
-                    (int) $foreignTagId,
+                    $tag['id'],
                 ],
             ],
         );
@@ -460,7 +409,7 @@ SQL,
         );
 
         self::assertSame(
-            'One or more selected tags do not exist.',
+            'Tags cannot be added to note tasks.',
             $response['error'],
         );
     }
@@ -1114,15 +1063,22 @@ SQL,
             ],
         );
 
-        $taggedTask = $this->jsonRequest(
-            'POST',
+        /*
+         * Tags belong to the note itself, not to
+         * its list subtasks.
+         */
+        $this->jsonRequest(
+            'PUT',
             sprintf(
-                '/api/notes/%d/tasks',
+                '/api/notes/%d',
                 $this->noteId,
             ),
             [
+                'title' =>
+                    'Functional task test',
+
                 'content' =>
-                    'Ordinary tagged task',
+                    '',
 
                 'tagIds' => [
                     $tag['id'],
@@ -1179,12 +1135,17 @@ SQL,
 
         self::assertCount(
             1,
-            $tagSearch['tasks'],
+            $tagSearch['notes'],
         );
 
         self::assertSame(
-            $taggedTask['id'],
-            $tagSearch['tasks'][0]['id'],
+            $this->noteId,
+            $tagSearch['notes'][0]['id'],
+        );
+
+        self::assertSame(
+            [],
+            $tagSearch['tasks'],
         );
 
         $emptySearch = $this->jsonRequest(
@@ -1311,10 +1272,6 @@ SQL,
 
                 'dueDate' =>
                     '2026-11-21',
-
-                'tagIds' => [
-                    $tag['id'],
-                ],
             ],
         );
 
@@ -1394,14 +1351,9 @@ SQL,
             $duplicatedTask['completedAt'],
         );
 
-        self::assertCount(
-            1,
-            $duplicatedTask['tags'],
-        );
-
         self::assertSame(
-            $tag['id'],
-            $duplicatedTask['tags'][0]['id'],
+            [],
+            $duplicatedTask['tags'],
         );
     }
 

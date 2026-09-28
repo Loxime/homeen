@@ -2113,10 +2113,6 @@ SQL,
 
                     'status' =>
                         'in_progress',
-
-                    'tagIds' => [
-                        $currentTagId,
-                    ],
                 ],
             );
 
@@ -2142,8 +2138,8 @@ SQL,
             $task['status'],
         );
 
-        self::assertCount(
-            1,
+        self::assertSame(
+            [],
             $task['tags'],
         );
 
@@ -2166,8 +2162,11 @@ SQL,
         );
 
         /*
-         * Updating with no local tags must
-         * remove only this user's tag.
+         * Historical tag associations may still
+         * exist in the database. Updating the
+         * note task without tagIds must not
+         * silently destroy another member's
+         * historical association.
          */
         $updated =
             $this->jsonRequest(
@@ -2188,8 +2187,6 @@ SQL,
 
                     'position' =>
                         0,
-
-                    'tagIds' => [],
 
                     'startDate' =>
                         null,

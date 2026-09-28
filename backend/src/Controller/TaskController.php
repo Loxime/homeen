@@ -29,6 +29,10 @@ final readonly class TaskController
     ): JsonResponse {
         $data = $this->input->read($request);
 
+        $this->assertNoNoteTaskTags(
+            $data
+        );
+
         return new JsonResponse(
             $this->tasks->create(
                 $noteId,
@@ -82,6 +86,10 @@ final readonly class TaskController
         Request $request,
     ): JsonResponse {
         $data = $this->input->read($request);
+
+        $this->assertNoNoteTaskTags(
+            $data
+        );
 
         $current = $this->tasks->get($id);
 
@@ -184,6 +192,33 @@ final readonly class TaskController
             null,
             204,
         );
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function assertNoNoteTaskTags(
+        array $data,
+    ): void {
+        if (
+            !array_key_exists(
+                'tagIds',
+                $data,
+            )
+        ) {
+            return;
+        }
+
+        $tagIds =
+            $this->tagIds(
+                $data['tagIds']
+            );
+
+        if ($tagIds !== []) {
+            throw new \InvalidArgumentException(
+                'Tags cannot be added to note tasks.'
+            );
+        }
     }
 
     private function dateValue(
