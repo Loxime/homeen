@@ -194,6 +194,70 @@ final class InputValue
     /**
      * @param array<string, mixed> $data
      */
+    /**
+     * @param array<string, mixed> $data
+     */
+    public static function optionalBoolean(
+        array $data,
+        string $field,
+        string $errorCode,
+    ): ?bool {
+        if (
+            !array_key_exists(
+                $field,
+                $data,
+            )
+        ) {
+            return null;
+        }
+
+        $value = $data[$field];
+
+        if (!is_bool($value)) {
+            throw new ValidationException(
+                $field.' must be a boolean.',
+                $errorCode,
+            );
+        }
+
+        return $value;
+    }
+
+    /**
+     * Missing and explicit null both return null.
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function nullableOptionalString(
+        array $data,
+        string $field,
+        string $errorCode,
+    ): ?string {
+        if (
+            !array_key_exists(
+                $field,
+                $data,
+            )
+            || $data[$field] === null
+        ) {
+            return null;
+        }
+
+        $value = $data[$field];
+
+        if (!is_string($value)) {
+            throw new ValidationException(
+                $field.' must be a string or null.',
+                $errorCode,
+            );
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
     public static function boolean(
         array $data,
         string $field,

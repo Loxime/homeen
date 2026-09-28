@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Dto\Input\TagCreateInput;
+use App\Dto\Input\TagUpdateInput;
 use App\Repository\TagRepository;
 use App\Service\JsonInput;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,7 +29,8 @@ final readonly class TagController
     public function list(): JsonResponse
     {
         return new JsonResponse([
-            'tags' => $this->tags->all(),
+            'tags' =>
+                $this->tags->all(),
         ]);
     }
 
@@ -39,12 +42,17 @@ final readonly class TagController
     public function create(
         Request $request,
     ): JsonResponse {
-        $data = $this->input->read($request);
+        $input =
+            TagCreateInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
+            );
 
         return new JsonResponse(
             $this->tags->create(
-                (string) ($data['name'] ?? ''),
-                (string) ($data['color'] ?? ''),
+                $input->name,
+                $input->color,
             ),
             201,
         );
@@ -59,13 +67,18 @@ final readonly class TagController
         int $id,
         Request $request,
     ): JsonResponse {
-        $data = $this->input->read($request);
+        $input =
+            TagUpdateInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
+            );
 
         return new JsonResponse(
             $this->tags->update(
                 $id,
-                (string) ($data['name'] ?? ''),
-                (string) ($data['color'] ?? ''),
+                $input->name,
+                $input->color,
             ),
         );
     }
@@ -78,7 +91,9 @@ final readonly class TagController
     public function delete(
         int $id,
     ): JsonResponse {
-        $this->tags->delete($id);
+        $this->tags->delete(
+            $id,
+        );
 
         return new JsonResponse(
             null,
