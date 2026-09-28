@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Dto\Input\ProjectTaskCreateInput;
+use App\Dto\Input\ProjectTaskOrderInput;
+use App\Dto\Input\ProjectTaskUpdateInput;
+use App\Dto\Input\TaskCompletionInput;
 use App\Repository\ProjectTaskRepository;
 use App\Service\JsonInput;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -46,62 +50,25 @@ final readonly class ProjectTaskController
         int $projectId,
         Request $request,
     ): JsonResponse {
-        $data =
-            $this->input->read(
-                $request
+        $input =
+            ProjectTaskCreateInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
             );
 
         return new JsonResponse(
             $this->tasks->create(
                 $projectId,
-                (string) (
-                    $data['title']
-                    ?? $data['content']
-                    ?? ''
-                ),
-                (string) (
-                    $data['description']
-                    ?? ''
-                ),
-                (string) (
-                    $data['priority']
-                    ?? 'normal'
-                ),
-                (string) (
-                    $data['status']
-                    ?? 'todo'
-                ),
-                array_key_exists(
-                    'workflowStageId',
-                    $data,
-                )
-                    ? $this->positiveInt(
-                        $data[
-                            'workflowStageId'
-                        ],
-                        'workflowStageId',
-                    )
-                    : null,
-                array_key_exists(
-                    'position',
-                    $data,
-                )
-                    ? $this->position(
-                        $data['position'],
-                    )
-                    : null,
-                $this->tagIds(
-                    $data['tagIds']
-                    ?? [],
-                ),
-                $this->dateValue(
-                    $data['startDate']
-                    ?? null,
-                ),
-                $this->dateValue(
-                    $data['dueDate']
-                    ?? null,
-                ),
+                $input->title,
+                $input->description,
+                $input->priority,
+                $input->status,
+                $input->workflowStageId,
+                $input->position,
+                $input->tagIds,
+                $input->startDate,
+                $input->dueDate,
             ),
             201,
         );
@@ -134,9 +101,11 @@ final readonly class ProjectTaskController
         int $taskId,
         Request $request,
     ): JsonResponse {
-        $data =
-            $this->input->read(
-                $request
+        $input =
+            ProjectTaskUpdateInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
             );
 
         $current =
@@ -149,63 +118,48 @@ final readonly class ProjectTaskController
             $this->tasks->update(
                 $projectId,
                 $taskId,
-                (string) (
-                    $data['title']
-                    ?? $data['content']
-                    ?? $current['title']
-                    ?? $current['content']
-                ),
-                (string) (
-                    $data['description']
-                    ?? $current['description']
-                    ?? ''
-                ),
-                (string) (
-                    $data['priority']
-                    ?? $current['priority']
-                ),
-                (string) (
-                    $data['status']
-                    ?? $current['status']
-                ),
-                array_key_exists(
-                    'workflowStageId',
-                    $data,
-                )
-                    ? $this->positiveInt(
-                        $data[
-                            'workflowStageId'
-                        ],
-                        'workflowStageId',
-                    )
+
+                $input->title
+                    ?? (string) (
+                        $current['title']
+                        ?? $current['content']
+                    ),
+
+                $input->description
+                    ?? (string) (
+                        $current[
+                            'description'
+                        ] ?? ''
+                    ),
+
+                $input->priority
+                    ?? (string) $current[
+                        'priority'
+                    ],
+
+                $input->status
+                    ?? (string) $current[
+                        'status'
+                    ],
+
+                $input->workflowStageProvided
+                    ? (int) $input
+                        ->workflowStageId
                     : (int) $current[
                         'workflowStageId'
                     ],
-                array_key_exists(
-                    'position',
-                    $data,
-                )
-                    ? $this->position(
-                        $data['position'],
-                    )
+
+                $input->positionProvided
+                    ? $input->position
                     : null,
-                array_key_exists(
-                    'tagIds',
-                    $data,
-                )
-                    ? $this->tagIds(
-                        $data['tagIds'],
-                    )
-                    : $this->currentTagIds(
+
+                $input->tagIds
+                    ?? $this->currentTagIds(
                         $current,
                     ),
-                array_key_exists(
-                    'startDate',
-                    $data,
-                )
-                    ? $this->dateValue(
-                        $data['startDate'],
-                    )
+
+                $input->startDateProvided
+                    ? $input->startDate
                     : (
                         $current['startDate']
                         !== null
@@ -214,13 +168,9 @@ final readonly class ProjectTaskController
                             ]
                             : null
                     ),
-                array_key_exists(
-                    'dueDate',
-                    $data,
-                )
-                    ? $this->dateValue(
-                        $data['dueDate'],
-                    )
+
+                $input->dueDateProvided
+                    ? $input->dueDate
                     : (
                         $current['dueDate']
                         !== null
@@ -243,21 +193,19 @@ final readonly class ProjectTaskController
         int $taskId,
         Request $request,
     ): JsonResponse {
-        $data =
-            $this->input->read(
-                $request
+        $input =
+            TaskCompletionInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
             );
 
         return new JsonResponse(
-            $this->tasks
-                ->setCompleted(
-                    $projectId,
-                    $taskId,
-                    (bool) (
-                        $data['completed']
-                        ?? false
-                    ),
-                ),
+            $this->tasks->setCompleted(
+                $projectId,
+                $taskId,
+                $input->completed,
+            ),
         );
     }
 
@@ -290,183 +238,20 @@ final readonly class ProjectTaskController
         int $projectId,
         Request $request,
     ): JsonResponse {
-        $data =
-            $this->input->read(
-                $request
+        $input =
+            ProjectTaskOrderInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
             );
-
-        $rawColumns =
-            $data['columns']
-            ?? null;
-
-        if (!is_array($rawColumns)) {
-            throw new \InvalidArgumentException(
-                'columns must be an array.'
-            );
-        }
-
-        $columns = [];
-
-        foreach ($rawColumns as $rawColumn) {
-            if (!is_array($rawColumn)) {
-                throw new \InvalidArgumentException(
-                    'Each task-order column must be an object.'
-                );
-            }
-
-            $stageId =
-                $this->positiveInt(
-                    $rawColumn[
-                        'workflowStageId'
-                    ] ?? null,
-                    'workflowStageId',
-                );
-
-            $rawTaskIds =
-                $rawColumn[
-                    'taskIds'
-                ] ?? null;
-
-            if (!is_array($rawTaskIds)) {
-                throw new \InvalidArgumentException(
-                    'taskIds must be an array.'
-                );
-            }
-
-            $taskIds = [];
-
-            foreach (
-                $rawTaskIds
-                as $rawTaskId
-            ) {
-                $taskIds[] =
-                    $this->positiveInt(
-                        $rawTaskId,
-                        'taskId',
-                    );
-            }
-
-            $columns[] = [
-                'workflowStageId' =>
-                    $stageId,
-
-                'taskIds' =>
-                    $taskIds,
-            ];
-        }
 
         return new JsonResponse([
             'tasks' =>
                 $this->tasks->reorder(
                     $projectId,
-                    $columns,
+                    $input->columns,
                 ),
         ]);
-    }
-
-    private function positiveInt(
-        mixed $value,
-        string $field,
-    ): int {
-        if (
-            is_int($value)
-            && $value > 0
-        ) {
-            return $value;
-        }
-
-        if (
-            is_string($value)
-            && ctype_digit($value)
-            && (int) $value > 0
-        ) {
-            return (int) $value;
-        }
-
-        throw new \InvalidArgumentException(
-            $field
-            .' must be a positive integer.'
-        );
-    }
-
-    private function position(
-        mixed $value,
-    ): int {
-        if (
-            is_int($value)
-            && $value >= 0
-        ) {
-            return $value;
-        }
-
-        if (
-            is_string($value)
-            && ctype_digit($value)
-        ) {
-            return (int) $value;
-        }
-
-        throw new \InvalidArgumentException(
-            'position must be a non-negative integer.'
-        );
-    }
-
-    private function dateValue(
-        mixed $value,
-    ): ?string {
-        if ($value === null) {
-            return null;
-        }
-
-        if (!is_string($value)) {
-            throw new \InvalidArgumentException(
-                'Task dates must be strings or null.'
-            );
-        }
-
-        $value = trim($value);
-
-        return $value === ''
-            ? null
-            : $value;
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function tagIds(
-        mixed $value,
-    ): array {
-        if (!is_array($value)) {
-            throw new \InvalidArgumentException(
-                'tagIds must be an array.'
-            );
-        }
-
-        $ids = [];
-
-        foreach ($value as $item) {
-            if (
-                !is_int($item)
-                && !(
-                    is_string($item)
-                    && ctype_digit($item)
-                )
-            ) {
-                throw new \InvalidArgumentException(
-                    'Tag identifiers must be integers.'
-                );
-            }
-
-            $ids[] =
-                (int) $item;
-        }
-
-        return array_values(
-            array_unique(
-                $ids
-            ),
-        );
     }
 
     /**

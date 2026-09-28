@@ -67,6 +67,44 @@ final class InputValue
         return $value;
     }
 
+    public static function positiveInt(
+        mixed $value,
+        string $field,
+        string $errorCode,
+    ): int {
+        if (
+            !is_int($value)
+            || $value <= 0
+        ) {
+            throw new ValidationException(
+                $field
+                .' must be a positive integer.',
+                $errorCode,
+            );
+        }
+
+        return $value;
+    }
+
+    public static function nonNegativeInt(
+        mixed $value,
+        string $field,
+        string $errorCode,
+    ): int {
+        if (
+            !is_int($value)
+            || $value < 0
+        ) {
+            throw new ValidationException(
+                $field
+                .' must be a non-negative integer.',
+                $errorCode,
+            );
+        }
+
+        return $value;
+    }
+
     public static function optionalNonNegativeInt(
         mixed $value,
         string $field,
