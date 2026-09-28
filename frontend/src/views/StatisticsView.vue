@@ -5,11 +5,16 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  watch,
 } from 'vue'
 
 import Chart from 'chart.js/auto'
 
 import { api } from '../services/api'
+
+import {
+  useTheme,
+} from '../composables/useTheme'
 
 import {
   formatDuration,
@@ -54,6 +59,10 @@ function addDays(
 
   return inputDate(date)
 }
+
+const {
+  theme,
+} = useTheme()
 
 const today =
   inputDate(
@@ -185,6 +194,27 @@ void {
       comparison.length,
     )
 
+  const rootStyles =
+    getComputedStyle(
+      document.documentElement,
+    )
+
+  const chartTextColor =
+    rootStyles
+      .getPropertyValue(
+        '--g-muted',
+      )
+      .trim()
+    || '#5f6368'
+
+  const chartGridColor =
+    rootStyles
+      .getPropertyValue(
+        '--g-border',
+      )
+      .trim()
+    || '#e0e3e7'
+
   comparisonChart =
     new Chart(
       comparisonCanvas.value,
@@ -252,6 +282,11 @@ void {
           plugins: {
             legend: {
               position: 'bottom',
+
+              labels: {
+                color:
+                  chartTextColor,
+              },
             },
 
             tooltip: {
@@ -297,8 +332,16 @@ void {
 
           scales: {
             x: {
+              ticks: {
+                color:
+                  chartTextColor,
+              },
+
               title: {
                 display: true,
+
+                color:
+                  chartTextColor,
 
                 text:
                   seriesGranularity.value
@@ -315,8 +358,22 @@ void {
             y: {
               beginAtZero: true,
 
+              ticks: {
+                color:
+                  chartTextColor,
+              },
+
+              grid: {
+                color:
+                  chartGridColor,
+              },
+
               title: {
                 display: true,
+
+                color:
+                  chartTextColor,
+
                 text:
                   'Concentration (minutes)',
               },
@@ -477,6 +534,15 @@ function readableRange(
     )
   }`
 }
+
+watch(
+  theme,
+  async () => {
+    await nextTick()
+
+    renderComparisonChart()
+  },
+)
 
 onMounted(
   () => void load(),

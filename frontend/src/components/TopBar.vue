@@ -10,6 +10,10 @@ import { useRoute, useRouter } from 'vue-router'
 import AppIcon from './AppIcon.vue'
 import { useAccess } from '../composables/useAccess'
 
+import {
+  useTheme,
+} from '../composables/useTheme'
+
 defineProps<{
   sidebarCollapsed: boolean
 }>()
@@ -22,6 +26,11 @@ const route = useRoute()
 const router = useRouter()
 
 const { logout } = useAccess()
+
+const {
+  theme,
+  toggleTheme,
+} = useTheme()
 
 const query = ref(
   typeof route.query.q === 'string'
@@ -143,21 +152,50 @@ async function signOut(): Promise<void> {
       />
     </form>
 
-    <button
-      class="topbar-logout"
-      type="button"
-      title="Se déconnecter"
-      aria-label="Se déconnecter"
-      @click="signOut"
-    >
-      <AppIcon
-        name="logout"
-        :size="19"
-      />
+    <div class="topbar-actions">
+      <button
+        class="topbar-theme"
+        type="button"
+        :title="
+          theme === 'dark'
+            ? 'Passer en mode clair'
+            : 'Passer en mode sombre'
+        "
+        :aria-label="
+          theme === 'dark'
+            ? 'Passer en mode clair'
+            : 'Passer en mode sombre'
+        "
+        @click="toggleTheme"
+      >
+        <span
+          class="topbar-theme-symbol"
+          aria-hidden="true"
+        >
+          {{
+            theme === 'dark'
+              ? '☀️'
+              : '🌙'
+          }}
+        </span>
+      </button>
 
-      <span>
-        Déconnexion
-      </span>
-    </button>
+      <button
+        class="topbar-logout"
+        type="button"
+        title="Se déconnecter"
+        aria-label="Se déconnecter"
+        @click="signOut"
+      >
+        <AppIcon
+          name="logout"
+          :size="19"
+        />
+
+        <span>
+          Déconnexion
+        </span>
+      </button>
+    </div>
   </header>
 </template>

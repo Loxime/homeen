@@ -610,3 +610,43 @@
       var(--homeen-sidebar-rail);
   }
 }
+
+/* Theme action */
+
+.topbar-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.topbar-theme {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #5f6368;
+}
+
+.topbar-theme:hover {
+  background: #f1f3f4;
+}
+
+.topbar-theme-symbol {
+  display: block;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+@media (min-width: 721px) {
+  .topbar-theme {
+    width: 44px;
+    height: 44px;
+  }
+}

@@ -2221,3 +2221,278 @@ button:not(:disabled):hover {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* === Dark theme === */
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --g-blue: #8ab4f8;
+  --g-blue-strong: #aecbfa;
+  --g-blue-soft: #263d5c;
+
+  --g-red: #f28b82;
+  --g-red-strong: #f6aea8;
+  --g-red-soft: #542724;
+
+  --g-yellow: #fdd663;
+  --g-yellow-strong: #fdd663;
+  --g-yellow-soft: #4a3d16;
+
+  --g-green: #81c995;
+  --g-green-strong: #a8dab5;
+  --g-green-soft: #244c32;
+
+  --g-bg: #111315;
+  --g-surface: #1b1f23;
+  --g-surface-alt: #242a30;
+  --g-border: #3a4148;
+  --g-text: #e8eaed;
+  --g-muted: #aab0b6;
+
+  --panel: var(--g-surface);
+  --border: var(--g-border);
+  --muted: var(--g-muted);
+  --text-main: var(--g-text);
+  --text-soft: var(--g-muted);
+
+  --surface: var(--g-surface);
+  --surface-soft: var(--g-surface-alt);
+  --border-color: var(--g-border);
+
+  --keep-accent-soft: #493d13;
+}
+
+html[data-theme="dark"],
+html[data-theme="dark"] body,
+html[data-theme="dark"] #app,
+html[data-theme="dark"] .app-layout,
+html[data-theme="dark"] .workspace,
+html[data-theme="dark"] .page-scroll {
+  background: var(--g-bg);
+  color: var(--g-text);
+}
+
+html[data-theme="dark"] .topbar {
+  border-color: var(--g-border);
+  background:
+    rgba(27,31,35,.96);
+}
+
+html[data-theme="dark"] .topbar-theme,
+html[data-theme="dark"] .topbar-icon-button,
+html[data-theme="dark"] .topbar-logout {
+  color: var(--g-muted);
+}
+
+html[data-theme="dark"] .topbar-theme:hover,
+html[data-theme="dark"] .topbar-icon-button:hover {
+  background: var(--g-surface-alt);
+  color: var(--g-text);
+}
+
+html[data-theme="dark"] .search-box {
+  background: var(--g-surface-alt);
+}
+
+html[data-theme="dark"] .search-box:focus-within {
+  border-color: #53677f;
+  background: var(--g-surface);
+  box-shadow:
+    0 1px 3px
+    rgba(0,0,0,.32);
+}
+
+html[data-theme="dark"] .sidebar,
+html[data-theme="dark"] .sidebar.collapsed {
+  background: var(--g-bg);
+  color: var(--g-text);
+}
+
+html[data-theme="dark"] .sidebar-entry,
+html[data-theme="dark"] .sidebar .nav-list a,
+html[data-theme="dark"] .sidebar .focus-quick {
+  color: var(--g-text);
+}
+
+html[data-theme="dark"] .sidebar-entry:hover,
+html[data-theme="dark"] .sidebar .nav-list a:hover,
+html[data-theme="dark"] .sidebar .focus-quick:hover {
+  background: var(--g-surface-alt);
+}
+
+html[data-theme="dark"] .sidebar .router-link-active {
+  background: var(--g-blue-soft);
+  color: #dbe8ff;
+}
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  border-color: #4a5158;
+  background: #20252a;
+  color: var(--g-text);
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: #858c92;
+}
+
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .settings-card,
+html[data-theme="dark"] .quality-gate,
+html[data-theme="dark"] .labels-panel,
+html[data-theme="dark"] .notes-list,
+html[data-theme="dark"] .channel-card,
+html[data-theme="dark"] .channel-invitation-row,
+html[data-theme="dark"] .project-column,
+html[data-theme="dark"] .project-board-header,
+html[data-theme="dark"] .task-detail-card,
+html[data-theme="dark"] .task-detail-main,
+html[data-theme="dark"] .modal,
+html[data-theme="dark"] .note-modal,
+html[data-theme="dark"] .access-card,
+html[data-theme="dark"] .app-toast {
+  border-color: var(--g-border);
+  background: var(--g-surface);
+  color: var(--g-text);
+}
+
+html[data-theme="dark"] .empty-state,
+html[data-theme="dark"] .empty-channel-state {
+  border-color: var(--g-border);
+  background:
+    rgba(27,31,35,.7);
+  color: var(--g-muted);
+}
+
+html[data-theme="dark"] .secondary,
+html[data-theme="dark"] .ui-button--secondary {
+  border-color: #53677f;
+  background: var(--g-surface);
+  color: var(--g-blue-strong);
+}
+
+html[data-theme="dark"] .secondary:hover,
+html[data-theme="dark"] .ui-button--secondary:hover:not(:disabled) {
+  background: var(--g-surface-alt);
+}
+
+html[data-theme="dark"] .ui-button--ghost {
+  color: var(--g-muted);
+}
+
+html[data-theme="dark"] .keep-note-composer,
+html[data-theme="dark"] .preset-button,
+html[data-theme="dark"] .session-feedback-options button {
+  border-color: var(--g-border);
+  background: var(--g-surface);
+  color: var(--g-text);
+}
+
+html[data-theme="dark"] .keep-note-composer:hover,
+html[data-theme="dark"] .preset-button:hover,
+html[data-theme="dark"] .session-feedback-options button:hover {
+  border-color: #53677f;
+  background: var(--g-surface-alt);
+}
+
+html[data-theme="dark"] .keep-editor-footer,
+html[data-theme="dark"] .whiteboard-toolbar,
+html[data-theme="dark"] .note-list-row {
+  border-color: var(--g-border);
+  background: var(--g-surface);
+  color: var(--g-muted);
+}
+
+html[data-theme="dark"] .note-list-row:hover {
+  background: var(--g-surface-alt);
+}
+
+html[data-theme="dark"] .list-title strong,
+html[data-theme="dark"] .panel h2,
+html[data-theme="dark"] .settings-card h2 {
+  color: var(--g-text);
+}
+
+html[data-theme="dark"] .whiteboard-wrap {
+  border-color: var(--g-border);
+  background: #171b1f;
+}
+
+html[data-theme="dark"] .whiteboard {
+  background-image:
+    radial-gradient(
+      #3b4249 1px,
+      transparent 1px
+    );
+}
+
+html[data-theme="dark"] .metric-card {
+  border-color: var(--g-border);
+  background: var(--g-surface);
+}
+
+html[data-theme="dark"] .focus-garden {
+  background:
+    linear-gradient(
+      135deg,
+      #17231c,
+      #18212c
+    );
+}
+
+html[data-theme="dark"] .focus-garden-symbol {
+  background: var(--g-surface-alt);
+}
+
+html[data-theme="dark"] .focus-garden-track {
+  background: #314039;
+}
+
+html[data-theme="dark"] .danger-zone {
+  border-color: #63332f;
+  background: #261918;
+}
+
+html[data-theme="dark"] .form-error {
+  border-color: #673934;
+  background: #321d1b;
+  color: #f2aaa3;
+}
+
+html[data-theme="dark"] .form-success {
+  border-color: #335c40;
+  background: #19271e;
+  color: #a8dab5;
+}
+
+html[data-theme="dark"] .markdown-preview code,
+html[data-theme="dark"] .markdown-preview pre {
+  background: var(--g-surface-alt);
+}
+
+html[data-theme="dark"] .swal2-popup {
+  background: var(--g-surface);
+  color: var(--g-text);
+}
+
+html[data-theme="dark"] .swal2-title,
+html[data-theme="dark"] .swal2-html-container {
+  color: var(--g-text);
+}
+
+html[data-theme="dark"] .swal2-input,
+html[data-theme="dark"] .swal2-textarea,
+html[data-theme="dark"] .swal2-select {
+  border-color: var(--g-border);
+  background: #20252a;
+  color: var(--g-text);
+}
+
+html[data-theme="dark"] .swal2-validation-message {
+  background: var(--g-surface-alt);
+  color: var(--g-red-strong);
+}
