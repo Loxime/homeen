@@ -13,8 +13,31 @@ import Swal from 'sweetalert2'
 import AppIcon from '../components/AppIcon.vue'
 import {
   ApiError,
-  api,
 } from '../services/api'
+
+import {
+  acceptProjectInvitation as acceptProjectInvitationRequest,
+  createProject as createProjectRequest,
+  deleteProject as deleteProjectRequest,
+  getPendingProjectInvitations,
+  getProjectMembers,
+  getProjects,
+  inviteToProject,
+  leaveProject as leaveProjectRequest,
+  lookupProjectInvitee,
+  rejectProjectInvitation as rejectProjectInvitationRequest,
+  removeProjectMember,
+  setProjectMemberRole,
+} from '../services/projectApi'
+
+import type {
+  ProjectInvitation,
+  ProjectMember,
+} from '../services/projectApi'
+
+import {
+  getAccessStatus,
+} from '../services/accessApi'
 
 import {
   useToast,
@@ -22,33 +45,7 @@ import {
 
 import type {
   Project,
-  ProjectRole,
 } from '../types/domain'
-
-interface ProjectInvitation {
-  id: number
-  projectId: number
-  name: string
-  description: string
-  color: string
-  invitedByEmail: string | null
-  createdAt: string
-}
-
-interface ProjectMember {
-  userId: number
-  email: string
-  role: ProjectRole
-  joinedAt: string
-}
-
-interface ProjectInvitee {
-  email: string
-}
-
-interface AccessStatus {
-  email: string | null
-}
 
 interface ProjectDraft {
   name: string
@@ -106,20 +103,9 @@ async function load(): Promise<void> {
       invitationResponse,
       accessResponse,
     ] = await Promise.all([
-      api<{
-        projects: Project[]
-      }>('/api/projects'),
-
-      api<{
-        invitations:
-          ProjectInvitation[]
-      }>(
-        '/api/project-invitations',
-      ),
-
-      api<AccessStatus>(
-        '/api/access/status',
-      ),
+      getProjects(),
+      getPendingProjectInvitations(),
+      getAccessStatus(),
     ])
 
     currentEmail.value =
@@ -127,10 +113,10 @@ async function load(): Promise<void> {
       ?? ''
 
     projects.value =
-      projectResponse.projects
+      projectResponse
 
     invitations.value =
-      invitationResponse.invitations
+      invitationResponse
   } catch (exception) {
     error.value =
       exception instanceof Error
@@ -264,23 +250,16 @@ Promise<void> {
 
   try {
     const project =
-      await api<Project>(
-        '/api/projects',
-        {
-          method: 'POST',
+      await createProjectRequest({
+        name:
+          result.value.name,
 
-          body: JSON.stringify({
-            name:
-              result.value.name,
+        description:
+          result.value.description,
 
-            description:
-              result.value.description,
-
-            color:
-              '#1A73E8',
-          }),
-        },
-      )
+        color:
+          '#1A73E8',
+      })
 
     await load()
 
@@ -352,27 +331,14 @@ async function invite(
      * avant de créer l'invitation.
      */
     const invitee =
-      await api<ProjectInvitee>(
-        `/api/projects/${project.id}/invitees/lookup`,
-        {
-          method: 'POST',
-
-          body: JSON.stringify({
-            email,
-          }),
-        },
+      await lookupProjectInvitee(
+        project.id,
+        email,
       )
 
-    await api(
-      `/api/projects/${project.id}/invitations`,
-      {
-        method: 'POST',
-
-        body: JSON.stringify({
-          email:
-            invitee.email,
-        }),
-      },
+    await inviteToProject(
+      project.id,
+      invitee.email,
     )
 
     inviteEmails.value[
@@ -409,11 +375,8 @@ async function acceptInvitation(
   error.value = ''
 
   try {
-    await api(
-      `/api/project-invitations/${invitation.id}/accept`,
-      {
-        method: 'POST',
-      },
+    await acceptProjectInvitationRequest(
+      invitation.id,
     )
 
     await load()
@@ -442,11 +405,8 @@ async function rejectInvitation(
   error.value = ''
 
   try {
-    await api(
-      `/api/project-invitations/${invitation.id}`,
-      {
-        method: 'DELETE',
-      },
+    await rejectProjectInvitationRequest(
+      invitation.id,
     )
 
     await load()
@@ -536,17 +496,15 @@ async function loadMembers(
 
   try {
     const response =
-      await api<{
-        members: ProjectMember[]
-      }>(
-        `/api/projects/${projectId}/members`,
+      await getProjectMembers(
+        projectId,
       )
 
     projectMembers.value = {
       ...projectMembers.value,
 
       [projectId]:
-        response.members,
+        response,
     }
 
     return true
@@ -932,15 +890,10 @@ async function changeMemberRole(
   error.value = ''
 
   try {
-    await api(
-      `/api/projects/${project.id}/members/${member.userId}/role`,
-      {
-        method: 'PUT',
-
-        body: JSON.stringify({
-          role,
-        }),
-      },
+    await setProjectMemberRole(
+      project.id,
+      member.userId,
+      role,
     )
 
     await loadMembers(
@@ -992,11 +945,9 @@ async function removeMember(
   error.value = ''
 
   try {
-    await api(
-      `/api/projects/${project.id}/members/${member.userId}`,
-      {
-        method: 'DELETE',
-      },
+    await removeProjectMember(
+      project.id,
+      member.userId,
     )
 
     project.memberCount =
@@ -1052,11 +1003,8 @@ async function deleteProject(
   error.value = ''
 
   try {
-    await api(
-      `/api/projects/${project.id}`,
-      {
-        method: 'DELETE',
-      },
+    await deleteProjectRequest(
+      project.id,
     )
 
     projects.value =
@@ -1111,11 +1059,8 @@ async function leaveProject(
   error.value = ''
 
   try {
-    await api(
-      `/api/projects/${project.id}/leave`,
-      {
-        method: 'POST',
-      },
+    await leaveProjectRequest(
+      project.id,
     )
 
     projects.value =

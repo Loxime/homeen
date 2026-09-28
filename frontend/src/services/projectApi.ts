@@ -4,11 +4,39 @@ import {
 
 import type {
   Project,
+  ProjectRole,
   ProjectTask,
   ProjectWorkflowStage,
   TaskPriority,
   TaskStatus,
 } from '../types/domain'
+
+export interface ProjectCreateInput {
+  name: string
+  description: string
+  color: string
+}
+
+export interface ProjectInvitation {
+  id: number
+  projectId: number
+  name: string
+  description: string
+  color: string
+  invitedByEmail: string | null
+  createdAt: string
+}
+
+export interface ProjectMember {
+  userId: number
+  email: string
+  role: ProjectRole
+  joinedAt: string
+}
+
+export interface ProjectInvitee {
+  email: string
+}
 
 export interface ProjectUpdateInput {
   name?: string
@@ -43,6 +71,157 @@ export interface ProjectTaskUpdateInput {
 export interface ProjectTaskOrderColumn {
   workflowStageId: number
   taskIds: number[]
+}
+
+export async function getProjects():
+Promise<Project[]> {
+  const response =
+    await api<{
+      projects: Project[]
+    }>(
+      '/api/projects',
+    )
+
+  return response.projects
+}
+
+export async function createProject(
+  input: ProjectCreateInput,
+): Promise<Project> {
+  return api<Project>(
+    '/api/projects',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  )
+}
+
+export async function deleteProject(
+  projectId: number,
+): Promise<void> {
+  await api<void>(
+    `/api/projects/${projectId}`,
+    {
+      method: 'DELETE',
+    },
+  )
+}
+
+export async function getPendingProjectInvitations():
+Promise<ProjectInvitation[]> {
+  const response =
+    await api<{
+      invitations: ProjectInvitation[]
+    }>(
+      '/api/project-invitations',
+    )
+
+  return response.invitations
+}
+
+export async function lookupProjectInvitee(
+  projectId: number,
+  email: string,
+): Promise<ProjectInvitee> {
+  return api<ProjectInvitee>(
+    `/api/projects/${projectId}/invitees/lookup`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+      }),
+    },
+  )
+}
+
+export async function inviteToProject(
+  projectId: number,
+  email: string,
+): Promise<void> {
+  await api<void>(
+    `/api/projects/${projectId}/invitations`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+      }),
+    },
+  )
+}
+
+export async function acceptProjectInvitation(
+  invitationId: number,
+): Promise<void> {
+  await api<void>(
+    `/api/project-invitations/${invitationId}/accept`,
+    {
+      method: 'POST',
+    },
+  )
+}
+
+export async function rejectProjectInvitation(
+  invitationId: number,
+): Promise<void> {
+  await api<void>(
+    `/api/project-invitations/${invitationId}`,
+    {
+      method: 'DELETE',
+    },
+  )
+}
+
+export async function getProjectMembers(
+  projectId: number,
+): Promise<ProjectMember[]> {
+  const response =
+    await api<{
+      members: ProjectMember[]
+    }>(
+      `/api/projects/${projectId}/members`,
+    )
+
+  return response.members
+}
+
+export async function setProjectMemberRole(
+  projectId: number,
+  userId: number,
+  role: 'admin' | 'member',
+): Promise<void> {
+  await api<void>(
+    `/api/projects/${projectId}/members/${userId}/role`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        role,
+      }),
+    },
+  )
+}
+
+export async function removeProjectMember(
+  projectId: number,
+  userId: number,
+): Promise<void> {
+  await api<void>(
+    `/api/projects/${projectId}/members/${userId}`,
+    {
+      method: 'DELETE',
+    },
+  )
+}
+
+export async function leaveProject(
+  projectId: number,
+): Promise<void> {
+  await api<void>(
+    `/api/projects/${projectId}/leave`,
+    {
+      method: 'POST',
+    },
+  )
 }
 
 export async function getProject(
