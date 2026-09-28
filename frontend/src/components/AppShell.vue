@@ -10,7 +10,6 @@ import {
   useRoute,
 } from 'vue-router'
 
-import AppToast from './AppToast.vue'
 import Sidebar from './Sidebar.vue'
 import TopBar from './TopBar.vue'
 
@@ -176,8 +175,6 @@ onUnmounted(() => {
         </RouterView>
       </div>
     </section>
-
-    <AppToast />
 
   </div>
 </template>

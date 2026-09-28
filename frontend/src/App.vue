@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 
 import AppShell from './components/AppShell.vue'
+import AppToast from './components/AppToast.vue'
 import InitialPasswordGate from './components/InitialPasswordGate.vue'
 import UserLoginGate from './components/UserLoginGate.vue'
 
@@ -54,4 +55,6 @@ onMounted(
       state.authenticated
     "
   />
+
+  <AppToast />
 </template>
