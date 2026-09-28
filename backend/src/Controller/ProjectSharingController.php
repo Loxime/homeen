@@ -45,22 +45,16 @@ final readonly class ProjectSharingController
                 $request,
             );
 
-        try {
-            return new JsonResponse(
-                $this->sharing
-                    ->lookupInvitee(
-                        $id,
-                        (string) (
-                            $data['email']
-                            ?? ''
-                        ),
+        return new JsonResponse(
+            $this->sharing
+                ->lookupInvitee(
+                    $id,
+                    (string) (
+                        $data['email']
+                        ?? ''
                     ),
-            );
-        } catch (\Throwable $exception) {
-            return $this->error(
-                $exception,
-            );
-        }
+                ),
+        );
     }
 
     #[Route(
@@ -77,22 +71,16 @@ final readonly class ProjectSharingController
                 $request,
             );
 
-        try {
-            return new JsonResponse(
-                $this->sharing->invite(
-                    $id,
-                    (string) (
-                        $data['email']
-                        ?? ''
-                    ),
+        return new JsonResponse(
+            $this->sharing->invite(
+                $id,
+                (string) (
+                    $data['email']
+                    ?? ''
                 ),
-                201,
-            );
-        } catch (\Throwable $exception) {
-            return $this->error(
-                $exception,
-            );
-        }
+            ),
+            201,
+        );
     }
 
     #[Route(
@@ -103,17 +91,11 @@ final readonly class ProjectSharingController
     public function accept(
         int $id,
     ): JsonResponse {
-        try {
-            return new JsonResponse(
-                $this->sharing->accept(
-                    $id,
-                ),
-            );
-        } catch (\Throwable $exception) {
-            return $this->error(
-                $exception,
-            );
-        }
+        return new JsonResponse(
+            $this->sharing->accept(
+                $id,
+            ),
+        );
     }
 
     #[Route(
@@ -124,18 +106,14 @@ final readonly class ProjectSharingController
     public function reject(
         int $id,
     ): JsonResponse {
-        try {
-            $this->sharing->reject($id);
+        $this->sharing->reject(
+            $id,
+        );
 
-            return new JsonResponse(
-                null,
-                204,
-            );
-        } catch (\Throwable $exception) {
-            return $this->error(
-                $exception,
-            );
-        }
+        return new JsonResponse(
+            null,
+            204,
+        );
     }
 
     #[Route(
@@ -153,22 +131,16 @@ final readonly class ProjectSharingController
                 $request,
             );
 
-        try {
-            return new JsonResponse(
-                $this->sharing->setRole(
-                    $id,
-                    $userId,
-                    (string) (
-                        $data['role']
-                        ?? ''
-                    ),
+        return new JsonResponse(
+            $this->sharing->setRole(
+                $id,
+                $userId,
+                (string) (
+                    $data['role']
+                    ?? ''
                 ),
-            );
-        } catch (\Throwable $exception) {
-            return $this->error(
-                $exception,
-            );
-        }
+            ),
+        );
     }
 
     #[Route(
@@ -180,22 +152,16 @@ final readonly class ProjectSharingController
         int $id,
         int $userId,
     ): JsonResponse {
-        try {
-            $this->sharing
-                ->removeMember(
-                    $id,
-                    $userId,
-                );
+        $this->sharing
+            ->removeMember(
+                $id,
+                $userId,
+            );
 
-            return new JsonResponse(
-                null,
-                204,
-            );
-        } catch (\Throwable $exception) {
-            return $this->error(
-                $exception,
-            );
-        }
+        return new JsonResponse(
+            null,
+            204,
+        );
     }
 
     #[Route(
@@ -206,102 +172,13 @@ final readonly class ProjectSharingController
     public function leave(
         int $id,
     ): JsonResponse {
-        try {
-            $this->sharing->leave($id);
+        $this->sharing->leave(
+            $id,
+        );
 
-            return new JsonResponse(
-                null,
-                204,
-            );
-        } catch (\Throwable $exception) {
-            return $this->error(
-                $exception,
-            );
-        }
-    }
-
-    private function error(
-        \Throwable $exception,
-    ): JsonResponse {
-        if (
-            $exception
-            instanceof \InvalidArgumentException
-        ) {
-            return new JsonResponse(
-                [
-                    'error' =>
-                        $exception
-                            ->getMessage(),
-
-                    'code' =>
-                        'PROJECT_INVALID_INPUT',
-                ],
-                422,
-            );
-        }
-
-        if (
-            $exception
-            instanceof \OutOfBoundsException
-        ) {
-            $code = match (
-                $exception->getMessage()
-            ) {
-                'User not found.' =>
-                    'PROJECT_USER_NOT_FOUND',
-
-                'Project member not found.' =>
-                    'PROJECT_MEMBER_NOT_FOUND',
-
-                'Invitation not found.' =>
-                    'PROJECT_INVITATION_NOT_FOUND',
-
-                default =>
-                    'PROJECT_NOT_FOUND',
-            };
-
-            return new JsonResponse(
-                [
-                    'error' =>
-                        $exception
-                            ->getMessage(),
-
-                    'code' =>
-                        $code,
-                ],
-                404,
-            );
-        }
-
-        if (
-            $exception
-            instanceof \DomainException
-        ) {
-            $status = match (
-                $exception->getMessage()
-            ) {
-                'PROJECT_MANAGEMENT_REQUIRED',
-                'PROJECT_OWNER_REQUIRED',
-                'PROJECT_ADMIN_CANNOT_REMOVE_ADMIN'
-                    => 403,
-
-                default => 409,
-            };
-
-            return new JsonResponse(
-                [
-                    'error' =>
-                        $exception
-                            ->getMessage(),
-
-                    'code' =>
-                        $exception
-                            ->getMessage(),
-                ],
-                $status,
-            );
-        }
-
-        throw $exception;
+        return new JsonResponse(
+            null,
+            204,
+        );
     }
 }

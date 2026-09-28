@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Exception\ConflictException;
+use App\Exception\ForbiddenException;
+use App\Exception\NotFoundException;
+use App\Exception\ValidationException;
 use App\Service\ActivityLogger;
 use App\Service\CurrentUser;
 use Doctrine\DBAL\Connection;
@@ -170,7 +174,8 @@ SQL,
         } catch (
             UniqueConstraintViolationException
         ) {
-            throw new \DomainException(
+            throw new ConflictException(
+                'PROJECT_ALREADY_INVITED',
                 'PROJECT_ALREADY_INVITED',
             );
         }
@@ -254,8 +259,9 @@ SQL,
                     if (
                         $invitation === false
                     ) {
-                        throw new \OutOfBoundsException(
+                        throw new NotFoundException(
                             'Invitation not found.',
+                            'PROJECT_INVITATION_NOT_FOUND',
                         );
                     }
 
@@ -337,8 +343,9 @@ SQL,
                 );
 
         if ($projectId === false) {
-            throw new \OutOfBoundsException(
+            throw new NotFoundException(
                 'Invitation not found.',
+                'PROJECT_INVITATION_NOT_FOUND',
             );
         }
 
@@ -379,7 +386,8 @@ SQL,
             );
 
         if ($target['role'] === 'owner') {
-            throw new \DomainException(
+            throw new ConflictException(
+                'PROJECT_OWNER_ROLE_IMMUTABLE',
                 'PROJECT_OWNER_ROLE_IMMUTABLE',
             );
         }
@@ -433,7 +441,8 @@ SQL,
             $userId
             === $context['currentUserId']
         ) {
-            throw new \DomainException(
+            throw new ConflictException(
+                'PROJECT_MANAGER_USE_LEAVE',
                 'PROJECT_MANAGER_USE_LEAVE',
             );
         }
@@ -445,7 +454,8 @@ SQL,
             );
 
         if ($target['role'] === 'owner') {
-            throw new \DomainException(
+            throw new ConflictException(
+                'PROJECT_OWNER_ROLE_IMMUTABLE',
                 'PROJECT_OWNER_ROLE_IMMUTABLE',
             );
         }
@@ -454,7 +464,8 @@ SQL,
             $context['role'] === 'admin'
             && $target['role'] === 'admin'
         ) {
-            throw new \DomainException(
+            throw new ForbiddenException(
+                'PROJECT_ADMIN_CANNOT_REMOVE_ADMIN',
                 'PROJECT_ADMIN_CANNOT_REMOVE_ADMIN',
             );
         }
@@ -488,7 +499,8 @@ SQL,
             $this->context($projectId);
 
         if ($context['role'] === 'owner') {
-            throw new \DomainException(
+            throw new ConflictException(
+                'PROJECT_OWNER_CANNOT_LEAVE',
                 'PROJECT_OWNER_CANNOT_LEAVE',
             );
         }
@@ -534,8 +546,9 @@ SQL,
                 FILTER_VALIDATE_EMAIL,
             ) === false
         ) {
-            throw new \InvalidArgumentException(
+            throw new ValidationException(
                 'Invalid email address.',
+                'PROJECT_INVALID_INPUT',
             );
         }
 
@@ -553,8 +566,9 @@ SQL,
                 );
 
         if ($target === null) {
-            throw new \OutOfBoundsException(
+            throw new NotFoundException(
                 'User not found.',
+                'PROJECT_USER_NOT_FOUND',
             );
         }
 
@@ -562,7 +576,8 @@ SQL,
             $target['id']
             === $context['currentUserId']
         ) {
-            throw new \DomainException(
+            throw new ConflictException(
+                'PROJECT_CANNOT_INVITE_SELF',
                 'PROJECT_CANNOT_INVITE_SELF',
             );
         }
@@ -587,7 +602,8 @@ SQL,
                 );
 
         if ($alreadyMember !== false) {
-            throw new \DomainException(
+            throw new ConflictException(
+                'PROJECT_ALREADY_MEMBER',
                 'PROJECT_ALREADY_MEMBER',
             );
         }
@@ -612,7 +628,8 @@ SQL,
                 );
 
         if ($alreadyInvited !== false) {
-            throw new \DomainException(
+            throw new ConflictException(
+                'PROJECT_ALREADY_INVITED',
                 'PROJECT_ALREADY_INVITED',
             );
         }
@@ -667,8 +684,9 @@ SQL,
                 );
 
         if ($row === false) {
-            throw new \OutOfBoundsException(
+            throw new NotFoundException(
                 'Project not found.',
+                'PROJECT_NOT_FOUND',
             );
         }
 
@@ -723,8 +741,9 @@ SQL,
                 );
 
         if ($row === false) {
-            throw new \OutOfBoundsException(
+            throw new NotFoundException(
                 'Project member not found.',
+                'PROJECT_MEMBER_NOT_FOUND',
             );
         }
 
@@ -755,7 +774,8 @@ SQL,
             return;
         }
 
-        throw new \DomainException(
+        throw new ForbiddenException(
+            'PROJECT_MANAGEMENT_REQUIRED',
             'PROJECT_MANAGEMENT_REQUIRED',
         );
     }
@@ -767,7 +787,8 @@ SQL,
             return;
         }
 
-        throw new \DomainException(
+        throw new ForbiddenException(
+            'PROJECT_OWNER_REQUIRED',
             'PROJECT_OWNER_REQUIRED',
         );
     }
@@ -785,8 +806,9 @@ SQL,
                 true,
             )
         ) {
-            throw new \InvalidArgumentException(
+            throw new ValidationException(
                 'Project role must be admin or member.',
+                'PROJECT_INVALID_INPUT',
             );
         }
 

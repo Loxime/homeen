@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Exception\NotFoundException;
+use App\Exception\ValidationException;
+use App\Exception\ForbiddenException;
+use App\Exception\ConflictException;
 use App\Service\ActivityLogger;
 use App\Service\CurrentUser;
 use Doctrine\DBAL\Connection;
@@ -69,7 +73,8 @@ SQL,
                 );
 
         if ($count >= self::MAX_STAGES) {
-            throw new \DomainException(
+            throw new ConflictException(
+                'PROJECT_WORKFLOW_LIMIT',
                 'PROJECT_WORKFLOW_LIMIT',
             );
         }
@@ -189,8 +194,9 @@ SQL,
                 );
 
         if ($affected !== 1) {
-            throw new \OutOfBoundsException(
+            throw new NotFoundException(
                 'Workflow stage not found.',
+                'PROJECT_WORKFLOW_NOT_FOUND',
             );
         }
 
@@ -244,8 +250,9 @@ SQL,
                     ),
                 )
         ) {
-            throw new \InvalidArgumentException(
+            throw new ValidationException(
                 'Workflow stage order is invalid.',
+                'PROJECT_WORKFLOW_INVALID',
             );
         }
 
@@ -275,8 +282,9 @@ SQL,
         sort($provided);
 
         if ($existing !== $provided) {
-            throw new \InvalidArgumentException(
+            throw new ValidationException(
                 'Workflow stage order must contain every project stage exactly once.',
+                'PROJECT_WORKFLOW_INVALID',
             );
         }
 
@@ -380,7 +388,8 @@ SQL,
                 );
 
         if ($taskCount > 0) {
-            throw new \DomainException(
+            throw new ConflictException(
+                'PROJECT_WORKFLOW_STAGE_NOT_EMPTY',
                 'PROJECT_WORKFLOW_STAGE_NOT_EMPTY',
             );
         }
@@ -400,7 +409,8 @@ SQL,
                 );
 
         if ($count <= 1) {
-            throw new \DomainException(
+            throw new ConflictException(
+                'PROJECT_WORKFLOW_MINIMUM',
                 'PROJECT_WORKFLOW_MINIMUM',
             );
         }
@@ -442,8 +452,9 @@ SQL,
                             );
 
                     if ($affected !== 1) {
-                        throw new \OutOfBoundsException(
+                        throw new NotFoundException(
                             'Workflow stage not found.',
+                            'PROJECT_WORKFLOW_NOT_FOUND',
                         );
                     }
 
@@ -514,8 +525,9 @@ SQL,
                 );
 
         if ($row === false) {
-            throw new \OutOfBoundsException(
+            throw new NotFoundException(
                 'Project not found.',
+                'PROJECT_WORKFLOW_NOT_FOUND',
             );
         }
 
@@ -558,8 +570,9 @@ SQL,
                 );
 
         if ($row === false) {
-            throw new \OutOfBoundsException(
+            throw new NotFoundException(
                 'Workflow stage not found.',
+                'PROJECT_WORKFLOW_NOT_FOUND',
             );
         }
 
@@ -653,7 +666,8 @@ SQL,
         }
 
         if ($exists !== false) {
-            throw new \DomainException(
+            throw new ConflictException(
+                'PROJECT_WORKFLOW_NAME_CONFLICT',
                 'PROJECT_WORKFLOW_NAME_CONFLICT',
             );
         }
@@ -668,8 +682,9 @@ SQL,
             $name === ''
             || mb_strlen($name) > 80
         ) {
-            throw new \InvalidArgumentException(
+            throw new ValidationException(
                 'Workflow stage name must contain between 1 and 80 characters.',
+                'PROJECT_WORKFLOW_INVALID',
             );
         }
 
@@ -686,7 +701,8 @@ SQL,
             return;
         }
 
-        throw new \DomainException(
+        throw new ForbiddenException(
+            'PROJECT_MANAGEMENT_REQUIRED',
             'PROJECT_MANAGEMENT_REQUIRED',
         );
     }
