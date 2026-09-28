@@ -20,8 +20,24 @@ import AppIcon from '../components/AppIcon.vue'
 import MarkdownPreview from '../components/MarkdownPreview.vue'
 
 import {
-  api,
-} from '../services/api'
+  deleteProjectTask,
+  getProject,
+  getProjectTask,
+  getProjectWorkflow,
+  setProjectTaskCompleted,
+  updateProjectTask,
+} from '../services/projectApi'
+
+import {
+  deleteTask,
+  getTask,
+  setTaskCompleted,
+  updateTask,
+} from '../services/taskApi'
+
+import {
+  getNote,
+} from '../services/noteApi'
 
 import {
   useTags,
@@ -103,13 +119,6 @@ const isProjectTask = computed(
       projectId.value,
     )
     && projectId.value > 0,
-)
-
-const taskEndpoint = computed(
-  () =>
-    isProjectTask.value
-      ? `/api/projects/${projectId.value}/tasks/${taskId.value}`
-      : `/api/tasks/${taskId.value}`,
 )
 
 const backPath =
@@ -206,19 +215,17 @@ async function load(): Promise<void> {
         loadedProject,
         workflow,
       ] = await Promise.all([
-        api<ProjectTask>(
-          taskEndpoint.value,
+        getProjectTask(
+          projectId.value,
+          taskId.value,
         ),
 
-        api<Project>(
-          `/api/projects/${projectId.value}`,
+        getProject(
+          projectId.value,
         ),
 
-        api<{
-          stages:
-            ProjectWorkflowStage[]
-        }>(
-          `/api/projects/${projectId.value}/workflow`,
+        getProjectWorkflow(
+          projectId.value,
         ),
 
         loadTags(),
@@ -232,13 +239,13 @@ async function load(): Promise<void> {
         loadedProject
 
       stages.value =
-        workflow.stages
+        workflow
 
       note.value = null
     } else {
       const loadedTask =
-        await api<Task>(
-          taskEndpoint.value,
+        await getTask(
+          taskId.value,
         )
 
       applyTask(
@@ -246,8 +253,8 @@ async function load(): Promise<void> {
       )
 
       note.value =
-        await api<Note>(
-          `/api/notes/${loadedTask.noteId}`,
+        await getNote(
+          loadedTask.noteId,
         )
 
       project.value = null
@@ -315,10 +322,7 @@ async function save(): Promise<void> {
   error.value = ''
 
   try {
-    const body: Record<
-      string,
-      unknown
-    > = {
+    const input = {
       title:
         title.value.trim(),
 
@@ -338,29 +342,27 @@ async function save(): Promise<void> {
         dueDate.value || null,
     }
 
-    if (
+    const updated =
       isProjectTask.value
       && selectedWorkflowStageId.value
         !== null
-    ) {
-      body.tagIds =
-        selectedTagIds.value
+        ? await updateProjectTask(
+            projectId.value,
+            taskId.value,
+            {
+              ...input,
 
-      body.workflowStageId =
-        selectedWorkflowStageId.value
-    }
+              tagIds:
+                selectedTagIds.value,
 
-    const updated =
-      await api<Task | ProjectTask>(
-        taskEndpoint.value,
-        {
-          method: 'PUT',
-
-          body: JSON.stringify(
-            body,
-          ),
-        },
-      )
+              workflowStageId:
+                selectedWorkflowStageId.value,
+            },
+          )
+        : await updateTask(
+            taskId.value,
+            input,
+          )
 
     applyTask(updated)
   } catch (exception) {
@@ -383,17 +385,16 @@ Promise<void> {
 
   try {
     const updated =
-      await api<Task | ProjectTask>(
-        `${taskEndpoint.value}/completed`,
-        {
-          method: 'PUT',
-
-          body: JSON.stringify({
-            completed:
-              !completed.value,
-          }),
-        },
-      )
+      isProjectTask.value
+        ? await setProjectTaskCompleted(
+            projectId.value,
+            taskId.value,
+            !completed.value,
+          )
+        : await setTaskCompleted(
+            taskId.value,
+            !completed.value,
+          )
 
     applyTask(updated)
   } catch (exception) {
@@ -433,12 +434,16 @@ Promise<void> {
   error.value = ''
 
   try {
-    await api(
-      taskEndpoint.value,
-      {
-        method: 'DELETE',
-      },
-    )
+    if (isProjectTask.value) {
+      await deleteProjectTask(
+        projectId.value,
+        taskId.value,
+      )
+    } else {
+      await deleteTask(
+        taskId.value,
+      )
+    }
 
     await router.push(
       backPath.value,

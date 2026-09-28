@@ -142,6 +142,15 @@ export async function reorderProjectWorkflow(
   return response.stages
 }
 
+export async function getProjectTask(
+  projectId: number,
+  taskId: number,
+): Promise<ProjectTask> {
+  return api<ProjectTask>(
+    `/api/projects/${projectId}/tasks/${taskId}`,
+  )
+}
+
 export async function getProjectTasks(
   projectId: number,
 ): Promise<ProjectTask[]> {

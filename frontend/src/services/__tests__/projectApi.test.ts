@@ -24,6 +24,7 @@ import {
   deleteProjectTask,
   deleteWorkflowStage,
   getProject,
+  getProjectTask,
   getProjectTasks,
   getProjectWorkflow,
   renameWorkflowStage,
@@ -100,6 +101,27 @@ describe('projectApi', () => {
     ).toHaveBeenNthCalledWith(
       3,
       '/api/projects/7/tasks',
+    )
+  })
+
+  it('loads a project task', async () => {
+    mocks.api.mockResolvedValue({
+      id: 21,
+    })
+
+    await expect(
+      getProjectTask(
+        7,
+        21,
+      ),
+    ).resolves.toEqual({
+      id: 21,
+    })
+
+    expect(
+      mocks.api,
+    ).toHaveBeenCalledWith(
+      '/api/projects/7/tasks/21',
     )
   })
 
