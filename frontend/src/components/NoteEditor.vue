@@ -351,8 +351,10 @@ async function addTask(): Promise<void> {
       {
         method: 'POST',
         body: JSON.stringify({
-          content:
+          title:
             taskText.value.trim(),
+
+          description: '',
         }),
       },
     )
@@ -917,12 +919,12 @@ async function restore(): Promise<void> {
 
             <input
               v-model="taskText"
-              maxlength="4000"
+              maxlength="255"
               placeholder="Ajouter une tâche"
             />
 
             <span class="char-count">
-              {{ taskText.length }}/4000
+              {{ taskText.length }}/255
             </span>
           </form>
 
@@ -948,7 +950,7 @@ async function restore(): Promise<void> {
                   :to="`/tasks/${task.id}`"
                   title="Ouvrir la tâche en plein écran"
                 >
-                  {{ task.content }}
+                  {{ task.title }}
                 </RouterLink>
 
                 <div class="task-meta">

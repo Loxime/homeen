@@ -37,6 +37,9 @@ const error = ref('')
 const taskContents =
   ref<Record<number, string>>({})
 
+const taskDescriptions =
+  ref<Record<number, string>>({})
+
 const creatingTaskStageId =
   ref<number | null>(null)
 
@@ -307,15 +310,22 @@ Promise<void> {
 async function createTask(
   stage: ProjectWorkflowStage,
 ): Promise<void> {
-  const content =
+  const title =
     (
       taskContents.value[
         stage.id
       ] ?? ''
     ).trim()
 
+  const description =
+    (
+      taskDescriptions.value[
+        stage.id
+      ] ?? ''
+    ).trim()
+
   if (
-    content === ''
+    title === ''
     || creatingTaskStageId.value
         !== null
   ) {
@@ -335,7 +345,9 @@ async function createTask(
           method: 'POST',
 
           body: JSON.stringify({
-            content,
+            title,
+            description,
+
             workflowStageId:
               stage.id,
           }),
@@ -348,6 +360,10 @@ async function createTask(
     ]
 
     taskContents.value[
+      stage.id
+    ] = ''
+
+    taskDescriptions.value[
       stage.id
     ] = ''
   } catch (exception) {
@@ -633,9 +649,9 @@ async function deleteTask(
   const result =
     await Swal.fire({
       icon: 'warning',
-      title: 'Supprimer cette tâche ?',
+      title: 'Supprimer cette issue ?',
       text:
-        `La tâche #${task.projectTaskNumber} sera supprimée définitivement.`,
+        `L’issue #${task.projectTaskNumber} sera supprimée définitivement.`,
       showCancelButton: true,
       confirmButtonText: 'Supprimer',
       cancelButtonText: 'Annuler',
@@ -1130,7 +1146,7 @@ onMounted(
                     stage.id,
                   ).length
                 }}
-                tâche{{
+                issue{{
                   tasksForStage(
                     stage.id,
                   ).length > 1
@@ -1303,7 +1319,7 @@ onMounted(
                       `/projects/${projectId}/tasks/${task.id}`
                     "
                   >
-                    {{ task.content }}
+                    {{ task.title }}
                   </RouterLink>
                 </p>
               </div>
@@ -1393,15 +1409,25 @@ onMounted(
               createTask(stage)
             "
           >
-            <textarea
+            <input
               v-model="
                 taskContents[
                   stage.id
                 ]
               "
-              maxlength="4000"
-              rows="2"
-              placeholder="Nouvelle tâche…"
+              maxlength="255"
+              placeholder="Titre de l’issue"
+            />
+
+            <textarea
+              v-model="
+                taskDescriptions[
+                  stage.id
+                ]
+              "
+              maxlength="20000"
+              rows="3"
+              placeholder="Description Markdown facultative…"
             />
 
             <button

@@ -34,6 +34,8 @@ export interface ProjectTask {
   workflowStageId: number
   workflowStageName: string
   workflowStagePosition: number
+  title: string
+  description: string
   content: string
   priority: TaskPriority
   status: TaskStatus
@@ -75,6 +77,8 @@ export interface Tag {
 export interface Task {
   id: number
   noteId: number
+  title: string
+  description: string
   content: string
   priority: TaskPriority
   status: TaskStatus

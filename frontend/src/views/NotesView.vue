@@ -448,7 +448,8 @@ Promise<void> {
           {
             method: 'POST',
             body: JSON.stringify({
-              content: task,
+              title: task,
+              description: '',
             }),
           },
         )

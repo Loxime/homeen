@@ -13,6 +13,7 @@ import {
 import Swal from 'sweetalert2'
 
 import AppIcon from '../components/AppIcon.vue'
+import MarkdownPreview from '../components/MarkdownPreview.vue'
 
 import {
   api,
@@ -55,7 +56,9 @@ const stages =
 const selectedWorkflowStageId =
   ref<number | null>(null)
 
-const content = ref('')
+const title = ref('')
+const description = ref('')
+
 const priority =
   ref<TaskPriority>('normal')
 
@@ -103,12 +106,23 @@ const taskEndpoint = computed(
       : `/api/tasks/${taskId.value}`,
 )
 
-const backPath = computed(
-  () =>
-    isProjectTask.value
-      ? `/projects/${projectId.value}`
-      : '/notes',
-)
+const backPath =
+  computed(
+    () => {
+      if (isProjectTask.value) {
+        return `/projects/${projectId.value}`
+      }
+
+      if (
+        task.value
+        && 'noteId' in task.value
+      ) {
+        return `/notes/${task.value.noteId}`
+      }
+
+      return '/notes'
+    },
+  )
 
 const projectTaskNumber =
   computed(
@@ -134,7 +148,15 @@ function applyTask(
   value: Task | ProjectTask,
 ): void {
   task.value = value
-  content.value = value.content
+
+  title.value =
+    value.title
+    || value.content
+
+  description.value =
+    value.description
+    ?? ''
+
   priority.value = value.priority
   status.value = value.status
   startDate.value = value.startDate
@@ -291,8 +313,11 @@ async function save(): Promise<void> {
       string,
       unknown
     > = {
-      content:
-        content.value.trim(),
+      title:
+        title.value.trim(),
+
+      description:
+        description.value,
 
       priority:
         priority.value,
@@ -538,7 +563,7 @@ onMounted(
             type="button"
             :disabled="
               saving
-              || !content.trim()
+              || !title.trim()
             "
             @click="save"
           >
@@ -560,22 +585,64 @@ onMounted(
 
       <div class="task-detail-layout">
         <main class="task-detail-main">
-          <label class="task-detail-content">
+          <label class="task-detail-title">
             <span>
-              Tâche
+              Titre
             </span>
 
-            <textarea
-              v-model="content"
-              maxlength="4000"
-              rows="8"
-              placeholder="Description de la tâche"
+            <input
+              v-model="title"
+              maxlength="255"
+              placeholder="Titre de l’issue"
             />
           </label>
 
+          <section class="task-markdown-editor">
+            <div class="task-markdown-heading">
+              <div>
+                <strong>
+                  Description
+                </strong>
+
+                <small class="muted">
+                  Markdown
+                </small>
+              </div>
+
+              <span class="muted">
+                {{ description.length }}/20000
+              </span>
+            </div>
+
+            <textarea
+              v-model="description"
+              maxlength="20000"
+              rows="12"
+              placeholder="Décrivez l’issue en Markdown…"
+            />
+
+            <div class="task-markdown-preview">
+              <strong class="task-markdown-preview-title">
+                Aperçu
+              </strong>
+
+              <MarkdownPreview
+                v-if="description.trim()"
+                :source="description"
+              />
+
+              <p
+                v-else
+                class="muted"
+              >
+                Aucune description.
+              </p>
+            </div>
+          </section>
+
           <div class="task-content-footer">
             <span>
-              {{ content.length }}/4000
+              {{ title.length }}/255
             </span>
 
             <button
@@ -799,3 +866,73 @@ onMounted(
     </template>
   </section>
 </template>
+
+
+<style scoped>
+.task-detail-title {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.task-detail-title > span {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.task-detail-title input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.task-markdown-editor {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.task-markdown-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.task-markdown-heading > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.task-markdown-editor textarea {
+  width: 100%;
+  min-height: 260px;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+  line-height: 1.55;
+}
+
+.task-markdown-preview {
+  min-height: 100px;
+  padding: 1rem;
+  border: 1px solid
+    var(--g-border);
+  border-radius: 12px;
+  background:
+    var(--g-surface-alt);
+}
+
+.task-markdown-preview-title {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+</style>
