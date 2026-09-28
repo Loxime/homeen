@@ -12,6 +12,10 @@ import {
   api,
 } from '../services/api'
 
+import {
+  useToast,
+} from '../composables/useToast'
+
 import type {
   Project,
   ProjectRole,
@@ -42,6 +46,19 @@ interface AccessStatus {
   email: string | null
 }
 
+interface ProjectDraft {
+  name: string
+  description: string
+}
+
+const {
+  success:
+    showSuccess,
+
+  error:
+    showError,
+} = useToast()
+
 const projects =
   ref<Project[]>([])
 
@@ -62,24 +79,10 @@ const memberActionBusy =
 const loading = ref(true)
 const error = ref('')
 
-const name = ref('')
-const description = ref('')
-const color = ref('#1A73E8')
 const creating = ref(false)
 
 const inviteEmails =
   ref<Record<number, string>>({})
-
-const confirmedInvitees =
-  ref<
-    Record<
-      number,
-      ProjectInvitee | undefined
-    >
-  >({})
-
-const lookupBusyProjectId =
-  ref<number | null>(null)
 
 const busyProjectId =
   ref<number | null>(null)
@@ -134,44 +137,157 @@ async function load(): Promise<void> {
 
 async function createProject():
 Promise<void> {
-  const projectName =
-    name.value.trim()
+  if (creating.value) {
+    return
+  }
+
+  const result =
+    await Swal.fire<ProjectDraft>({
+      title: 'Nouveau projet',
+
+      html: `
+        <div
+          style="
+            display:grid;
+            gap:14px;
+            text-align:left;
+          "
+        >
+          <label
+            style="
+              display:grid;
+              gap:6px;
+            "
+          >
+            <span>Nom du projet</span>
+
+            <input
+              id="project-create-name"
+              class="swal2-input"
+              maxlength="120"
+              autocomplete="off"
+              placeholder="Nom du projet"
+              style="
+                width:100%;
+                margin:0;
+                box-sizing:border-box;
+              "
+            />
+          </label>
+
+          <label
+            style="
+              display:grid;
+              gap:6px;
+            "
+          >
+            <span>
+              Description
+              <small>(optionnel)</small>
+            </span>
+
+            <textarea
+              id="project-create-description"
+              class="swal2-textarea"
+              maxlength="4000"
+              rows="5"
+              placeholder="Description du projet"
+              style="
+                width:100%;
+                margin:0;
+                box-sizing:border-box;
+                resize:vertical;
+              "
+            ></textarea>
+          </label>
+        </div>
+      `,
+
+      showCancelButton: true,
+      confirmButtonText: 'Créer',
+      cancelButtonText: 'Annuler',
+
+      focusConfirm: false,
+
+      preConfirm: () => {
+        const popup =
+          Swal.getPopup()
+
+        const nameInput =
+          popup?.querySelector<HTMLInputElement>(
+            '#project-create-name',
+          )
+
+        const descriptionInput =
+          popup?.querySelector<HTMLTextAreaElement>(
+            '#project-create-description',
+          )
+
+        const projectName =
+          nameInput?.value.trim()
+          ?? ''
+
+        if (projectName === '') {
+          Swal.showValidationMessage(
+            'Le nom du projet est obligatoire.',
+          )
+
+          return false
+        }
+
+        return {
+          name:
+            projectName,
+
+          description:
+            descriptionInput
+              ?.value
+              .trim()
+            ?? '',
+        }
+      },
+    })
 
   if (
-    projectName === ''
-    || creating.value
+    !result.isConfirmed
+    || !result.value
   ) {
     return
   }
 
   creating.value = true
-  error.value = ''
 
   try {
-    await api<Project>(
-      '/api/projects',
-      {
-        method: 'POST',
+    const project =
+      await api<Project>(
+        '/api/projects',
+        {
+          method: 'POST',
 
-        body: JSON.stringify({
-          name: projectName,
-          description:
-            description.value,
-          color: color.value,
-        }),
-      },
-    )
+          body: JSON.stringify({
+            name:
+              result.value.name,
 
-    name.value = ''
-    description.value = ''
-    color.value = '#1A73E8'
+            description:
+              result.value.description,
+
+            color:
+              '#1A73E8',
+          }),
+        },
+      )
 
     await load()
+
+    showSuccess(
+      `Création du projet ${project.name}.`,
+    )
   } catch (exception) {
-    error.value =
+    showError(
       exception instanceof Error
         ? exception.message
-        : 'Impossible de créer le projet.'
+        : 'Impossible de créer le projet.',
+    )
   } finally {
     creating.value = false
   }
@@ -204,15 +320,7 @@ function invitationErrorMessage(
     ?? exception.message
 }
 
-function clearConfirmedInvitee(
-  projectId: number,
-): void {
-  delete confirmedInvitees.value[
-    projectId
-  ]
-}
-
-async function lookupInvitee(
+async function invite(
   project: Project,
 ): Promise<void> {
   const email =
@@ -224,24 +332,20 @@ async function lookupInvitee(
 
   if (
     email === ''
-    || lookupBusyProjectId.value
-      !== null
-    || busyProjectId.value
-      !== null
+    || busyProjectId.value !== null
   ) {
     return
   }
 
-  clearConfirmedInvitee(
-    project.id,
-  )
-
-  lookupBusyProjectId.value =
+  busyProjectId.value =
     project.id
 
-  error.value = ''
-
   try {
+    /*
+     * Vérifie automatiquement que l'adresse
+     * correspond bien à un compte Harpocrate
+     * avant de créer l'invitation.
+     */
     const invitee =
       await api<ProjectInvitee>(
         `/api/projects/${project.id}/invitees/lookup`,
@@ -254,88 +358,14 @@ async function lookupInvitee(
         },
       )
 
-    /*
-     * Le champ peut avoir changé pendant
-     * la requête. Ne jamais confirmer une
-     * ancienne valeur dans ce cas.
-     */
-    if (
-      (
-        inviteEmails.value[
-          project.id
-        ] ?? ''
-      ).trim() !== email
-    ) {
-      return
-    }
-
-    confirmedInvitees.value[
-      project.id
-    ] = invitee
-
-    /*
-     * Utilise l'adresse primaire canonique
-     * retournée par Harpocrate.
-     */
-    inviteEmails.value[
-      project.id
-    ] = invitee.email
-  } catch (exception) {
-    clearConfirmedInvitee(
-      project.id,
-    )
-
-    error.value =
-      invitationErrorMessage(
-        exception,
-        'Impossible de vérifier ce compte.',
-      )
-  } finally {
-    lookupBusyProjectId.value = null
-  }
-}
-
-async function invite(
-  project: Project,
-): Promise<void> {
-  const invitee =
-    confirmedInvitees.value[
-      project.id
-    ]
-
-  const email =
-    (
-      inviteEmails.value[
-        project.id
-      ] ?? ''
-    ).trim()
-
-  if (
-    invitee === undefined
-    || email === ''
-    || email.toLowerCase()
-      !== invitee.email
-        .toLowerCase()
-    || busyProjectId.value !== null
-    || lookupBusyProjectId.value
-      !== null
-  ) {
-    return
-  }
-
-  busyProjectId.value =
-    project.id
-
-  error.value = ''
-
-  try {
     await api(
       `/api/projects/${project.id}/invitations`,
       {
         method: 'POST',
 
         body: JSON.stringify({
-          email: invitee.email,
+          email:
+            invitee.email,
         }),
       },
     )
@@ -344,15 +374,16 @@ async function invite(
       project.id
     ] = ''
 
-    clearConfirmedInvitee(
-      project.id,
+    showSuccess(
+      `Invitation envoyée à ${invitee.email}.`,
     )
   } catch (exception) {
-    error.value =
+    showError(
       invitationErrorMessage(
         exception,
         'Impossible d’envoyer l’invitation.',
-      )
+      ),
+    )
   } finally {
     busyProjectId.value = null
   }
@@ -1017,8 +1048,7 @@ async function deleteProject(
         + 'Ses tâches de projet seront supprimées, '
         + 'mais ses notes resteront disponibles.',
       showCancelButton: true,
-      confirmButtonText:
-        'Supprimer le projet',
+      confirmButtonText: 'Oui',
       cancelButtonText: 'Annuler',
       focusCancel: true,
     })
@@ -1053,6 +1083,10 @@ async function deleteProject(
 
     projectMembers.value =
       remainingMembers
+
+    showSuccess(
+      `Projet ${project.name} supprimé.`,
+    )
   } catch (exception) {
     error.value =
       exception instanceof Error
@@ -1243,39 +1277,16 @@ onMounted(
             notes, tâches et collaborateurs.
           </p>
         </div>
-      </div>
-
-      <form
-        class="project-create-form"
-        @submit.prevent="createProject"
-      >
-        <input
-          v-model.trim="name"
-          maxlength="120"
-          placeholder="Nom du projet"
-          required
-        />
-
-        <textarea
-          v-model="description"
-          maxlength="4000"
-          rows="2"
-          placeholder="Description facultative"
-        />
-
-        <input
-          v-model="color"
-          type="color"
-          class="color-input"
-          aria-label="Couleur du projet"
-        />
 
         <button
-          class="ui-button ui-button--primary"
-          :disabled="
-            creating
-            || !name.trim()
+          class="
+            ui-button
+            ui-button--primary
+            project-create-button
           "
+          type="button"
+          :disabled="creating"
+          @click="createProject"
         >
           <AppIcon
             name="plus"
@@ -1285,10 +1296,10 @@ onMounted(
           {{
             creating
               ? 'Création…'
-              : 'Créer'
+              : 'Créer un projet'
           }}
         </button>
-      </form>
+      </div>
     </section>
 
     <p
@@ -1408,106 +1419,80 @@ onMounted(
               type="email"
               maxlength="254"
               autocomplete="email"
-              placeholder="Rechercher un compte Harpocrate"
-              aria-label="Compte Harpocrate à rechercher"
-              @input="
-                clearConfirmedInvitee(
-                  project.id,
-                )
-              "
+              placeholder="Email d’un compte Harpocrate"
+              aria-label="Compte Harpocrate à inviter"
             />
 
-            <small
-              v-if="
-                confirmedInvitees[
-                  project.id
-                ]
-              "
-              class="project-invite-selected"
-            >
-              Compte sélectionné :
-              <strong>
-                {{
-                  confirmedInvitees[
-                    project.id
-                  ]?.email
-                }}
-              </strong>
-            </small>
-
-            <small
-              v-else
-              class="muted"
-            >
-              Saisissez l’email exact
-              d’un compte Harpocrate.
+            <small class="muted">
+              Le compte est vérifié
+              automatiquement avant l’envoi.
             </small>
           </div>
 
           <button
-            class="ui-button ui-button--secondary"
-            type="button"
+            class="
+              ui-button
+              ui-button--secondary
+            "
+            type="submit"
             :disabled="
-              lookupBusyProjectId !== null
-              || busyProjectId !== null
+              busyProjectId !== null
               || !inviteEmails[
                 project.id
               ]?.trim()
             "
-            @click="
-              lookupInvitee(project)
-            "
           >
             {{
-              lookupBusyProjectId
+              busyProjectId
                 === project.id
-                ? 'Vérification…'
-                : 'Vérifier'
+                ? 'Envoi…'
+                : 'Inviter'
             }}
-          </button>
-
-          <button
-            class="ui-button ui-button--secondary"
-            type="submit"
-            :disabled="
-              busyProjectId !== null
-              || lookupBusyProjectId
-                !== null
-              || !confirmedInvitees[
-                project.id
-              ]
-            "
-          >
-            Inviter
           </button>
         </form>
 
-        <button
-          v-if="project.role === 'owner'"
-          class="
-            ui-button
-            ui-button--secondary
-            project-delete
-          "
-          type="button"
-          :disabled="
-            busyProjectId !== null
-          "
-          @click="
-            deleteProject(project)
-          "
-        >
-          Supprimer le projet
-        </button>
+        <div class="project-card-icon-actions">
+          <RouterLink
+            class="
+              project-card-icon-action
+              project-open
+            "
+            :to="
+              `/projects/${project.id}`
+            "
+            title="Ouvrir le projet"
+            :aria-label="
+              `Ouvrir le projet ${project.name}`
+            "
+          >
+            <span aria-hidden="true">
+              📂
+            </span>
+          </RouterLink>
 
-        <RouterLink
-          class="ui-button ui-button--primary project-open"
-          :to="
-            `/projects/${project.id}`
-          "
-        >
-          Ouvrir le projet
-        </RouterLink>
+          <button
+            v-if="project.role === 'owner'"
+            class="
+              project-card-icon-action
+              project-delete
+            "
+            type="button"
+            title="Supprimer le projet"
+            :aria-label="
+              `Supprimer le projet ${project.name}`
+            "
+            :disabled="
+              busyProjectId !== null
+            "
+            @click="
+              deleteProject(project)
+            "
+          >
+            <span aria-hidden="true">
+              🗑️
+            </span>
+          </button>
+        </div>
       </article>
     </div>
   </section>
@@ -1620,6 +1605,38 @@ onMounted(
 .project-card-actions {
   display: flex;
   gap: 0.5rem;
+}
+
+.project-card-icon-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.project-card-icon-action {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid
+    var(--border-color, #dadce0);
+  border-radius: 12px;
+  background:
+    var(--surface, #fff);
+  font-size: 1.1rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.project-card-icon-action:hover {
+  background:
+    var(--surface-soft, #f6f8fc);
+}
+
+.project-card-icon-action.project-delete {
+  color:
+    var(--danger, #b3261e);
 }
 
 .project-open {

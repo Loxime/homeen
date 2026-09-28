@@ -48,6 +48,9 @@ const route = useRoute()
 const {
   success:
     showSuccess,
+
+  error:
+    showError,
 } = useToast()
 
 const notes =
@@ -478,10 +481,14 @@ Promise<void> {
         : 'Note créée.',
     )
   } catch (exception) {
-    error.value =
+    const message =
       exception instanceof Error
         ? exception.message
         : 'Impossible de créer la note.'
+
+    showError(
+      message,
+    )
 
     /*
      * A failure after note creation may leave
@@ -850,12 +857,14 @@ onMounted(
     <div
       v-if="
         scope === 'active'
-        && !quickComposerOpen
       "
       class="keep-note-composer-shell"
     >
       <button
-        class="keep-note-composer keep-note-composer-main"
+        class="
+          keep-note-composer
+          keep-note-composer-main
+        "
         type="button"
         @click="openQuickComposer"
       >
@@ -882,159 +891,6 @@ onMounted(
         />
       </button>
     </div>
-
-    <form
-      v-else-if="
-        scope === 'active'
-      "
-      class="keep-quick-composer"
-      @submit.prevent="
-        createQuickNote
-      "
-    >
-      <div class="keep-quick-mode-heading">
-        <AppIcon
-          :name="
-            quickMode === 'list'
-              ? 'list'
-              : 'note'
-          "
-          :size="18"
-        />
-
-        <span>
-          {{
-            quickMode === 'list'
-              ? 'Nouvelle liste'
-              : 'Nouvelle note'
-          }}
-        </span>
-      </div>
-
-      <input
-        ref="quickTitleInput"
-        v-model="quickTitle"
-        class="keep-quick-title"
-        maxlength="255"
-        placeholder="Titre"
-        aria-label="Titre de la note"
-      />
-
-      <textarea
-        v-if="
-          quickMode === 'note'
-        "
-        ref="quickContentInput"
-        v-model="quickContent"
-        class="keep-quick-content"
-        placeholder="Créer une note…"
-        aria-label="Contenu de la note"
-        rows="3"
-        @keydown.ctrl.enter.prevent="
-          createQuickNote
-        "
-        @keydown.meta.enter.prevent="
-          createQuickNote
-        "
-        @keydown.esc="
-          closeQuickComposer
-        "
-      />
-
-      <div
-        v-else
-        class="keep-quick-list"
-      >
-        <div
-          v-for="(_, index) in quickTasks"
-          :key="index"
-          class="keep-quick-task"
-        >
-          <input
-            v-model="
-              quickTasks[index]
-            "
-            maxlength="4000"
-            :placeholder="
-              `Élément ${index + 1}`
-            "
-            :aria-label="
-              `Élément ${index + 1}`
-            "
-            @keydown.ctrl.enter.prevent="
-              createQuickNote
-            "
-            @keydown.meta.enter.prevent="
-              createQuickNote
-            "
-            @keydown.esc="
-              closeQuickComposer
-            "
-          />
-
-          <button
-            type="button"
-            title="Retirer cet élément"
-            aria-label="Retirer cet élément"
-            @click="
-              removeQuickTask(index)
-            "
-          >
-            <AppIcon
-              name="close"
-              :size="15"
-            />
-          </button>
-        </div>
-
-        <button
-          type="button"
-          class="keep-quick-add-task"
-          @click="addQuickTask"
-        >
-          <AppIcon
-            name="plus"
-            :size="16"
-          />
-
-          Ajouter un élément
-        </button>
-      </div>
-
-      <footer class="keep-quick-actions">
-        <span class="muted">
-          Ctrl/Cmd + Entrée pour créer
-        </span>
-
-        <div>
-          <button
-            type="button"
-            class="keep-quick-close"
-            :disabled="quickSaving"
-            @click="
-              closeQuickComposer
-            "
-          >
-            Fermer
-          </button>
-
-          <button
-            type="submit"
-            class="keep-quick-create"
-            :disabled="
-              quickSaving
-              || !quickCanCreate
-            "
-          >
-            {{
-              quickSaving
-                ? 'Création…'
-                : 'Créer'
-            }}
-          </button>
-        </div>
-      </footer>
-    </form>
 
     <p
       v-if="error"
@@ -1466,6 +1322,164 @@ onMounted(
         </button>
       </div>
     </div>
+
+    <BaseModal
+      :open="quickComposerOpen"
+      :title="
+        quickMode === 'list'
+          ? 'Nouvelle liste'
+          : 'Nouvelle note'
+      "
+      @close="closeQuickComposer"
+    >
+      <form
+        class="
+          keep-quick-composer
+          keep-quick-composer--modal
+        "
+        @submit.prevent="
+          createQuickNote
+        "
+      >
+        <div class="keep-quick-mode-heading">
+          <AppIcon
+            :name="
+              quickMode === 'list'
+                ? 'list'
+                : 'note'
+            "
+            :size="18"
+          />
+
+          <strong>
+            {{
+              quickMode === 'list'
+                ? 'Créer une liste'
+                : 'Créer une note'
+            }}
+          </strong>
+        </div>
+
+        <input
+          ref="quickTitleInput"
+          v-model="quickTitle"
+          class="keep-quick-title"
+          maxlength="255"
+          placeholder="Titre"
+          aria-label="Titre"
+          autofocus
+        />
+
+        <textarea
+          v-if="
+            quickMode === 'note'
+          "
+          ref="quickContentInput"
+          v-model="quickContent"
+          class="keep-quick-content"
+          placeholder="Contenu de la note…"
+          aria-label="Contenu de la note"
+          rows="7"
+          @keydown.ctrl.enter.prevent="
+            createQuickNote
+          "
+          @keydown.meta.enter.prevent="
+            createQuickNote
+          "
+        />
+
+        <div
+          v-else
+          class="keep-quick-list"
+        >
+          <div
+            v-for="(_, index) in quickTasks"
+            :key="index"
+            class="keep-quick-task"
+          >
+            <input
+              v-model="
+                quickTasks[index]
+              "
+              maxlength="4000"
+              :placeholder="
+                `Tâche ${index + 1}`
+              "
+              :aria-label="
+                `Tâche ${index + 1}`
+              "
+              @keydown.ctrl.enter.prevent="
+                createQuickNote
+              "
+              @keydown.meta.enter.prevent="
+                createQuickNote
+              "
+            />
+
+            <button
+              type="button"
+              title="Retirer"
+              aria-label="Retirer cette tâche"
+              @click="
+                removeQuickTask(index)
+              "
+            >
+              <AppIcon
+                name="close"
+                :size="15"
+              />
+            </button>
+          </div>
+
+          <button
+            type="button"
+            class="keep-quick-add-task"
+            @click="addQuickTask"
+          >
+            <AppIcon
+              name="plus"
+              :size="16"
+            />
+
+            Ajouter une tâche
+          </button>
+        </div>
+
+        <footer class="keep-quick-actions">
+          <span class="muted">
+            Ctrl/Cmd + Entrée pour créer
+          </span>
+
+          <div>
+            <button
+              type="button"
+              class="keep-quick-close"
+              :disabled="quickSaving"
+              @click="
+                closeQuickComposer
+              "
+            >
+              Annuler
+            </button>
+
+            <button
+              type="submit"
+              class="keep-quick-create"
+              :disabled="
+                quickSaving
+                || !quickCanCreate
+              "
+            >
+              {{
+                quickSaving
+                  ? 'Création…'
+                  : 'Créer'
+              }}
+            </button>
+          </div>
+        </footer>
+      </form>
+    </BaseModal>
 
     <BaseModal
       :open="modalOpen"
