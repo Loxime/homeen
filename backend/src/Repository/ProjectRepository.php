@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Exception\ForbiddenException;
+use App\Exception\NotFoundException;
+use App\Exception\ValidationException;
 use App\Service\ActivityLogger;
 use App\Service\CurrentUser;
 use Doctrine\DBAL\Connection;
@@ -34,8 +37,9 @@ final readonly class ProjectRepository
                 'TRUE',
 
             default =>
-                throw new \InvalidArgumentException(
+                throw new ValidationException(
                     'Unknown project scope.',
+                    'INVALID_PROJECT_SCOPE',
                 ),
         };
 
@@ -285,8 +289,9 @@ SQL,
                 );
 
         if ($affected !== 1) {
-            throw new \OutOfBoundsException(
+            throw new NotFoundException(
                 'Project not found.',
+                'PROJECT_NOT_FOUND',
             );
         }
 
@@ -367,8 +372,9 @@ SQL,
                         );
 
                     if ($affected !== 1) {
-                        throw new \OutOfBoundsException(
+                        throw new NotFoundException(
                             'Project not found.',
+                            'PROJECT_NOT_FOUND',
                         );
                     }
                 },
@@ -506,8 +512,9 @@ SQL,
              * for missing and inaccessible
              * projects.
              */
-            throw new \OutOfBoundsException(
+            throw new NotFoundException(
                 'Project not found.',
+                'PROJECT_NOT_FOUND',
             );
         }
 
@@ -544,7 +551,8 @@ SQL,
             return;
         }
 
-        throw new \DomainException(
+        throw new ForbiddenException(
+            'Project administrator privileges are required.',
             'PROJECT_MANAGEMENT_REQUIRED',
         );
     }
@@ -556,7 +564,8 @@ SQL,
             return;
         }
 
-        throw new \DomainException(
+        throw new ForbiddenException(
+            'Only the project owner can delete this project.',
             'PROJECT_OWNER_REQUIRED',
         );
     }
@@ -570,8 +579,9 @@ SQL,
             $name === ''
             || mb_strlen($name) > 120
         ) {
-            throw new \InvalidArgumentException(
+            throw new ValidationException(
                 'Project name must contain between 1 and 120 characters.',
+                'INVALID_PROJECT_INPUT',
             );
         }
 
@@ -588,8 +598,9 @@ SQL,
             mb_strlen($description)
             > 4000
         ) {
-            throw new \InvalidArgumentException(
+            throw new ValidationException(
                 'Project description cannot exceed 4000 characters.',
+                'INVALID_PROJECT_INPUT',
             );
         }
 
@@ -605,8 +616,9 @@ SQL,
                 $color,
             ) !== 1
         ) {
-            throw new \InvalidArgumentException(
+            throw new ValidationException(
                 'Project color must be a six-digit hexadecimal color.',
+                'INVALID_PROJECT_INPUT',
             );
         }
 

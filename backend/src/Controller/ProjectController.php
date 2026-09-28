@@ -95,36 +95,14 @@ final readonly class ProjectController
                 ),
             );
 
-        try {
-            return new JsonResponse(
-                $this->projects->update(
-                    $id,
-                    $input->name,
-                    $input->description,
-                    $input->color,
-                ),
-            );
-        } catch (
-            \DomainException $exception
-        ) {
-            if (
-                $exception->getMessage()
-                !== 'PROJECT_MANAGEMENT_REQUIRED'
-            ) {
-                throw $exception;
-            }
-
-            return new JsonResponse(
-                [
-                    'error' =>
-                        'Project administrator privileges are required.',
-
-                    'code' =>
-                        'PROJECT_MANAGEMENT_REQUIRED',
-                ],
-                403,
-            );
-        }
+        return new JsonResponse(
+            $this->projects->update(
+                $id,
+                $input->name,
+                $input->description,
+                $input->color,
+            ),
+        );
     }
 
     #[Route(
@@ -135,36 +113,14 @@ final readonly class ProjectController
     public function delete(
         int $id,
     ): JsonResponse {
-        try {
-            $this->projects->delete(
-                $id,
-            );
+        $this->projects->delete(
+            $id,
+        );
 
-            return new JsonResponse(
-                null,
-                204,
-            );
-        } catch (
-            \DomainException $exception
-        ) {
-            if (
-                $exception->getMessage()
-                !== 'PROJECT_OWNER_REQUIRED'
-            ) {
-                throw $exception;
-            }
-
-            return new JsonResponse(
-                [
-                    'error' =>
-                        'Only the project owner can delete this project.',
-
-                    'code' =>
-                        'PROJECT_OWNER_REQUIRED',
-                ],
-                403,
-            );
-        }
+        return new JsonResponse(
+            null,
+            204,
+        );
     }
 
     #[Route(
