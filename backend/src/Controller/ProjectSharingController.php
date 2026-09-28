@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Dto\Input\ProjectInviteInput;
+use App\Dto\Input\ProjectMemberRoleInput;
 use App\Repository\ProjectSharingRepository;
 use App\Service\JsonInput;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -40,19 +42,18 @@ final readonly class ProjectSharingController
         int $id,
         Request $request,
     ): JsonResponse {
-        $data =
-            $this->input->read(
-                $request,
+        $input =
+            ProjectInviteInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
             );
 
         return new JsonResponse(
             $this->sharing
                 ->lookupInvitee(
                     $id,
-                    (string) (
-                        $data['email']
-                        ?? ''
-                    ),
+                    $input->email,
                 ),
         );
     }
@@ -66,18 +67,17 @@ final readonly class ProjectSharingController
         int $id,
         Request $request,
     ): JsonResponse {
-        $data =
-            $this->input->read(
-                $request,
+        $input =
+            ProjectInviteInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
             );
 
         return new JsonResponse(
             $this->sharing->invite(
                 $id,
-                (string) (
-                    $data['email']
-                    ?? ''
-                ),
+                $input->email,
             ),
             201,
         );
@@ -126,19 +126,18 @@ final readonly class ProjectSharingController
         int $userId,
         Request $request,
     ): JsonResponse {
-        $data =
-            $this->input->read(
-                $request,
+        $input =
+            ProjectMemberRoleInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
             );
 
         return new JsonResponse(
             $this->sharing->setRole(
                 $id,
                 $userId,
-                (string) (
-                    $data['role']
-                    ?? ''
-                ),
+                $input->role,
             ),
         );
     }

@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Exception\ValidationException;
+use App\Dto\Input\ProjectWorkflowOrderInput;
+use App\Dto\Input\ProjectWorkflowStageInput;
 use App\Repository\ProjectWorkflowRepository;
 use App\Service\JsonInput;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -48,18 +49,17 @@ final readonly class ProjectWorkflowController
         int $projectId,
         Request $request,
     ): JsonResponse {
-        $data =
-            $this->input->read(
-                $request,
+        $input =
+            ProjectWorkflowStageInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
             );
 
         return new JsonResponse(
             $this->workflow->create(
                 $projectId,
-                (string) (
-                    $data['name']
-                    ?? ''
-                ),
+                $input->name,
             ),
             201,
         );
@@ -75,19 +75,18 @@ final readonly class ProjectWorkflowController
         int $stageId,
         Request $request,
     ): JsonResponse {
-        $data =
-            $this->input->read(
-                $request,
+        $input =
+            ProjectWorkflowStageInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
             );
 
         return new JsonResponse(
             $this->workflow->rename(
                 $projectId,
                 $stageId,
-                (string) (
-                    $data['name']
-                    ?? ''
-                ),
+                $input->name,
             ),
         );
     }
@@ -101,45 +100,19 @@ final readonly class ProjectWorkflowController
         int $projectId,
         Request $request,
     ): JsonResponse {
-        $data =
-            $this->input->read(
-                $request,
+        $input =
+            ProjectWorkflowOrderInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
             );
-
-        $rawStageIds =
-            $data['stageIds']
-            ?? null;
-
-        if (!is_array($rawStageIds)) {
-            throw new ValidationException(
-                'stageIds must be an array.',
-                'PROJECT_WORKFLOW_INVALID',
-            );
-        }
-
-        $stageIds = [];
-
-        foreach ($rawStageIds as $stageId) {
-            if (
-                !is_int($stageId)
-                || $stageId <= 0
-            ) {
-                throw new ValidationException(
-                    'stageIds must contain positive integers.',
-                    'PROJECT_WORKFLOW_INVALID',
-                );
-            }
-
-            $stageIds[] =
-                $stageId;
-        }
 
         return new JsonResponse([
             'stages' =>
                 $this->workflow
                     ->reorder(
                         $projectId,
-                        $stageIds,
+                        $input->stageIds,
                     ),
         ]);
     }
