@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Dto\Input\UsageActivityInput;
 use App\Repository\UsageRepository;
 use App\Service\JsonInput;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -26,16 +27,34 @@ final readonly class UsageController
     #[Route('/sessions/{id<\\d+>}/heartbeat', name: 'api_usage_heartbeat', methods: ['POST'])]
     public function heartbeat(int $id, Request $request): JsonResponse
     {
-        $data = $this->input->read($request);
-        $this->usage->heartbeat($id, (int) ($data['activeSeconds'] ?? 0));
+        $input =
+            UsageActivityInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
+            );
+
+        $this->usage->heartbeat(
+            $id,
+            $input->activeSeconds,
+        );
         return new JsonResponse(['ok' => true]);
     }
 
     #[Route('/sessions/{id<\\d+>}/stop', name: 'api_usage_stop', methods: ['POST'])]
     public function stop(int $id, Request $request): JsonResponse
     {
-        $data = $this->input->read($request);
-        $this->usage->stop($id, (int) ($data['activeSeconds'] ?? 0));
+        $input =
+            UsageActivityInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
+            );
+
+        $this->usage->stop(
+            $id,
+            $input->activeSeconds,
+        );
         return new JsonResponse(['ok' => true]);
     }
 }

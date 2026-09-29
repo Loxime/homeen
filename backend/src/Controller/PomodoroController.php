@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Dto\Input\PomodoroRatingInput;
+use App\Dto\Input\PomodoroStartInput;
 use App\Repository\PomodoroRepository;
 use App\Service\JsonInput;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -32,8 +34,19 @@ final readonly class PomodoroController
     #[Route('/sessions', name: 'api_pomodoro_start', methods: ['POST'])]
     public function start(Request $request): JsonResponse
     {
-        $data = $this->input->read($request);
-        return new JsonResponse($this->pomodoro->start((int) ($data['workMinutes'] ?? 0)), 201);
+        $input =
+            PomodoroStartInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
+            );
+
+        return new JsonResponse(
+            $this->pomodoro->start(
+                $input->workMinutes,
+            ),
+            201,
+        );
     }
 
     #[Route('/quick-start', name: 'api_pomodoro_quick_start', methods: ['POST'])]
@@ -74,15 +87,17 @@ final readonly class PomodoroController
         int $id,
         Request $request,
     ): JsonResponse {
-        $data = $this->input->read($request);
+        $input =
+            PomodoroRatingInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
+            );
 
         return new JsonResponse(
             $this->pomodoro->rate(
                 $id,
-                (int) (
-                    $data['rating']
-                    ?? 0
-                ),
+                $input->rating,
             ),
         );
     }

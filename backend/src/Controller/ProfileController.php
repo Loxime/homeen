@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Dto\Input\ProfileDeleteInput;
+use App\Dto\Input\ProfileEmailInput;
+use App\Dto\Input\ProfileNotificationInput;
+use App\Dto\Input\ProfilePasswordChangeInput;
 use App\Repository\UserRepository;
 use App\Service\JsonInput;
 use App\Service\UserPasswordService;
@@ -56,11 +60,14 @@ final readonly class ProfileController
     public function addEmail(
         Request $request,
     ): JsonResponse {
-        $data = $this->input->read($request);
+        $input =
+            ProfileEmailInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
+            );
 
-        $email = trim(
-            (string) ($data['email'] ?? '')
-        );
+        $email = $input->email;
 
         if (
             $email === ''
@@ -156,19 +163,22 @@ final readonly class ProfileController
         Request $request,
     ): JsonResponse {
         $userId = $this->userId($request);
-        $data = $this->input->read($request);
 
-        $currentPassword = (string) (
-            $data['currentPassword'] ?? ''
-        );
+        $input =
+            ProfilePasswordChangeInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
+            );
 
-        $password = (string) (
-            $data['password'] ?? ''
-        );
+        $currentPassword =
+            $input->currentPassword;
 
-        $confirmation = (string) (
-            $data['confirmation'] ?? ''
-        );
+        $password =
+            $input->password;
+
+        $confirmation =
+            $input->confirmation;
 
         $currentHash = $this->users
             ->findPasswordHash($userId);
@@ -261,30 +271,15 @@ final readonly class ProfileController
     public function notifications(
         Request $request,
     ): JsonResponse {
-        $data = $this->input->read($request);
-
-        if (
-            !array_key_exists(
-                'soundEnabled',
-                $data,
-            )
-            || !is_bool(
-                $data['soundEnabled']
-            )
-        ) {
-            return new JsonResponse(
-                [
-                    'error' =>
-                        'soundEnabled must be a boolean.',
-                    'code' =>
-                        'INVALID_NOTIFICATION_SETTING',
-                ],
-                422,
+        $input =
+            ProfileNotificationInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
             );
-        }
 
         $enabled =
-            $data['soundEnabled'];
+            $input->soundEnabled;
 
         $this->users
             ->setNotificationSoundEnabled(
@@ -307,11 +302,15 @@ final readonly class ProfileController
     ): JsonResponse {
         $userId = $this->userId($request);
 
-        $data = $this->input->read($request);
+        $input =
+            ProfileDeleteInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
+            );
 
-        $password = (string) (
-            $data['password'] ?? ''
-        );
+        $password =
+            $input->password;
 
         if ($password === '') {
             return new JsonResponse(

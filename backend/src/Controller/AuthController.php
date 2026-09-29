@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Dto\Input\AuthLoginInput;
+use App\Dto\Input\AuthPasswordChangeInput;
 use App\Repository\UserRepository;
 use App\Service\JsonInput;
 use App\Service\UserPasswordService;
@@ -56,15 +58,15 @@ final readonly class AuthController
             );
         }
 
-        $data = $this->input->read($request);
+        $input =
+            AuthLoginInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
+            );
 
-        $email = trim(
-            (string) ($data['email'] ?? '')
-        );
-
-        $password = (string) (
-            $data['password'] ?? ''
-        );
+        $email = $input->email;
+        $password = $input->password;
 
         $user = $this
             ->users
@@ -189,15 +191,18 @@ final readonly class AuthController
             );
         }
 
-        $data = $this->input->read($request);
+        $input =
+            AuthPasswordChangeInput::fromArray(
+                $this->input->read(
+                    $request,
+                ),
+            );
 
-        $password = (string) (
-            $data['password'] ?? ''
-        );
+        $password =
+            $input->password;
 
-        $confirmation = (string) (
-            $data['confirmation'] ?? ''
-        );
+        $confirmation =
+            $input->confirmation;
 
         if ($password !== $confirmation) {
             return new JsonResponse(

@@ -67,6 +67,36 @@ final class InputValue
         return $value;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
+    public static function integer(
+        array $data,
+        string $field,
+        int $default,
+        string $errorCode,
+    ): int {
+        if (
+            !array_key_exists(
+                $field,
+                $data,
+            )
+        ) {
+            return $default;
+        }
+
+        $value = $data[$field];
+
+        if (!is_int($value)) {
+            throw new ValidationException(
+                $field.' must be an integer.',
+                $errorCode,
+            );
+        }
+
+        return $value;
+    }
+
     public static function positiveInt(
         mixed $value,
         string $field,
