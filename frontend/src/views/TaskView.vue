@@ -17,6 +17,7 @@ import {
 import Swal from 'sweetalert2'
 
 import AppIcon from '../components/AppIcon.vue'
+import LabelSelector from '../components/LabelSelector.vue'
 import MarkdownPreview from '../components/MarkdownPreview.vue'
 
 import {
@@ -270,42 +271,7 @@ async function load(): Promise<void> {
   }
 }
 
-function toggleTagFromEvent(
-  tagId: number,
-  event: Event,
-): void {
-  const input =
-    event.target as HTMLInputElement
-
-  toggleTag(
-    tagId,
-    input.checked,
-  )
-}
-
-function toggleTag(
-  tagId: number,
-  checked: boolean,
-): void {
-  if (checked) {
-    selectedTagIds.value =
-      Array.from(
-        new Set([
-          ...selectedTagIds.value,
-          tagId,
-        ]),
-      )
-
-    return
-  }
-
-  selectedTagIds.value =
-    selectedTagIds.value.filter(
-      id => id !== tagId,
-    )
-}
-
-async function save(): Promise<void> {
+async function save(): Promise<boolean> {
   if (
     !task.value
     || saving.value
@@ -315,7 +281,7 @@ async function save(): Promise<void> {
         === null
     )
   ) {
-    return
+    return false
   }
 
   saving.value = true
@@ -365,13 +331,42 @@ async function save(): Promise<void> {
           )
 
     applyTask(updated)
+
+    return true
   } catch (exception) {
     error.value =
       exception instanceof Error
         ? exception.message
         : 'Impossible d’enregistrer la tâche.'
+
+    return false
   } finally {
     saving.value = false
+  }
+}
+
+async function updateLabels(
+  tagIds: number[],
+): Promise<void> {
+  if (
+    !isProjectTask.value
+    || saving.value
+  ) {
+    return
+  }
+
+  const previous =
+    [...selectedTagIds.value]
+
+  selectedTagIds.value =
+    [...tagIds]
+
+  const saved =
+    await save()
+
+  if (!saved) {
+    selectedTagIds.value =
+      previous
   }
 }
 
@@ -778,60 +773,16 @@ onMounted(
             v-if="isProjectTask"
             class="task-detail-card"
           >
-            <h2>
-              Tags
-            </h2>
-
-            <p
-              v-if="tags.length === 0"
-              class="muted"
-            >
-              Aucun tag disponible.
-            </p>
-
-            <div
-              v-else
-              class="task-detail-tags"
-            >
-              <label
-                v-for="tag in tags"
-                :key="tag.id"
-                class="task-detail-tag"
-                :class="{
-                  active:
-                    selectedTagIds.includes(
-                      tag.id,
-                    ),
-                }"
-              >
-                <input
-                  type="checkbox"
-                  :checked="
-                    selectedTagIds.includes(
-                      tag.id,
-                    )
-                  "
-                  @change="
-                    toggleTagFromEvent(
-                      tag.id,
-                      $event,
-                    )
-                  "
-                />
-
-                <span
-                  class="task-tag-dot"
-                  :style="{
-                    background:
-                      tag.color,
-                  }"
-                />
-
-                <span>
-                  {{ tag.name }}
-                </span>
-              </label>
-            </div>
+            <LabelSelector
+              :tags="tags"
+              :model-value="
+                selectedTagIds
+              "
+              :disabled="saving"
+              @update:model-value="
+                updateLabels
+              "
+            />
           </section>
 
           <section class="task-detail-card task-detail-meta">

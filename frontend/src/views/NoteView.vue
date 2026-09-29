@@ -10,10 +10,12 @@ import {
   useRouter,
 } from 'vue-router'
 
+import LabelSelector from '../components/LabelSelector.vue'
 import NoteEditor from '../components/NoteEditor.vue'
 
 import {
   getNote,
+  updateNote,
 } from '../services/noteApi'
 
 import {
@@ -54,6 +56,7 @@ const projects =
 
 const loading = ref(true)
 const unavailable = ref(false)
+const labelSaving = ref(false)
 
 const noteId =
   computed(
@@ -184,6 +187,56 @@ function handleSaved(
   note.value = updated
 }
 
+async function updateLabels(
+  tagIds: number[],
+): Promise<void> {
+  if (
+    !note.value
+    || labelSaving.value
+  ) {
+    return
+  }
+
+  labelSaving.value = true
+
+  try {
+    const current = note.value
+
+    note.value =
+      await updateNote(
+        current.id,
+        {
+          title:
+            current.title,
+
+          content:
+            current.noteType === 'list'
+              ? ''
+              : current.content,
+
+          isPinned:
+            current.isPinned,
+
+          color:
+            current.color,
+
+          tagIds,
+
+          projectId:
+            current.projectId,
+        },
+      )
+  } catch (exception) {
+    showError(
+      exception instanceof Error
+        ? exception.message
+        : 'Impossible de modifier les labels.',
+    )
+  } finally {
+    labelSaving.value = false
+  }
+}
+
 async function close():
 Promise<void> {
   await router.push(
@@ -255,16 +308,33 @@ onMounted(
         </strong>
       </nav>
 
-      <div class="note-full-page-shell">
-        <NoteEditor
-          :key="note.id"
-          :note="note"
-          :tags="tags"
-          :projects="projects"
-          @saved="handleSaved"
-          @changed="refreshNote"
-          @closed="close"
-        />
+      <div class="note-full-page-layout">
+        <div class="note-full-page-shell">
+          <NoteEditor
+            :key="note.id"
+            :note="note"
+            :tags="tags"
+            :projects="projects"
+            @saved="handleSaved"
+            @changed="refreshNote"
+            @closed="close"
+          />
+        </div>
+
+        <aside class="note-full-page-labels">
+          <LabelSelector
+            :tags="tags"
+            :model-value="
+              note.tags.map(
+                tag => tag.id,
+              )
+            "
+            :disabled="labelSaving"
+            @update:model-value="
+              updateLabels
+            "
+          />
+        </aside>
       </div>
     </template>
   </section>
@@ -307,6 +377,37 @@ onMounted(
 
 .note-breadcrumb-link:hover {
   text-decoration: underline;
+}
+
+.note-full-page-layout {
+  min-width: 0;
+
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(240px, 290px);
+  align-items: start;
+  gap: 1rem;
+}
+
+.note-full-page-labels {
+  min-width: 0;
+  padding: 1rem;
+
+  border: 1px solid var(--g-border);
+  border-radius: 18px;
+
+  background: var(--g-surface);
+}
+
+@media (max-width: 860px) {
+  .note-full-page-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .note-full-page-labels {
+    order: 2;
+  }
 }
 
 .note-full-page-shell {
