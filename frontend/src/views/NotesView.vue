@@ -45,7 +45,6 @@ import {
 } from '../composables/useToast'
 
 import type {
-  Note,
   NoteSummary,
   Project,
 } from '../types/domain'
