@@ -21,6 +21,7 @@ import {
   faCheck,
   faCopy,
   faFileLines,
+  faFolderOpen,
   faGripVertical,
   faImage,
   faList,
@@ -61,6 +62,7 @@ type AppIconName =
   | 'users'
   | 'plus'
   | 'grid'
+  | 'folder-open'
   | 'list'
   | 'whiteboard'
   | 'copy'
@@ -95,6 +97,7 @@ Record<AppIconName, IconDefinition> = {
   users: faUsers,
   plus: faPlus,
   grid: faTableCellsLarge,
+  'folder-open': faFolderOpen,
   list: faList,
   whiteboard: faTableColumns,
   copy: faCopy,

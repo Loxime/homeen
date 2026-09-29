@@ -5,7 +5,6 @@ import {
 
 import {
   computed,
-  nextTick,
   onMounted,
   ref,
   watch,
@@ -16,12 +15,13 @@ import {
   useRouter,
 } from 'vue-router'
 
+import Swal from 'sweetalert2'
+
 import {
   isPinnedNoteLimitError,
   showPinnedNoteLimitAlert,
 } from '../services/noteAlerts'
 
-import BaseModal from '../components/BaseModal.vue'
 import AppIcon from '../components/AppIcon.vue'
 
 import {
@@ -79,40 +79,8 @@ const error = ref('')
 
 watchErrorToast(error)
 
-const quickComposerOpen =
-  ref(false)
-
-const quickMode =
-  ref<'note' | 'list'>(
-    'note',
-  )
-
-const quickTitle =
-  ref('')
-
-const quickContent =
-  ref('')
-
-const quickTasks =
-  ref<string[]>([
-    '',
-  ])
-
-const quickSaving =
-  ref(false)
-
 const quickActionBusyId =
   ref<number | null>(null)
-
-const quickContentInput =
-  ref<HTMLTextAreaElement | null>(
-    null,
-  )
-
-const quickTitleInput =
-  ref<HTMLInputElement | null>(
-    null,
-  )
 
 const savedDisplay =
   localStorage.getItem(
@@ -247,28 +215,6 @@ const gridSections =
     },
   )
 
-const quickCanCreate =
-  computed(
-    () => {
-      if (
-        quickMode.value
-        === 'list'
-      ) {
-        return quickTasks.value.some(
-          task =>
-            task.trim() !== '',
-        )
-      }
-
-      return (
-        quickTitle.value.trim()
-        !== ''
-        || quickContent.value.trim()
-        !== ''
-      )
-    },
-  )
-
 async function load():
 Promise<void> {
   loading.value = true
@@ -318,115 +264,220 @@ function openNote(
   )
 }
 
-async function openQuickComposer():
-Promise<void> {
-  quickMode.value = 'note'
-  quickComposerOpen.value = true
-
-  await nextTick()
-
-  quickContentInput.value?.focus()
+interface QuickCreationInput {
+  title: string
+  content: string
+  tasks: string[]
 }
 
-async function openQuickListComposer():
-Promise<void> {
-  quickMode.value = 'list'
-  quickComposerOpen.value = true
+function quickCreationMarkup(
+  mode: 'note' | 'list',
+): string {
+  if (mode === 'list') {
+    return `
+      <div class="swal-quick-note-form">
+        <label for="swal-note-title">
+          Titre
+        </label>
 
-  await nextTick()
+        <input
+          id="swal-note-title"
+          class="swal2-input"
+          maxlength="255"
+          placeholder="Titre de la liste"
+          autocomplete="off"
+        />
 
-  quickTitleInput.value?.focus()
-}
+        <label for="swal-note-tasks">
+          Tâches
+        </label>
 
-function resetQuickComposer(): void {
-  quickComposerOpen.value = false
-  quickMode.value = 'note'
-  quickTitle.value = ''
-  quickContent.value = ''
-  quickTasks.value = ['']
-}
+        <textarea
+          id="swal-note-tasks"
+          class="swal2-textarea"
+          rows="7"
+          placeholder="Une tâche par ligne"
+        ></textarea>
 
-function closeQuickComposer(): void {
-  if (quickSaving.value) {
-    return
+        <small>
+          Une ligne correspond à une tâche.
+        </small>
+      </div>
+    `
   }
 
-  resetQuickComposer()
+  return `
+    <div class="swal-quick-note-form">
+      <label for="swal-note-title">
+        Titre
+      </label>
+
+      <input
+        id="swal-note-title"
+        class="swal2-input"
+        maxlength="255"
+        placeholder="Titre"
+        autocomplete="off"
+      />
+
+      <label for="swal-note-content">
+        Contenu
+      </label>
+
+      <textarea
+        id="swal-note-content"
+        class="swal2-textarea"
+        rows="7"
+        placeholder="Contenu de la note…"
+      ></textarea>
+    </div>
+  `
 }
 
-function addQuickTask(): void {
-  quickTasks.value.push('')
-}
+function readQuickCreation(
+  mode: 'note' | 'list',
+): QuickCreationInput | false {
+  const popup =
+    Swal.getPopup()
 
-function removeQuickTask(
-  index: number,
-): void {
-  if (
-    quickTasks.value.length
-    === 1
-  ) {
-    quickTasks.value[0] = ''
-    return
-  }
-
-  quickTasks.value.splice(
-    index,
-    1,
-  )
-}
-
-async function createQuickNote():
-Promise<void> {
-  if (
-    quickSaving.value
-    || !quickCanCreate.value
-  ) {
-    return
-  }
+  const titleInput =
+    popup?.querySelector<HTMLInputElement>(
+      '#swal-note-title',
+    )
 
   const title =
-    quickTitle.value.trim()
+    titleInput?.value.trim() ?? ''
+
+  if (mode === 'list') {
+    const taskInput =
+      popup?.querySelector<HTMLTextAreaElement>(
+        '#swal-note-tasks',
+      )
+
+    const tasks =
+      (taskInput?.value ?? '')
+        .split(/\r?\n/)
+        .map(
+          task => task.trim(),
+        )
+        .filter(
+          task => task !== '',
+        )
+
+    if (
+      title === ''
+      && tasks.length === 0
+    ) {
+      Swal.showValidationMessage(
+        'Ajoutez un titre ou au moins une tâche.',
+      )
+
+      return false
+    }
+
+    return {
+      title,
+      content: '',
+      tasks,
+    }
+  }
+
+  const contentInput =
+    popup?.querySelector<HTMLTextAreaElement>(
+      '#swal-note-content',
+    )
 
   const content =
-    quickMode.value === 'note'
-      ? quickContent.value.trim()
-      : ''
+    contentInput?.value.trim() ?? ''
 
-  const tasks =
-    quickTasks.value
-      .map(
-        task => task.trim(),
-      )
-      .filter(
-        task => task !== '',
-      )
+  if (
+    title === ''
+    && content === ''
+  ) {
+    Swal.showValidationMessage(
+      'Ajoutez un titre ou du contenu.',
+    )
 
-  quickSaving.value = true
+    return false
+  }
+
+  return {
+    title,
+    content,
+    tasks: [],
+  }
+}
+
+async function createQuickNote(
+  mode: 'note' | 'list',
+): Promise<void> {
+  const result =
+    await Swal.fire<
+      QuickCreationInput
+    >({
+      title:
+        mode === 'list'
+          ? 'Créer une liste'
+          : 'Créer une note',
+
+      html:
+        quickCreationMarkup(mode),
+
+      showCancelButton: true,
+      confirmButtonText: 'Créer',
+      cancelButtonText: 'Annuler',
+      focusConfirm: false,
+
+      didOpen: () => {
+        Swal
+          .getPopup()
+          ?.querySelector<HTMLInputElement>(
+            '#swal-note-title',
+          )
+          ?.focus()
+      },
+
+      preConfirm: () =>
+        readQuickCreation(mode),
+    })
+
+  if (
+    !result.isConfirmed
+    || !result.value
+  ) {
+    return
+  }
+
   error.value = ''
 
   try {
     const note =
       await createNote({
-        title,
-        content,
+        title:
+          result.value.title,
+
+        content:
+          result.value.content,
+
         noteType:
-          quickMode.value === 'list'
+          mode === 'list'
             ? 'list'
             : 'text',
+
         tagIds: [],
+
         projectId:
           projectId.value,
 
         isPinned: false,
+
         color: '#FFFFFF',
       })
 
-    if (
-      quickMode.value === 'list'
-    ) {
+    if (mode === 'list') {
       for (
         const task
-        of tasks
+        of result.value.tasks
       ) {
         await createNoteTask(
           note.id,
@@ -438,34 +489,39 @@ Promise<void> {
       }
     }
 
-    resetQuickComposer()
-
     await load()
 
     showSuccess(
-      tasks.length > 0
+      mode === 'list'
         ? 'Liste créée.'
         : 'Note créée.',
     )
   } catch (exception) {
-    const message =
+    showError(
       exception instanceof Error
         ? exception.message
-        : 'Impossible de créer la note.'
-
-    showError(
-      message,
+        : mode === 'list'
+          ? 'Impossible de créer la liste.'
+          : 'Impossible de créer la note.',
     )
 
     /*
-     * A failure after note creation may leave
-     * the successfully created portion intact.
-     * Reload so the UI reflects server state.
+     * Si la note est créée mais qu'une tâche
+     * échoue ensuite, on recharge l'état réel
+     * renvoyé par le serveur.
      */
     await load()
-  } finally {
-    quickSaving.value = false
   }
+}
+
+async function openQuickComposer():
+Promise<void> {
+  await createQuickNote('note')
+}
+
+async function openQuickListComposer():
+Promise<void> {
+  await createQuickNote('list')
 }
 
 async function updateQuickAppearance(
@@ -1279,163 +1335,7 @@ onMounted(
       </div>
     </div>
 
-    <BaseModal
-      :open="quickComposerOpen"
-      :title="
-        quickMode === 'list'
-          ? 'Nouvelle liste'
-          : 'Nouvelle note'
-      "
-      @close="closeQuickComposer"
-    >
-      <form
-        class="
-          keep-quick-composer
-          keep-quick-composer--modal
-        "
-        @submit.prevent="
-          createQuickNote
-        "
-      >
-        <div class="keep-quick-mode-heading">
-          <AppIcon
-            :name="
-              quickMode === 'list'
-                ? 'list'
-                : 'note'
-            "
-            :size="18"
-          />
 
-          <strong>
-            {{
-              quickMode === 'list'
-                ? 'Créer une liste'
-                : 'Créer une note'
-            }}
-          </strong>
-        </div>
-
-        <input
-          ref="quickTitleInput"
-          v-model="quickTitle"
-          class="keep-quick-title"
-          maxlength="255"
-          placeholder="Titre"
-          aria-label="Titre"
-          autofocus
-        />
-
-        <textarea
-          v-if="
-            quickMode === 'note'
-          "
-          ref="quickContentInput"
-          v-model="quickContent"
-          class="keep-quick-content"
-          placeholder="Contenu de la note…"
-          aria-label="Contenu de la note"
-          rows="7"
-          @keydown.ctrl.enter.prevent="
-            createQuickNote
-          "
-          @keydown.meta.enter.prevent="
-            createQuickNote
-          "
-        />
-
-        <div
-          v-else
-          class="keep-quick-list"
-        >
-          <div
-            v-for="(_, index) in quickTasks"
-            :key="index"
-            class="keep-quick-task"
-          >
-            <input
-              v-model="
-                quickTasks[index]
-              "
-              maxlength="4000"
-              :placeholder="
-                `Tâche ${index + 1}`
-              "
-              :aria-label="
-                `Tâche ${index + 1}`
-              "
-              @keydown.ctrl.enter.prevent="
-                createQuickNote
-              "
-              @keydown.meta.enter.prevent="
-                createQuickNote
-              "
-            />
-
-            <button
-              type="button"
-              title="Retirer"
-              aria-label="Retirer cette tâche"
-              @click="
-                removeQuickTask(index)
-              "
-            >
-              <AppIcon
-                name="close"
-                :size="15"
-              />
-            </button>
-          </div>
-
-          <button
-            type="button"
-            class="keep-quick-add-task"
-            @click="addQuickTask"
-          >
-            <AppIcon
-              name="plus"
-              :size="16"
-            />
-
-            Ajouter une tâche
-          </button>
-        </div>
-
-        <footer class="keep-quick-actions">
-          <span class="muted">
-            Ctrl/Cmd + Entrée pour créer
-          </span>
-
-          <div>
-            <button
-              type="button"
-              class="keep-quick-close"
-              :disabled="quickSaving"
-              @click="
-                closeQuickComposer
-              "
-            >
-              Annuler
-            </button>
-
-            <button
-              type="submit"
-              class="keep-quick-create"
-              :disabled="
-                quickSaving
-                || !quickCanCreate
-              "
-            >
-              {{
-                quickSaving
-                  ? 'Création…'
-                  : 'Créer'
-              }}
-            </button>
-          </div>
-        </footer>
-      </form>
-    </BaseModal>
 
   </section>
 </template>

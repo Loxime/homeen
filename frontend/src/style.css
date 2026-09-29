@@ -3330,3 +3330,38 @@ h3 { margin-bottom: .35rem; }
 .project-chip {
   gap: .3rem;
 }
+
+/* V3 note/list creation in SweetAlert2 */
+
+.swal-quick-note-form {
+  display: grid;
+  gap: .55rem;
+  text-align: left;
+}
+
+.swal-quick-note-form label {
+  margin-top: .3rem;
+  color: var(--g-text);
+  font-size: .8rem;
+  font-weight: 700;
+}
+
+.swal-quick-note-form
+.swal2-input,
+.swal-quick-note-form
+.swal2-textarea {
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.swal-quick-note-form
+.swal2-textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.swal-quick-note-form small {
+  color: var(--g-muted);
+  font-size: .72rem;
+}

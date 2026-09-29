@@ -91,6 +91,26 @@ const backPath =
     return '/notes'
   })
 
+const currentProject =
+  computed(
+    () => {
+      const id =
+        note.value?.projectId
+
+      if (!id) {
+        return null
+      }
+
+      return (
+        projects.value.find(
+          project =>
+            project.id === id,
+        )
+        ?? null
+      )
+    },
+  )
+
 const pageTitle =
   computed(
     () =>
@@ -291,17 +311,45 @@ onMounted(
         class="note-breadcrumb"
         aria-label="Fil d’Ariane"
       >
-        <button
-          type="button"
-          class="note-breadcrumb-link"
-          @click="close"
-        >
-          Notes
-        </button>
+        <template v-if="currentProject">
+          <RouterLink
+            class="note-breadcrumb-link"
+            to="/projects"
+          >
+            Projets
+          </RouterLink>
 
-        <span aria-hidden="true">
-          ›
-        </span>
+          <span aria-hidden="true">
+            ›
+          </span>
+
+          <RouterLink
+            class="note-breadcrumb-link"
+            :to="
+              `/projects/${currentProject.id}`
+            "
+          >
+            {{ currentProject.name }}
+          </RouterLink>
+
+          <span aria-hidden="true">
+            ›
+          </span>
+        </template>
+
+        <template v-else>
+          <button
+            type="button"
+            class="note-breadcrumb-link"
+            @click="close"
+          >
+            Notes
+          </button>
+
+          <span aria-hidden="true">
+            ›
+          </span>
+        </template>
 
         <strong>
           {{ pageTitle }}

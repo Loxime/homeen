@@ -1408,9 +1408,10 @@ onMounted(
               `Ouvrir le projet ${project.name}`
             "
           >
-            <span aria-hidden="true">
-              📂
-            </span>
+            <AppIcon
+              name="folder-open"
+              :size="16"
+            />
           </RouterLink>
 
           <button
@@ -1444,8 +1445,12 @@ onMounted(
 
 <style scoped>
 .projects-page {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+
   display: grid;
-  gap: 1.5rem;
+  gap: 1.75rem;
 }
 
 .project-section {
@@ -1476,21 +1481,30 @@ onMounted(
 
 .project-grid {
   display: grid;
-  grid-template-columns:
-    repeat(
-      auto-fill,
-      minmax(260px, 1fr)
-    );
+  grid-template-columns: 1fr;
   gap: 1rem;
 }
 
 .project-card {
+  min-width: 0;
+  min-height: 240px;
+
   display: grid;
+  grid-template-rows:
+    auto
+    minmax(0, 1fr)
+    auto
+    auto
+    auto;
+  align-content: start;
   gap: 1rem;
-  padding: 1rem;
+
+  padding: 1.15rem;
+
   border: 1px solid
     var(--border-color, #dadce0);
-  border-radius: 14px;
+  border-radius: 16px;
+
   background:
     var(--surface, #fff);
 }
@@ -1505,6 +1519,14 @@ onMounted(
   display: grid;
   gap: 0.15rem;
 }
+
+
+.project-card-heading strong {
+  color: var(--g-text);
+  font-size: 1.08rem;
+  line-height: 1.25;
+}
+
 
 .project-dot {
   width: 12px;
@@ -1596,13 +1618,40 @@ onMounted(
     currentColor;
 }
 
-@media (max-width: 800px) {
+@media (max-width: 719px) {
   .project-create-form {
     grid-template-columns: 1fr;
   }
 
   .project-invite-form {
     flex-direction: column;
+  }
+}
+
+@media (min-width: 720px) {
+  .project-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .project-card {
+    min-height: 270px;
+    padding: 1.3rem;
+  }
+}
+
+@media (min-width: 1180px) {
+  .project-grid {
+    grid-template-columns:
+      repeat(
+        auto-fit,
+        minmax(360px, 1fr)
+      );
+  }
+
+  .project-card {
+    min-height: 290px;
+    padding: 1.4rem;
   }
 }
 </style>
