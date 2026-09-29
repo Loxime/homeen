@@ -926,12 +926,19 @@ async function removeMember(
     return
   }
 
-  const confirmed =
-    window.confirm(
-      `Retirer ${member.email} du projet « ${project.name} » ?`,
-    )
+  const result =
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Retirer ce membre ?',
+      text:
+        `Retirer ${member.email} du projet « ${project.name} » ?`,
+      showCancelButton: true,
+      confirmButtonText: 'Retirer',
+      cancelButtonText: 'Annuler',
+      focusCancel: true,
+    })
 
-  if (!confirmed) {
+  if (!result.isConfirmed) {
     return
   }
 
@@ -1044,12 +1051,19 @@ async function leaveProject(
     return
   }
 
-  const confirmed =
-    window.confirm(
-      `Quitter le projet « ${project.name} » ?`,
-    )
+  const result =
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Quitter ce projet ?',
+      text:
+        `Quitter le projet « ${project.name} » ?`,
+      showCancelButton: true,
+      confirmButtonText: 'Quitter',
+      cancelButtonText: 'Annuler',
+      focusCancel: true,
+    })
 
-  if (!confirmed) {
+  if (!result.isConfirmed) {
     return
   }
 

@@ -13,7 +13,11 @@ import {
   usePomodoro,
 } from '../composables/usePomodoro'
 
-import { api } from '../services/api'
+import {
+  getPomodoroHistory,
+  getPomodoroInsights,
+  ratePomodoroSession,
+} from '../services/pomodoroApi'
 
 import {
   formatClock,
@@ -178,14 +182,8 @@ async function loadHistory(
 
   try {
     const response =
-      await api<{
-        sessions:
-          PomodoroSession[]
-
-        pagination:
-          PomodoroHistoryPagination
-      }>(
-        `/api/pomodoro/history?page=${page}`,
+      await getPomodoroHistory(
+        page,
       )
 
     history.value =
@@ -226,9 +224,7 @@ async function changeHistoryPage(
 async function loadInsights():
 Promise<void> {
   insights.value =
-    await api<PomodoroInsights>(
-      '/api/pomodoro/insights',
-    )
+    await getPomodoroInsights()
 }
 
 async function refreshOverview():
@@ -326,15 +322,9 @@ async function rateSession(
   error.value = ''
 
   try {
-    await api<PomodoroSession>(
-      `/api/pomodoro/sessions/${completedSession.value.id}/rating`,
-      {
-        method: 'POST',
-
-        body: JSON.stringify({
-          rating,
-        }),
-      },
+    await ratePomodoroSession(
+      completedSession.value.id,
+      rating,
     )
 
     completedSession.value = null

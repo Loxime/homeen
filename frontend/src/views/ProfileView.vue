@@ -4,7 +4,20 @@ import {
 } from '../composables/useErrorToast'
 
 import { onMounted, ref } from 'vue'
-import { api } from '../services/api'
+import Swal from 'sweetalert2'
+
+import {
+  addProfileEmail,
+  changeProfilePassword,
+  deleteProfile,
+  getProfile,
+  removeProfileEmail,
+} from '../services/profileApi'
+
+import type {
+  Profile,
+  ProfileEmail,
+} from '../services/profileApi'
 import { useAccess } from '../composables/useAccess'
 import {
   useNotificationSound,
@@ -13,19 +26,6 @@ import {
 import {
   useToast,
 } from '../composables/useToast'
-
-interface ProfileEmail {
-  id: number
-  email: string
-  isPrimary: boolean
-}
-
-interface Profile {
-  id: number
-  primaryEmail: string
-  notificationSoundEnabled: boolean
-  emails: ProfileEmail[]
-}
 
 const { state } = useAccess()
 
@@ -65,9 +65,7 @@ async function load(): Promise<void> {
 
   try {
     const loadedProfile =
-      await api<Profile>(
-        '/api/profile',
-      )
+      await getProfile()
 
     profile.value =
       loadedProfile
@@ -92,14 +90,8 @@ async function addEmail(): Promise<void> {
   addingEmail.value = true
 
   try {
-    await api(
-      '/api/profile/emails',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          email: newEmail.value,
-        }),
-      },
+    await addProfileEmail(
+      newEmail.value,
     )
 
     newEmail.value = ''
@@ -128,33 +120,29 @@ async function deleteAccount(): Promise<void> {
     return
   }
 
-  const confirmed = window.confirm(
-    'Supprimer définitivement votre compte et toutes vos données personnelles ? Cette action est irréversible.',
-  )
+  const result =
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Supprimer votre compte ?',
+      text:
+        'Toutes vos données personnelles seront supprimées définitivement. Cette action est irréversible.',
+      showCancelButton: true,
+      confirmButtonText: 'Supprimer',
+      cancelButtonText: 'Annuler',
+      focusCancel: true,
+    })
 
-  if (!confirmed) {
+  if (!result.isConfirmed) {
     return
   }
 
   deletingAccount.value = true
 
   try {
-    await api(
-      '/api/profile',
-      {
-        method: 'DELETE',
-        body: JSON.stringify({
-          password:
-            deletePassword.value,
-        }),
-      },
+    await deleteProfile(
+      deletePassword.value,
     )
 
-    /*
-     * The backend invalidated the session.
-     * A complete reload guarantees that all
-     * in-memory personal state is discarded.
-     */
     window.location.assign('/')
   } catch (exception) {
     error.value =
@@ -173,11 +161,19 @@ async function removeEmail(
     return
   }
 
-  if (
-    !window.confirm(
-      `Retirer ${email.email} de vos adresses de connexion ?`,
-    )
-  ) {
+  const result =
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Retirer cette adresse ?',
+      text:
+        `Retirer ${email.email} de vos adresses de connexion ?`,
+      showCancelButton: true,
+      confirmButtonText: 'Retirer',
+      cancelButtonText: 'Annuler',
+      focusCancel: true,
+    })
+
+  if (!result.isConfirmed) {
     return
   }
 
@@ -185,11 +181,8 @@ async function removeEmail(
   success.value = ''
 
   try {
-    await api(
-      `/api/profile/emails/${email.id}`,
-      {
-        method: 'DELETE',
-      },
+    await removeProfileEmail(
+      email.id,
     )
 
     success.value =
@@ -219,18 +212,10 @@ async function changePassword(): Promise<void> {
   changingPassword.value = true
 
   try {
-    await api(
-      '/api/profile/password',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          currentPassword:
-            currentPassword.value,
-          password: password.value,
-          confirmation:
-            confirmation.value,
-        }),
-      },
+    await changeProfilePassword(
+      currentPassword.value,
+      password.value,
+      confirmation.value,
     )
 
     currentPassword.value = ''

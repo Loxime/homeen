@@ -18,8 +18,17 @@ import AppIcon from '../components/AppIcon.vue'
 import NoteEditor from '../components/NoteEditor.vue'
 
 import {
-  api,
-} from '../services/api'
+  search,
+} from '../services/searchApi'
+
+import type {
+  SearchNoteResult,
+  SearchTaskResult,
+} from '../services/searchApi'
+
+import {
+  getNote,
+} from '../services/noteApi'
 
 import {
   useTags,
@@ -28,39 +37,6 @@ import {
 import type {
   Note,
 } from '../types/domain'
-
-interface SearchNoteResult {
-  id: number
-  title: string
-  content: string
-  archivedAt: string | null
-  updatedAt: string
-}
-
-interface SearchTaskResult {
-  id: number
-  noteId: number
-  noteTitle: string
-  content: string
-  priority:
-    | 'low'
-    | 'normal'
-    | 'high'
-    | 'urgent'
-  status:
-    | 'todo'
-    | 'in_progress'
-    | 'done'
-  startDate: string | null
-  dueDate: string | null
-  noteArchivedAt: string | null
-  updatedAt: string
-}
-
-interface SearchResponse {
-  notes: SearchNoteResult[]
-  tasks: SearchTaskResult[]
-}
 
 const route = useRoute()
 
@@ -151,14 +127,9 @@ Promise<void> {
   loading.value = true
 
   try {
-    const params =
-      new URLSearchParams({
-        q: query.value,
-      })
-
     const response =
-      await api<SearchResponse>(
-        `/api/search?${params}`,
+      await search(
+        query.value,
       )
 
     notes.value =
@@ -185,8 +156,8 @@ async function openNote(
     const [
       note,
     ] = await Promise.all([
-      api<Note>(
-        `/api/notes/${result.id}`,
+      getNote(
+        result.id,
       ),
       loadSupportData(),
     ])

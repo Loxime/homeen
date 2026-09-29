@@ -1,5 +1,10 @@
 import { computed, reactive } from 'vue'
-import { api } from '../services/api'
+import {
+  getPomodoroActive,
+  getPomodoroPresets,
+  startPomodoroSession,
+  stopPomodoroSession,
+} from '../services/pomodoroApi'
 import {
   calculatePomodoroState,
   calculatePomodoroStateFromElapsed,
@@ -200,8 +205,8 @@ function tick(): void {
 }
 
 async function loadActive(): Promise<void> {
-  const response = await api<{ session: PomodoroSession | null }>('/api/pomodoro/active')
-  store.active = response.session
+  store.active =
+    await getPomodoroActive()
 
   syncLiveAnchor(
     store.active,
@@ -211,22 +216,16 @@ async function loadActive(): Promise<void> {
 }
 
 async function loadPresets(): Promise<void> {
-  const response = await api<{ presets: PomodoroPreset[] }>('/api/pomodoro/presets')
-  store.presets = response.presets
+  store.presets =
+    await getPomodoroPresets()
 }
 
 async function start(workMinutes: number): Promise<void> {
   enableAudio()
 
   store.active =
-    await api<PomodoroSession>(
-      '/api/pomodoro/sessions',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          workMinutes,
-        }),
-      },
+    await startPomodoroSession(
+      workMinutes,
     )
 
   syncLiveAnchor(
@@ -259,11 +258,8 @@ async function stop(): Promise<PomodoroSession | null> {
   }
 
   const completed =
-    await api<PomodoroSession>(
-      `/api/pomodoro/sessions/${store.active.id}/stop`,
-      {
-        method: 'POST',
-      },
+    await stopPomodoroSession(
+      store.active.id,
     )
 
   store.active = null

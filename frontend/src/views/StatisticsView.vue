@@ -14,7 +14,9 @@ import {
 
 import Chart from 'chart.js/auto'
 
-import { api } from '../services/api'
+import {
+  getStatistics,
+} from '../services/statisticsApi'
 
 import {
   useTheme,
@@ -407,8 +409,8 @@ Promise<void> {
       )
     }
 
-    const params =
-      new URLSearchParams({
+    data.value =
+      await getStatistics({
         start:
           periodStart.value,
 
@@ -421,11 +423,6 @@ Promise<void> {
         compareEnd:
           compareEnd.value,
       })
-
-    data.value =
-      await api<StatisticsResponse>(
-        `/api/statistics?${params}`,
-      )
 
     await nextTick()
     renderComparisonChart()
