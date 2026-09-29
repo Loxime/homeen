@@ -398,9 +398,10 @@ onMounted(
                 beginEdit(tag)
               "
             >
-              <span aria-hidden="true">
-                ✏️
-              </span>
+              <AppIcon
+                name="edit"
+                :size="14"
+              />
             </button>
 
             <button
@@ -420,9 +421,10 @@ onMounted(
                 deleteTag(tag)
               "
             >
-              <span aria-hidden="true">
-                🗑️
-              </span>
+              <AppIcon
+                name="trash"
+                :size="14"
+              />
             </button>
           </div>
         </template>

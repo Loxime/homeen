@@ -127,7 +127,14 @@ body {
   color: var(--g-muted);
   transition:
     background 140ms ease,
+    border-color 140ms ease,
     color 140ms ease;
+}
+
+.topbar-logout {
+  border-color: #efc7c4;
+  background: #fff;
+  color: var(--g-red-strong);
 }
 
 .topbar-icon-button:hover {
@@ -147,7 +154,7 @@ body {
 }
 
 .search-box:focus-within {
-  border-color: #c7d7f5;
+  border-color: var(--g-border);
   background: #fff;
   box-shadow:
     0 1px 2px rgba(60,64,67,.10),
@@ -235,7 +242,7 @@ input:focus,
 textarea:focus,
 select:focus {
   border-color: var(--g-blue);
-  box-shadow: 0 0 0 3px rgba(26,115,232,.12);
+  box-shadow: none;
 }
 
 /* Buttons */
@@ -398,7 +405,7 @@ select:focus {
   width: min(680px,100%);
   min-height: 56px;
   margin-bottom: 28px;
-  border: 1px solid #c7d7f5;
+  border: 1px solid var(--g-border);
   border-radius: 18px;
   background: #fff;
   color: var(--g-muted);
@@ -406,7 +413,7 @@ select:focus {
 }
 
 .keep-note-composer:hover {
-  border-color: #a8c7fa;
+  border-color: var(--g-border);
   background: #f8fbff;
 }
 
@@ -423,7 +430,7 @@ select:focus {
 
 .note-card:hover {
   transform: translateY(-1px);
-  border-color: #c7d7f5;
+  border-color: var(--g-border);
   box-shadow: 0 4px 14px rgba(60,64,67,.08);
 }
 
@@ -660,8 +667,12 @@ select:focus {
     grid-template-columns: 1fr;
   }
 
+  .topbar-logout {
+    padding-inline: 12px;
+  }
+
   .topbar-logout span {
-    display: none;
+    display: inline;
   }
 }
 
@@ -1461,7 +1472,13 @@ select:focus-visible {
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
+  outline: 2px solid
+    rgba(95,99,104,.28);
   outline-offset: 0;
+}
+
+.search-box input:focus-visible {
+  outline: none;
 }
 
 /*
@@ -2280,13 +2297,16 @@ html[data-theme="dark"] .topbar {
     rgba(27,31,35,.96);
 }
 
-html[data-theme="dark"] .topbar-theme,
-html[data-theme="dark"] .topbar-icon-button,
-html[data-theme="dark"] .topbar-logout {
+html[data-theme="dark"] .topbar-icon-button {
   color: var(--g-muted);
 }
 
-html[data-theme="dark"] .topbar-theme:hover,
+html[data-theme="dark"] .topbar-logout {
+  border-color: #70413e;
+  background: var(--g-surface);
+  color: var(--g-red);
+}
+
 html[data-theme="dark"] .topbar-icon-button:hover {
   background: var(--g-surface-alt);
   color: var(--g-text);
@@ -2297,7 +2317,7 @@ html[data-theme="dark"] .search-box {
 }
 
 html[data-theme="dark"] .search-box:focus-within {
-  border-color: #53677f;
+  border-color: var(--g-border);
   background: var(--g-surface);
   box-shadow:
     0 1px 3px

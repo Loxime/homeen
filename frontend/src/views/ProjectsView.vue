@@ -1431,9 +1431,10 @@ onMounted(
               deleteProject(project)
             "
           >
-            <span aria-hidden="true">
-              🗑️
-            </span>
+            <AppIcon
+              name="trash"
+              :size="14"
+            />
           </button>
         </div>
       </article>

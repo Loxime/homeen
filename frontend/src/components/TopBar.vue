@@ -155,6 +155,10 @@ async function signOut(): Promise<void> {
     <div class="topbar-actions">
       <button
         class="topbar-theme"
+        :class="{
+          'is-dark':
+            theme === 'dark',
+        }"
         type="button"
         :title="
           theme === 'dark'
@@ -166,17 +170,24 @@ async function signOut(): Promise<void> {
             ? 'Passer en mode clair'
             : 'Passer en mode sombre'
         "
+        :aria-pressed="
+          theme === 'dark'
+        "
         @click="toggleTheme"
       >
         <span
-          class="topbar-theme-symbol"
+          class="topbar-theme-track"
           aria-hidden="true"
         >
-          {{
-            theme === 'dark'
-              ? '☀️'
-              : '🌙'
-          }}
+          <span
+            class="topbar-theme-thumb"
+          >
+            {{
+              theme === 'dark'
+                ? '☾'
+                : '☀'
+            }}
+          </span>
         </span>
       </button>
 
@@ -184,12 +195,11 @@ async function signOut(): Promise<void> {
         class="topbar-logout"
         type="button"
         title="Se déconnecter"
-        aria-label="Se déconnecter"
         @click="signOut"
       >
         <AppIcon
           name="logout"
-          :size="19"
+          :size="18"
         />
 
         <span>
