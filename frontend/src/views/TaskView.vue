@@ -502,7 +502,11 @@ onMounted(
             type="button"
             @click="back"
           >
-            ←
+            <AppIcon
+              name="arrow-left"
+              :size="13"
+            />
+
             {{
               isProjectTask
                 ? 'Retour au projet'

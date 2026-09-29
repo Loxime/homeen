@@ -3,6 +3,8 @@ import {
   useToast,
 } from '../composables/useToast'
 
+import AppIcon from './AppIcon.vue'
+
 const {
   toast,
   hide,
@@ -33,7 +35,10 @@ const {
           aria-label="Fermer la notification"
           @click="hide"
         >
-          ×
+          <AppIcon
+            name="close"
+            :size="13"
+          />
         </button>
       </div>
     </Transition>
