@@ -12,12 +12,16 @@ import type {
 } from '@fortawesome/fontawesome-svg-core'
 
 import {
+  faArrowLeft,
+  faArrowRight,
   faBars,
+  faCircle,
   faBoxArchive,
   faChartColumn,
   faCheck,
   faCopy,
   faFileLines,
+  faGripVertical,
   faImage,
   faList,
   faLock,
@@ -38,6 +42,10 @@ import {
 
 type AppIconName =
   | 'menu'
+  | 'arrow-left'
+  | 'arrow-right'
+  | 'circle'
+  | 'grip'
   | 'note'
   | 'image'
   | 'tag'
@@ -68,6 +76,10 @@ const props = defineProps<{
 const icons:
 Record<AppIconName, IconDefinition> = {
   menu: faBars,
+  'arrow-left': faArrowLeft,
+  'arrow-right': faArrowRight,
+  circle: faCircle,
+  grip: faGripVertical,
   note: faFileLines,
   image: faImage,
   tag: faTag,

@@ -14,6 +14,8 @@ import {
 
 import Swal from 'sweetalert2'
 
+import AppIcon from '../components/AppIcon.vue'
+
 import {
   createProjectTask,
   createWorkflowStage,
@@ -54,12 +56,6 @@ const error = ref('')
 
 watchErrorToast(error)
 
-const taskContents =
-  ref<Record<number, string>>({})
-
-const taskDescriptions =
-  ref<Record<number, string>>({})
-
 const creatingTaskStageId =
   ref<number | null>(null)
 
@@ -80,6 +76,12 @@ const draggedStageId =
 
 const dragOverStageOrderId =
   ref<number | null>(null)
+
+const stageOrderBeforeDrag =
+  ref<number[] | null>(null)
+
+const stageDropInFlight =
+  ref(false)
 
 const stageName = ref('')
 const creatingStage = ref(false)
@@ -316,28 +318,77 @@ Promise<void> {
     )
 }
 
+function isCompletedStage(
+  stage: ProjectWorkflowStage,
+): boolean {
+  const name =
+    stage.name
+      .trim()
+      .toLocaleLowerCase()
+      .normalize('NFD')
+      .replace(
+        /[\u0300-\u036f]/g,
+        '',
+      )
+
+  return name === 'termine'
+}
+
 async function createTask(
   stage: ProjectWorkflowStage,
 ): Promise<void> {
-  const title =
-    (
-      taskContents.value[
-        stage.id
-      ] ?? ''
-    ).trim()
+  if (
+    isCompletedStage(stage)
+    || creatingTaskStageId.value
+      !== null
+  ) {
+    return
+  }
 
-  const description =
-    (
-      taskDescriptions.value[
-        stage.id
-      ] ?? ''
-    ).trim()
+  const result =
+    await Swal.fire({
+      title: 'Créer une issue',
+      input: 'text',
+      inputLabel: 'Titre',
+      inputPlaceholder:
+        'Titre de l’issue',
+      inputAttributes: {
+        maxlength: '255',
+      },
+      showCancelButton: true,
+      confirmButtonText: 'Créer',
+      cancelButtonText: 'Annuler',
+      focusCancel: false,
+      preConfirm: value => {
+        const title =
+          typeof value === 'string'
+            ? value.trim()
+            : ''
+
+        if (title === '') {
+          Swal.showValidationMessage(
+            'Le titre est obligatoire.',
+          )
+
+          return false
+        }
+
+        return title
+      },
+    })
 
   if (
-    title === ''
-    || creatingTaskStageId.value
-        !== null
+    !result.isConfirmed
+    || typeof result.value
+      !== 'string'
   ) {
+    return
+  }
+
+  const title =
+    result.value.trim()
+
+  if (title === '') {
     return
   }
 
@@ -352,8 +403,7 @@ async function createTask(
         projectId.value,
         {
           title,
-          description,
-
+          description: '',
           workflowStageId:
             stage.id,
         },
@@ -363,19 +413,11 @@ async function createTask(
       ...tasks.value,
       created,
     ]
-
-    taskContents.value[
-      stage.id
-    ] = ''
-
-    taskDescriptions.value[
-      stage.id
-    ] = ''
   } catch (exception) {
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Impossible de créer la tâche.'
+        : 'Impossible de créer l’issue.'
   } finally {
     creatingTaskStageId.value =
       null
@@ -445,6 +487,11 @@ function startTaskDrag(
   task: ProjectTask,
   event: DragEvent,
 ): void {
+  if (busyTaskId.value !== null) {
+    event.preventDefault()
+    return
+  }
+
   draggedStageId.value = null
   dragOverStageOrderId.value = null
 
@@ -453,7 +500,7 @@ function startTaskDrag(
 
   event.dataTransfer?.setData(
     'text/plain',
-    String(task.id),
+    `task:${task.id}`,
   )
 
   if (event.dataTransfer) {
@@ -471,12 +518,21 @@ function endTaskDrag(): void {
 function markTaskDropTarget(
   stageId: number,
   taskId: number | null,
+  event: DragEvent,
 ): void {
   if (
-    draggedStageId.value
-    !== null
+    draggedTaskId.value === null
+    || busyTaskId.value !== null
   ) {
     return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect =
+      'move'
   }
 
   dragOverStageId.value =
@@ -489,6 +545,7 @@ function markTaskDropTarget(
 async function dropTask(
   stage: ProjectWorkflowStage,
   beforeTask: ProjectTask | null,
+  event: DragEvent,
 ): Promise<void> {
   const taskId =
     draggedTaskId.value
@@ -499,6 +556,9 @@ async function dropTask(
   ) {
     return
   }
+
+  event.preventDefault()
+  event.stopPropagation()
 
   if (
     beforeTask !== null
@@ -518,6 +578,9 @@ async function dropTask(
     endTaskDrag()
     return
   }
+
+  const previousTasks =
+    [...tasks.value]
 
   const columns =
     stages.value.map(
@@ -553,9 +616,7 @@ async function dropTask(
   }
 
   if (beforeTask === null) {
-    target.taskIds.push(
-      taskId
-    )
+    target.taskIds.push(taskId)
   } else {
     const index =
       target.taskIds.indexOf(
@@ -563,9 +624,7 @@ async function dropTask(
       )
 
     if (index < 0) {
-      target.taskIds.push(
-        taskId
-      )
+      target.taskIds.push(taskId)
     } else {
       target.taskIds.splice(
         index,
@@ -575,10 +634,51 @@ async function dropTask(
     }
   }
 
-  busyTaskId.value =
-    taskId
+  const byId =
+    new Map(
+      tasks.value.map(
+        task => [
+          task.id,
+          task,
+        ] as const,
+      ),
+    )
 
+  const optimistic:
+    ProjectTask[] = []
+
+  for (const column of columns) {
+    column.taskIds.forEach(
+      (id, index) => {
+        const task =
+          byId.get(id)
+
+        if (!task) {
+          return
+        }
+
+        optimistic.push({
+          ...task,
+          workflowStageId:
+            column.workflowStageId,
+          position:
+            index + 1,
+        })
+      },
+    )
+  }
+
+  if (
+    optimistic.length
+    === tasks.value.length
+  ) {
+    tasks.value = optimistic
+  }
+
+  busyTaskId.value = taskId
   error.value = ''
+
+  endTaskDrag()
 
   try {
     tasks.value =
@@ -587,13 +687,46 @@ async function dropTask(
         columns,
       )
   } catch (exception) {
+    tasks.value =
+      previousTasks
+
     error.value =
       exception instanceof Error
         ? exception.message
-        : 'Impossible de réordonner les tâches.'
+        : 'Impossible de déplacer l’issue.'
   } finally {
     busyTaskId.value = null
-    endTaskDrag()
+  }
+}
+
+function restoreStageOrder(
+  ids: number[],
+): void {
+  const byId =
+    new Map(
+      stages.value.map(
+        stage => [
+          stage.id,
+          stage,
+        ] as const,
+      ),
+    )
+
+  const ordered =
+    ids
+      .map(id => byId.get(id))
+      .filter(
+        (
+          stage,
+        ): stage is ProjectWorkflowStage =>
+          stage !== undefined,
+      )
+
+  if (
+    ordered.length
+    === stages.value.length
+  ) {
+    stages.value = ordered
   }
 }
 
@@ -614,6 +747,14 @@ function startStageDrag(
   dragOverStageId.value = null
   dragOverTaskId.value = null
 
+  stageOrderBeforeDrag.value =
+    stages.value.map(
+      candidate =>
+        candidate.id,
+    )
+
+  stageDropInFlight.value = false
+
   draggedStageId.value =
     stage.id
 
@@ -633,61 +774,45 @@ function startStageDrag(
 
 function markStageDropTarget(
   stageId: number,
+  event: DragEvent,
 ): void {
-  if (
+  const sourceId =
     draggedStageId.value
-      === null
-    || draggedStageId.value
-      === stageId
+
+  if (
+    sourceId === null
+    || sourceId === stageId
+    || busyStageId.value !== null
   ) {
     return
+  }
+
+  event.preventDefault()
+
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect =
+      'move'
   }
 
   dragOverStageOrderId.value =
     stageId
-}
 
-function endStageDrag(): void {
-  draggedStageId.value = null
-  dragOverStageOrderId.value = null
-}
-
-async function dropStage(
-  targetStage:
-    ProjectWorkflowStage,
-  event: DragEvent,
-): Promise<void> {
-  const stageId =
-    draggedStageId.value
-
-  if (
-    stageId === null
-    || busyStageId.value
-      !== null
-  ) {
-    return
-  }
-
-  const sourceStage =
+  const source =
     stages.value.find(
       stage =>
-        stage.id === stageId,
+        stage.id === sourceId,
     )
 
-  if (
-    sourceStage === undefined
-    || sourceStage.id
-      === targetStage.id
-  ) {
-    endStageDrag()
+  if (!source) {
     return
   }
 
-  const element =
+  const targetElement =
     event.currentTarget as HTMLElement
 
   const rectangle =
-    element.getBoundingClientRect()
+    targetElement
+      .getBoundingClientRect()
 
   const placeAfter =
     event.clientX
@@ -697,18 +822,16 @@ async function dropStage(
   const ordered =
     stages.value.filter(
       stage =>
-        stage.id !== stageId,
+        stage.id !== sourceId,
     )
 
   const targetIndex =
     ordered.findIndex(
       stage =>
-        stage.id
-        === targetStage.id,
+        stage.id === stageId,
     )
 
   if (targetIndex < 0) {
-    endStageDrag()
     return
   }
 
@@ -720,7 +843,7 @@ async function dropStage(
           : 0
       ),
     0,
-    sourceStage,
+    source,
   )
 
   const currentIds =
@@ -734,20 +857,84 @@ async function dropStage(
     )
 
   if (
-    currentIds.every(
-      (
-        id,
-        index,
-      ) =>
+    !currentIds.every(
+      (id, index) =>
         id === orderedIds[index],
     )
   ) {
-    endStageDrag()
+    stages.value = ordered
+  }
+}
+
+function endStageDrag(): void {
+  if (
+    !stageDropInFlight.value
+    && stageOrderBeforeDrag.value
+  ) {
+    restoreStageOrder(
+      stageOrderBeforeDrag.value,
+    )
+
+    stageOrderBeforeDrag.value =
+      null
+  }
+
+  draggedStageId.value = null
+  dragOverStageOrderId.value = null
+}
+
+async function dropStage(
+  event: DragEvent,
+): Promise<void> {
+  const stageId =
+    draggedStageId.value
+
+  if (
+    stageId === null
+    || busyStageId.value
+      !== null
+  ) {
     return
   }
 
-  busyStageId.value =
-    stageId
+  event.preventDefault()
+  event.stopPropagation()
+
+  const originalIds =
+    stageOrderBeforeDrag.value
+      ? [...stageOrderBeforeDrag.value]
+      : stages.value.map(
+          stage => stage.id,
+        )
+
+  const orderedIds =
+    stages.value.map(
+      stage => stage.id,
+    )
+
+  if (
+    originalIds.length
+      === orderedIds.length
+    && originalIds.every(
+      (id, index) =>
+        id === orderedIds[index],
+    )
+  ) {
+    stageOrderBeforeDrag.value =
+      null
+
+    draggedStageId.value = null
+    dragOverStageOrderId.value =
+      null
+
+    return
+  }
+
+  stageDropInFlight.value = true
+  busyStageId.value = stageId
+
+  draggedStageId.value = null
+  dragOverStageOrderId.value = null
 
   error.value = ''
 
@@ -758,14 +945,18 @@ async function dropStage(
         orderedIds,
       )
   } catch (exception) {
+    restoreStageOrder(originalIds)
+
     error.value =
       exception instanceof Error
         ? exception.message
         : 'Impossible de déplacer la colonne.'
   } finally {
     busyStageId.value = null
-    endStageDrag()
+    stageOrderBeforeDrag.value = null
+    stageDropInFlight.value = false
   }
+
 }
 
 async function toggleTask(
@@ -1301,14 +1492,14 @@ onMounted(
               dragOverStageOrderId
                 === stage.id,
           }"
-          @dragover.prevent="
+          @dragover="
             markStageDropTarget(
               stage.id,
+              $event,
             )
           "
-          @drop.prevent="
+          @drop="
             dropStage(
-              stage,
               $event,
             )
           "
@@ -1335,85 +1526,128 @@ onMounted(
               </small>
             </div>
 
-            <div
-              v-if="canManageWorkflow"
-              class="workflow-actions"
-            >
+            <div class="workflow-actions">
               <button
+                v-if="
+                  !isCompletedStage(stage)
+                "
                 type="button"
-                class="project-column-drag-handle"
-                draggable="true"
-                title="Glisser pour déplacer la colonne"
-                aria-label="Déplacer la colonne par glisser-déposer"
+                class="project-column-add"
+                title="Créer une issue"
+                aria-label="Créer une issue"
                 :disabled="
-                  busyStageId !== null
-                "
-                @dragstart="
-                  startStageDrag(
-                    stage,
-                    $event,
-                  )
-                "
-                @dragend="
-                  endStageDrag
-                "
-              >
-                ⋮⋮
-              </button>
-              <button
-                type="button"
-                title="Déplacer à gauche"
-                :disabled="
-                  stageIndex === 0
-                  || busyStageId !== null
+                  creatingTaskStageId
+                    !== null
                 "
                 @click="
-                  moveStage(stage, -1)
+                  createTask(stage)
                 "
               >
-                ←
+                <AppIcon
+                  name="plus"
+                  :size="14"
+                />
               </button>
 
-              <button
-                type="button"
-                title="Déplacer à droite"
-                :disabled="
-                  stageIndex
-                    === stages.length - 1
-                  || busyStageId !== null
-                "
-                @click="
-                  moveStage(stage, 1)
-                "
+              <template
+                v-if="canManageWorkflow"
               >
-                →
-              </button>
+                <button
+                  type="button"
+                  class="project-column-drag-handle"
+                  draggable="true"
+                  title="Glisser pour déplacer la colonne"
+                  aria-label="Déplacer la colonne par glisser-déposer"
+                  :disabled="
+                    busyStageId !== null
+                  "
+                  @dragstart="
+                    startStageDrag(
+                      stage,
+                      $event,
+                    )
+                  "
+                  @dragend="
+                    endStageDrag
+                  "
+                >
+                  <AppIcon
+                    name="grip"
+                    :size="14"
+                  />
+                </button>
 
-              <button
-                type="button"
-                title="Renommer"
-                :disabled="
-                  busyStageId !== null
-                "
-                @click="
-                  renameStage(stage)
-                "
-              >
-                ✎
-              </button>
+                <button
+                  type="button"
+                  title="Déplacer à gauche"
+                  aria-label="Déplacer la colonne à gauche"
+                  :disabled="
+                    stageIndex === 0
+                    || busyStageId !== null
+                  "
+                  @click="
+                    moveStage(stage, -1)
+                  "
+                >
+                  <AppIcon
+                    name="arrow-left"
+                    :size="13"
+                  />
+                </button>
 
-              <button
-                type="button"
-                title="Supprimer"
-                :disabled="
-                  busyStageId !== null
-                "
-                @click="
-                  deleteStage(stage)
-                "
-              >
-                ×
-              </button>
+                <button
+                  type="button"
+                  title="Déplacer à droite"
+                  aria-label="Déplacer la colonne à droite"
+                  :disabled="
+                    stageIndex
+                      === stages.length - 1
+                    || busyStageId !== null
+                  "
+                  @click="
+                    moveStage(stage, 1)
+                  "
+                >
+                  <AppIcon
+                    name="arrow-right"
+                    :size="13"
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  title="Renommer"
+                  aria-label="Renommer la colonne"
+                  :disabled="
+                    busyStageId !== null
+                  "
+                  @click="
+                    renameStage(stage)
+                  "
+                >
+                  <AppIcon
+                    name="edit"
+                    :size="13"
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  title="Supprimer"
+                  aria-label="Supprimer la colonne"
+                  :disabled="
+                    busyStageId !== null
+                  "
+                  @click="
+                    deleteStage(stage)
+                  "
+                >
+                  <AppIcon
+                    name="trash"
+                    :size="13"
+                  />
+                </button>
+              </template>
             </div>
           </header>
 
@@ -1426,16 +1660,18 @@ onMounted(
                 && dragOverTaskId
                   === null,
             }"
-            @dragover.self.prevent="
+            @dragover="
               markTaskDropTarget(
                 stage.id,
                 null,
+                $event,
               )
             "
-            @drop.self.prevent="
+            @drop="
               dropTask(
                 stage,
                 null,
+                $event,
               )
             "
           >
@@ -1472,16 +1708,18 @@ onMounted(
               @dragend="
                 endTaskDrag
               "
-              @dragover.prevent="
+              @dragover="
                 markTaskDropTarget(
                   stage.id,
                   task.id,
+                  $event,
                 )
               "
-              @drop.prevent="
+              @drop="
                 dropTask(
                   stage,
                   task,
+                  $event,
                 )
               "
             >
@@ -1501,11 +1739,14 @@ onMounted(
                     toggleTask(task)
                   "
                 >
-                  {{
-                    task.isCompleted
-                      ? '✓'
-                      : '○'
-                  }}
+                  <AppIcon
+                    :name="
+                      task.isCompleted
+                        ? 'check'
+                        : 'circle'
+                    "
+                    :size="12"
+                  />
                 </button>
 
                 <span class="project-task-number">
@@ -1596,55 +1837,19 @@ onMounted(
                   @click="
                     deleteTask(task)
                   "
+                  title="Supprimer l’issue"
+                  aria-label="Supprimer l’issue"
                 >
-                  Supprimer
+                  <AppIcon
+                    name="trash"
+                    :size="13"
+                  />
                 </button>
               </div>
             </article>
           </div>
 
-          <form
-            class="project-task-create"
-            @submit.prevent="
-              createTask(stage)
-            "
-          >
-            <input
-              v-model="
-                taskContents[
-                  stage.id
-                ]
-              "
-              maxlength="255"
-              placeholder="Titre de l’issue"
-            />
 
-            <textarea
-              v-model="
-                taskDescriptions[
-                  stage.id
-                ]
-              "
-              maxlength="20000"
-              rows="3"
-              placeholder="Description Markdown facultative…"
-            />
-
-            <button
-              class="ui-button ui-button--secondary"
-              :disabled="
-                creatingTaskStageId
-                  !== null
-                || !(
-                  taskContents[
-                    stage.id
-                  ] ?? ''
-                ).trim()
-              "
-            >
-              Ajouter
-            </button>
-          </form>
         </section>
       </div>
     </template>
@@ -1792,11 +1997,24 @@ onMounted(
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns:
-    minmax(280px, 320px);
-  gap: 1rem;
+    minmax(260px, 88vw);
+  gap: .85rem;
+
+  min-height: 64dvh;
+
   overflow-x: auto;
-  align-items: start;
-  padding-bottom: 0.75rem;
+  overscroll-behavior-inline:
+    contain;
+
+  align-items: stretch;
+
+  padding:
+    .25rem
+    .1rem
+    .75rem;
+
+  scroll-snap-type:
+    x proximity;
 }
 
 .project-column--dragging {
@@ -1826,14 +2044,30 @@ onMounted(
 }
 
 .project-column {
+  min-height: 64dvh;
+
   display: grid;
+  grid-template-rows:
+    auto
+    minmax(0, 1fr);
+  align-self: stretch;
   gap: 0.75rem;
+
   padding: 0.85rem;
+
   border: 1px solid
     var(--border-color, #dadce0);
   border-radius: 14px;
+
   background:
     var(--surface, #fff);
+
+  scroll-snap-align: start;
+
+  transition:
+    border-color 140ms ease,
+    opacity 140ms ease,
+    transform 140ms ease;
 }
 
 .project-column-header {
@@ -1857,11 +2091,25 @@ onMounted(
 .workflow-actions button,
 .project-task-actions button,
 .project-task-check {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0 .4rem;
+
+  display: inline-grid;
+  place-items: center;
+
   border: 1px solid
     var(--border-color, #dadce0);
   border-radius: 7px;
+
   background: transparent;
+  color: inherit;
+
   cursor: pointer;
+}
+
+.project-column-add {
+  color: var(--g-blue-strong);
 }
 
 .workflow-actions button:disabled,
@@ -1872,17 +2120,39 @@ onMounted(
 }
 
 .project-task-list {
+  min-height: 7rem;
+  min-width: 0;
+
+  overflow-y: auto;
+
   display: grid;
+  align-content: start;
   gap: 0.65rem;
+
+  padding:
+    2px
+    3px
+    1rem;
 }
 
 .project-task-card {
   display: grid;
   gap: 0.65rem;
+
   padding: 0.75rem;
+
   border: 1px solid
     var(--border-color, #dadce0);
   border-radius: 10px;
+
+  background:
+    var(--surface, #fff);
+
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease,
+    transform 120ms ease;
 }
 
 .project-task-card--done {
@@ -1991,21 +2261,6 @@ onMounted(
   font-size: .7rem;
 }
 
-.project-task-create {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.project-task-create textarea {
-  width: 100%;
-  resize: vertical;
-  box-sizing: border-box;
-}
-
-.project-task-create button {
-  justify-self: start;
-}
-
 @media (max-width: 800px) {
   .project-board-header {
     flex-direction: column;
@@ -2035,9 +2290,14 @@ onMounted(
     flex-direction: column;
   }
 
+}
+
+@media (min-width: 801px) {
   .project-board {
     grid-auto-columns:
-      minmax(260px, 85vw);
+      minmax(320px, 360px);
+
+    gap: 1rem;
   }
 }
 </style>
