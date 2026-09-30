@@ -36,16 +36,47 @@ done
 echo "== Backup database =="
 mkdir -p backups
 
-backup_file="backups/homeen-$(date +%Y%m%d-%H%M%S).sql.gz"
+backup_base="backups/homeen-$(date +%Y%m%d-%H%M%S)"
+backup_sql="${backup_base}.sql.tmp"
+backup_file="${backup_base}.sql.gz"
 
-compose exec -T database \
+if ! compose exec -T database \
     sh -lc \
     'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' \
-    | gzip > "$backup_file"
+    > "$backup_sql"
+then
+    rm -f "$backup_sql"
+    echo "Database backup failed during pg_dump." >&2
+    exit 1
+fi
 
-test -s "$backup_file"
+if [ ! -s "$backup_sql" ]; then
+    rm -f "$backup_sql"
+    echo "Database backup is empty." >&2
+    exit 1
+fi
 
-echo "Backup created: $backup_file"
+if ! gzip -c "$backup_sql" > "$backup_file"; then
+    rm -f "$backup_sql" "$backup_file"
+    echo "Database backup compression failed." >&2
+    exit 1
+fi
+
+rm -f "$backup_sql"
+
+if ! gzip -t "$backup_file"; then
+    rm -f "$backup_file"
+    echo "Database backup gzip verification failed." >&2
+    exit 1
+fi
+
+if [ ! -s "$backup_file" ]; then
+    rm -f "$backup_file"
+    echo "Compressed database backup is empty." >&2
+    exit 1
+fi
+
+echo "Backup created and verified: $backup_file"
 
 echo "== Run Doctrine migrations =="
 compose run --rm php \
